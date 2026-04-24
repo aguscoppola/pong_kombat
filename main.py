@@ -1,57 +1,109 @@
-import pygame
-import random
-import sys
-import math
+import pygame  # Importamos pygame, nuestra caja de herramientas para el juego.
+import random  # Para las decisiones al azar (como el sorteo de poderes).
+import sys     
+import math    
+import os      # Para manejar carpetas y rutas de archivos
 
-# --- Constants ---
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-FPS = 60
+# --- Constantes Básicas ---
+SCREEN_WIDTH = 800   
+SCREEN_HEIGHT = 600  
+FPS = 60             
 
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
+# ¡Agregamos colores nuevos para los poderes!
+WHITE = (255, 255, 255) 
+BLACK = (0, 0, 0)       
+RED = (255, 50, 50)     # Rojo para la Bola de Fuego
+GREEN = (50, 255, 50)   # Verde para el Escudo Gigante
 
-PADDLE_WIDTH = 15
-PADDLE_HEIGHT = 100
-PADDLE_SPEED = 400 # pixels per second
-PADDLE_OFFSET = 30
+# Constantes de los Poderes (para que el código sea más fácil de leer)
+POWER_NONE = 0       # Sin poder
+POWER_FIREBALL = 1   # Poder de Bola de Fuego
+POWER_SHIELD = 2     # Poder de Paleta Gigante
 
-BALL_SIZE = 15
-BALL_START_SPEED = 300 # pixels per second
-BALL_SPEED_MULTIPLIER = 1.05
-MAX_BOUNCE_ANGLE = math.radians(60) # 60 degrees
+# Cosas de las Paletas
+PADDLE_WIDTH = 15      
+PADDLE_HEIGHT = 100    
+PADDLE_SPEED = 400     
+PADDLE_OFFSET = 30     
 
-MAX_SCORE = 12
+# Cosas de la Pelota
+BALL_SIZE = 15           
+BALL_START_SPEED = 300   
+BALL_SPEED_MULTIPLIER = 1.05 
+MAX_BOUNCE_ANGLE = math.radians(60) 
 
-# --- Game States ---
-STATE_MENU = 0
-STATE_PLAYING = 1
-STATE_GAME_OVER = 2
-STATE_SERVE = 3
+# Reglas del juego
+MAX_SCORE = 12 
+
+# Estados del Juego
+STATE_MENU = 0       
+STATE_PLAYING = 1    
+STATE_GAME_OVER = 2  
+STATE_SERVE = 3      
+
+# --- CLASES ---
 
 class Paddle:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, PADDLE_WIDTH, PADDLE_HEIGHT)
         self.y_float = float(y)
+        
+        # ¡Nuevas variables para la v2.0 Kombat!
+        self.color = WHITE         # La paleta empieza siendo blanca
+        self.hits = 0              # Contador de toques (empieza en 0)
+        self.power_stored = POWER_NONE # Poder guardado listo para usarse
+        self.power_active = POWER_NONE # Poder que se está usando AHORA mismo
+        self.shield_hits_left = 0  # Cuántos golpes le quedan al escudo gigante
+        self.shield_shrink_timer = 0.0 # ¡NUEVO! Tiempo de espera antes de encogerse
+
+    # Función que reinicia la paleta cuando alguien anota un gol
+    def reset(self):
+        self.rect.height = PADDLE_HEIGHT # Vuelve al tamaño normal por las dudas
+        self.color = WHITE               # Vuelve a ser blanca
+        self.hits = 0                    # ¡Los toques vuelven a 0!
+        self.power_stored = POWER_NONE
+        self.power_active = POWER_NONE
+        self.shield_hits_left = 0
+        self.shield_shrink_timer = 0.0
     
+    # Función que activa el poder guardado cuando presionamos 'D' o 'L'
+    def activate_power(self):
+        # Solo lo activamos si teníamos un poder guardado
+        if self.power_stored != POWER_NONE:
+            self.power_active = self.power_stored # El poder pasa de "guardado" a "activo"
+            self.power_stored = POWER_NONE        # Vaciamos la reserva
+            
+            # Si el poder que activamos es el Escudo Gigante...
+            if self.power_active == POWER_SHIELD:
+                self.rect.height = PADDLE_HEIGHT * 2 # ¡La paleta se hace el doble de alta!
+                self.shield_hits_left = 2            # Nos va a durar 2 golpes
+                
+                # Chequeamos que al crecer no se haya salido de la pantalla por abajo
+                if self.rect.bottom > SCREEN_HEIGHT:
+                    self.rect.bottom = SCREEN_HEIGHT
+                    self.y_float = float(self.rect.y)
+            
+            # Si es la Bola de Fuego, no hacemos nada extra aquí. 
+            # El color rojo ya lo tiene y el efecto ocurrirá cuando toque la pelota.
+
     def move(self, direction, dt):
         self.y_float += direction * PADDLE_SPEED * dt
         self.rect.y = int(self.y_float)
         
-        # Clamping
-        if self.rect.top < 0:
-            self.rect.top = 0
+        if self.rect.top < 0: 
+            self.rect.top = 0 
             self.y_float = float(self.rect.y)
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT
+        if self.rect.bottom > SCREEN_HEIGHT: 
+            self.rect.bottom = SCREEN_HEIGHT 
             self.y_float = float(self.rect.y)
 
     def draw(self, surface):
-        pygame.draw.rect(surface, WHITE, self.rect)
+        # Ahora dibujamos la paleta usando su color dinámico (que puede ser blanco, rojo o verde)
+        pygame.draw.rect(surface, self.color, self.rect)
 
 class Ball:
     def __init__(self, x, y):
-        self.start_x = x
+        self.start_x = x 
         self.start_y = y
         self.rect = pygame.Rect(x - BALL_SIZE//2, y - BALL_SIZE//2, BALL_SIZE, BALL_SIZE)
         self.x_float = float(self.rect.x)
@@ -59,14 +111,22 @@ class Ball:
         self.vx = 0.0
         self.vy = 0.0
         self.speed = BALL_START_SPEED
+        
+        # ¡Nuevas variables de la pelota!
+        self.color = WHITE
+        self.is_fireball = False # Nos indica si la pelota está "prendida fuego"
 
     def serve(self, direction_x):
         self.rect.center = (self.start_x, self.start_y)
         self.x_float = float(self.rect.x)
         self.y_float = float(self.rect.y)
-        self.speed = BALL_START_SPEED
+        self.speed = BALL_START_SPEED 
         
-        angle = random.uniform(-math.pi/4, math.pi/4) # Random angle between -45 and 45 degrees
+        # Reiniciamos el estado de la pelota en cada saque
+        self.color = WHITE
+        self.is_fireball = False
+        
+        angle = random.uniform(-math.pi/4, math.pi/4) 
         self.vx = self.speed * math.cos(angle) * direction_x
         self.vy = self.speed * math.sin(angle)
 
@@ -77,14 +137,17 @@ class Ball:
         self.rect.y = int(self.y_float)
 
     def draw(self, surface):
-        pygame.draw.rect(surface, WHITE, self.rect)
+        # Dibujamos la pelota con su color
+        pygame.draw.rect(surface, self.color, self.rect)
 
 class Game:
     def __init__(self):
-        pygame.init()
+        pygame.init() 
+        pygame.mixer.init() # ¡NUEVO! Encendemos el sistema de sonido
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Pong Kombat v1.0")
-        self.clock = pygame.time.Clock()
+        pygame.display.set_caption("Pong Kombat v2.0") # ¡Subimos de versión!
+        
+        self.clock = pygame.time.Clock() 
         self.font = pygame.font.SysFont("Arial", 36, bold=True)
         self.large_font = pygame.font.SysFont("Arial", 72, bold=True)
         
@@ -94,28 +157,44 @@ class Game:
         
         self.score1 = 0
         self.score2 = 0
-        self.state = STATE_MENU
-        self.serve_timer = 0
-        self.serve_direction = 1 # 1 for right, -1 for left
-        self.winner_text = ""
+        
+        self.state = STATE_MENU 
+        self.serve_timer = 0    
+        self.serve_direction = 1 
+        self.winner_text = ""    
+        
+        # Cargamos los archivos de sonido desde la nueva carpeta "sounds"
+        self.hit_sound = pygame.mixer.Sound(os.path.join("sounds", "hit.wav"))
+        self.pop_sound = pygame.mixer.Sound(os.path.join("sounds", "pop.wav"))
+        
+        self.fire_sound = pygame.mixer.Sound(os.path.join("sounds", "fire.wav"))
+        self.fire_sound.set_volume(0.5) # Le bajamos el volumen a la mitad (50%)
+        
+        self.wall_sound_cooldown = 0.0 # Cooldown para evitar el bug del ruido múltiple
 
     def reset_game(self):
         self.score1 = 0
         self.score2 = 0
+        # Volvemos a centrar las paletas y usamos nuestra nueva función reset() para borrar poderes
         self.paddle1.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle1.y_float = float(self.paddle1.rect.y)
+        self.paddle1.reset()
+        
         self.paddle2.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle2.y_float = float(self.paddle2.rect.y)
-        self.state = STATE_SERVE
-        self.serve_timer = 1.0 # 1 second pause
-        self.serve_direction = random.choice([1, -1])
-        self.ball.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        self.paddle2.reset()
+        
+        self.state = STATE_SERVE 
+        self.serve_timer = 1.0 
+        self.serve_direction = random.choice([1, -1]) 
+        self.ball.serve(self.serve_direction)
 
     def handle_input(self, dt):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+            
             if event.type == pygame.KEYDOWN:
                 if self.state == STATE_MENU:
                     if event.key == pygame.K_SPACE:
@@ -123,65 +202,113 @@ class Game:
                 elif self.state == STATE_GAME_OVER:
                     if event.key == pygame.K_SPACE:
                         self.reset_game()
+                
+                # ¡NUEVO! Detección de las teclas D y L para activar poderes
+                elif self.state == STATE_PLAYING:
+                    if event.key == pygame.K_d:
+                        self.paddle1.activate_power()
+                    if event.key == pygame.K_RIGHT:
+                        self.paddle2.activate_power()
 
         keys = pygame.key.get_pressed()
         
         if self.state in [STATE_PLAYING, STATE_SERVE]:
-            # Player 1 (W/S)
             if keys[pygame.K_w]:
-                self.paddle1.move(-1, dt)
+                self.paddle1.move(-1, dt) 
             if keys[pygame.K_s]:
-                self.paddle1.move(1, dt)
+                self.paddle1.move(1, dt)  
             
-            # Player 2 (Up/Down)
             if keys[pygame.K_UP]:
                 self.paddle2.move(-1, dt)
             if keys[pygame.K_DOWN]:
                 self.paddle2.move(1, dt)
 
     def check_collisions(self):
-        # Top/Bottom Wall Collisions
+        # Colisiones con Techo y Piso
         if self.ball.rect.top <= 0:
             self.ball.rect.top = 0
             self.ball.y_float = float(self.ball.rect.y)
-            self.ball.vy = abs(self.ball.vy) # Force down
+            self.ball.vy = abs(self.ball.vy) 
+            if self.wall_sound_cooldown <= 0:
+                self.hit_sound.play() # Sonido al chocar el techo
+                self.wall_sound_cooldown = 0.25 # Reiniciamos el cooldown
         elif self.ball.rect.bottom >= SCREEN_HEIGHT:
             self.ball.rect.bottom = SCREEN_HEIGHT
             self.ball.y_float = float(self.ball.rect.y)
-            self.ball.vy = -abs(self.ball.vy) # Force up
+            self.ball.vy = -abs(self.ball.vy) 
+            if self.wall_sound_cooldown <= 0:
+                self.hit_sound.play() # Sonido al chocar el piso
+                self.wall_sound_cooldown = 0.25 # Reiniciamos el cooldown
 
-        # Left/Right Wall Collisions (Goals)
-        if self.ball.rect.right < 0:
-            self.score2 += 1
-            self.goal_scored(-1) # Serve to player 1
-        elif self.ball.rect.left > SCREEN_WIDTH:
-            self.score1 += 1
-            self.goal_scored(1) # Serve to player 2
+        # Colisiones de Gol
+        if self.ball.rect.right < 0: 
+            self.score2 += 1         
+            self.goal_scored(-1)     
+        elif self.ball.rect.left > SCREEN_WIDTH: 
+            self.score1 += 1         
+            self.goal_scored(1)      
 
-        # Paddle Collisions
+        # Colisiones con las Paletas
         if self.ball.vx < 0 and self.ball.rect.colliderect(self.paddle1.rect):
-            self.handle_paddle_collision(self.paddle1, 1)
+            self.handle_paddle_collision(self.paddle1, 1) 
         elif self.ball.vx > 0 and self.ball.rect.colliderect(self.paddle2.rect):
-            self.handle_paddle_collision(self.paddle2, -1)
+            self.handle_paddle_collision(self.paddle2, -1) 
 
     def handle_paddle_collision(self, paddle, direction_x):
-        # Increase speed
+        # ¡NUEVO! Reproducimos el sonido de burbuja (POP) al tocar la paleta
+        self.pop_sound.play() 
+        
+        # 1. Si la pelota viene como Bola de Fuego (y acaba de chocar mi paleta), se apaga.
+        if self.ball.is_fireball:
+            self.ball.is_fireball = False
+            self.ball.color = WHITE
+            self.ball.speed /= 2 # Le quitamos la velocidad x2
+            self.fire_sound.fadeout(500) # Hacemos que el sonido se desvanezca más rápido (0.5 seg)
+
+        # 2. Aumento de dificultad estándar del Pong Clásico
         self.ball.speed *= BALL_SPEED_MULTIPLIER
         
-        # Calculate dynamic bounce angle
-        # Relative intersect Y from center of paddle
-        relative_intersect_y = (paddle.rect.y + (paddle.rect.height / 2)) - self.ball.rect.centery
-        # Normalize relative intersection from -1 to 1
-        normalized_relative_intersection_y = (relative_intersect_y / (paddle.rect.height / 2))
+        # 3. ¡Sumamos un golpe a la paleta!
+        paddle.hits += 1
         
-        # Calculate bounce angle (negative because standard screen coords have Y pointing down)
+        # ¿Llegó a 7 golpes y NO tiene poderes encima?
+        if paddle.hits >= 7:
+            if paddle.power_stored == POWER_NONE and paddle.power_active == POWER_NONE:
+                # ¡Sorteo de poderes! (random.choice elige uno de la lista al azar)
+                paddle.power_stored = random.choice([POWER_FIREBALL, POWER_SHIELD])
+                
+                # Le cambiamos el color a la paleta para avisarle al jugador
+                if paddle.power_stored == POWER_FIREBALL:
+                    paddle.color = RED
+                elif paddle.power_stored == POWER_SHIELD:
+                    paddle.color = GREEN
+            
+            # Reiniciamos sus toques a 0
+            paddle.hits = 0
+
+        # 4. Revisamos si la paleta tenía un poder ACTIVO listo para reaccionar al golpe
+        if paddle.power_active == POWER_FIREBALL:
+            paddle.power_active = POWER_NONE # Se gastó el poder
+            paddle.color = WHITE             # Paleta vuelve a la normalidad
+            self.ball.is_fireball = True     # ¡Bola se enciende!
+            self.ball.color = RED
+            self.ball.speed *= 2             # ¡Súper velocidad!
+            self.fire_sound.play(-1)         # ¡NUEVO! Reproduce el fuego en bucle infinito (-1)
+            
+        elif paddle.power_active == POWER_SHIELD:
+            paddle.shield_hits_left -= 1     # Gastamos 1 golpe del escudo gigante
+            if paddle.shield_hits_left <= 0: # Si ya se acabaron los golpes...
+                paddle.shield_shrink_timer = 0.1 # Iniciamos el cooldown de 0.1s
+                # (No la encogemos aquí para evitar el bug matemático, se encoge en el update)
+        
+        # 5. Matemáticas de rebote
+        relative_intersect_y = (paddle.rect.y + (paddle.rect.height / 2)) - self.ball.rect.centery
+        normalized_relative_intersection_y = (relative_intersect_y / (paddle.rect.height / 2))
         bounce_angle = normalized_relative_intersection_y * MAX_BOUNCE_ANGLE * -1
         
-        # Apply new velocity based on angle and new speed
         self.ball.vx = self.ball.speed * math.cos(bounce_angle) * direction_x
         self.ball.vy = self.ball.speed * math.sin(bounce_angle)
         
-        # Nudge ball out of paddle to prevent sticking
         if direction_x == 1:
             self.ball.rect.left = paddle.rect.right
         else:
@@ -189,28 +316,47 @@ class Game:
         self.ball.x_float = float(self.ball.rect.x)
 
     def goal_scored(self, serve_direction):
+        # Apagamos el fuego de a poco si alguien hace gol
+        self.fire_sound.fadeout(500)
+        
+        # Cuando hay gol, borramos todos los poderes y toques de las paletas. ¡Empiezan limpios!
+        self.paddle1.reset()
+        self.paddle2.reset()
+        
         if self.score1 >= MAX_SCORE:
-            self.winner_text = "Player 1 Wins!"
-            self.state = STATE_GAME_OVER
+            self.winner_text = "¡Jugador 1 Gana!"
+            self.state = STATE_GAME_OVER 
         elif self.score2 >= MAX_SCORE:
-            self.winner_text = "Player 2 Wins!"
-            self.state = STATE_GAME_OVER
+            self.winner_text = "¡Jugador 2 Gana!"
+            self.state = STATE_GAME_OVER 
         else:
             self.state = STATE_SERVE
-            self.serve_timer = 1.0
+            self.serve_timer = 1.0 
             self.serve_direction = serve_direction
-            self.ball.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+            self.ball.serve(self.serve_direction)
 
     def update(self, dt):
         if self.state == STATE_SERVE:
-            self.serve_timer -= dt
-            if self.serve_timer <= 0:
-                self.state = STATE_PLAYING
-                self.ball.serve(self.serve_direction)
+            self.serve_timer -= dt 
+            if self.serve_timer <= 0: 
+                self.state = STATE_PLAYING 
                 
         elif self.state == STATE_PLAYING:
-            self.ball.update(dt)
-            self.check_collisions()
+            # Bajamos el reloj del cooldown si es mayor a cero
+            if self.wall_sound_cooldown > 0:
+                self.wall_sound_cooldown -= dt
+                
+            # Revisamos si alguna paleta tiene que encogerse (cooldown de 0.1s)
+            for p in [self.paddle1, self.paddle2]:
+                if p.shield_shrink_timer > 0:
+                    p.shield_shrink_timer -= dt
+                    if p.shield_shrink_timer <= 0:
+                        p.power_active = POWER_NONE 
+                        p.rect.height = PADDLE_HEIGHT # ¡Ahora sí encogemos la paleta!
+                        p.color = WHITE               # Vuelve a ser blanca
+                
+            self.ball.update(dt) 
+            self.check_collisions() 
 
     def draw_dashed_line(self, surface, color, start_pos, end_pos, width=1, dash_length=10):
         x1, y1 = start_pos
@@ -229,7 +375,6 @@ class Game:
             c = round(math.sqrt(a**2 + b**2))
             dx = dl * a / c
             dy = dl * b / c
-
             xcoords = [x for x in range(x1, x2, round(dx) if x1 < x2 else -round(dx))]
             ycoords = [y for y in range(y1, y2, round(dy) if y1 < y2 else -round(dy))]
 
@@ -241,27 +386,24 @@ class Game:
             pygame.draw.line(surface, color, start, end, width)
 
     def draw(self):
-        self.screen.fill(BLACK)
+        self.screen.fill(BLACK) 
         
-        # Draw Net
         self.draw_dashed_line(self.screen, WHITE, (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), width=2, dash_length=15)
         
-        # Draw Score
         score_text = self.font.render(f"{self.score1}    {self.score2}", True, WHITE)
         score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 40))
-        self.screen.blit(score_text, score_rect)
+        self.screen.blit(score_text, score_rect) 
         
-        # Draw Entities
         self.paddle1.draw(self.screen)
         self.paddle2.draw(self.screen)
+        
         if self.state in [STATE_PLAYING, STATE_SERVE]:
             self.ball.draw(self.screen)
             
-        # UI overlays
         if self.state == STATE_MENU:
-            title_text = self.large_font.render("PONG KOMBAT", True, WHITE)
+            title_text = self.large_font.render("PONG KOMBAT v2.0", True, WHITE)
             title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
-            start_text = self.font.render("Press SPACE to Start", True, WHITE)
+            start_text = self.font.render("Presiona ESPACIO para Empezar", True, WHITE)
             start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
             self.screen.blit(title_text, title_rect)
             self.screen.blit(start_text, start_rect)
@@ -269,20 +411,20 @@ class Game:
         elif self.state == STATE_GAME_OVER:
             win_text = self.large_font.render(self.winner_text, True, WHITE)
             win_rect = win_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
-            restart_text = self.font.render("Press SPACE to Restart", True, WHITE)
+            restart_text = self.font.render("Presiona ESPACIO para Reiniciar", True, WHITE)
             restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
             self.screen.blit(win_text, win_rect)
             self.screen.blit(restart_text, restart_rect)
 
-        pygame.display.flip()
+        pygame.display.flip() 
 
     def run(self):
-        while True:
-            dt = self.clock.tick(FPS) / 1000.0 # Delta time in seconds
-            self.handle_input(dt)
-            self.update(dt)
-            self.draw()
+        while True: 
+            dt = self.clock.tick(FPS) / 1000.0 
+            self.handle_input(dt) 
+            self.update(dt)       
+            self.draw()           
 
 if __name__ == "__main__":
-    game = Game()
-    game.run()
+    game = Game() 
+    game.run()    

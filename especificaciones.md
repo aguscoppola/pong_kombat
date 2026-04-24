@@ -58,5 +58,25 @@ El juego debe manejar al menos tres estados (`MENU`, `PLAYING`, `GAME_OVER`).
 ---
 
 ## Roadmap v2.0+ 
-# Mecánicas Nuevas (Kombat)
-*(Por definir. Espacio reservado para especificaciones futuras de power-ups, físicas no lineales, barras de salud o mecánicas de combate).*
+### Mecánicas Nuevas: Modo Kombat (Poderes Especiales)
+
+Se introducirá un sistema de poderes especiales para darle un giro dinámico y táctico al juego clásico.
+
+**1. Sistema de Carga (Meter):**
+* **Contador de Golpes:** Cada vez que un jugador golpea la pelota con su paleta, se suma 1 toque a su contador personal.
+* **Reinicio de Contador:** Cada vez que un jugador anota un punto (hay un gol), los contadores de *ambos* jugadores se reinician automáticamente a 0.
+* **Obtención de Poder:** Al acumular **7 toques** en una misma ronda, el jugador recibe un poder especial de forma aleatoria (suerte).
+
+**2. Indicadores Visuales:**
+Para que el jugador sepa qué poder le tocó, su paleta cambiará de color al llegar a los 7 toques:
+*   **Paleta Roja:** Indica que obtuvo el Poder 1 (Bola Rápida).
+*   **Paleta Verde:** Indica que obtuvo el Poder 2 (Paleta Gigante).
+
+**3. Teclas de Activación:**
+El jugador puede decidir en qué momento exacto usar su poder guardado presionando una tecla:
+*   **Jugador 1:** Tecla `D`
+*   **Jugador 2:** Tecla `Flecha Derecha`
+
+**4. Lista de Poderes Especiales:**
+1.  **Bola Roja (Ofensivo):** Al activar este poder (paleta roja), el próximo impacto convertirá la pelota en color rojo y esta saldrá disparada al **doble de velocidad (x2)**. La pelota mantendrá esta súper-velocidad hasta que el oponente logre golpearla. Luego de usarlo, la paleta vuelve a ser blanca.
+2.  **Escudo Gigante (Defensivo):** Al activar este poder (paleta verde), la paleta mutará y se volverá el **doble de grande (x2 de altura)**, haciendo muy fácil atajar la pelota. Esta ventaja durará exactamente **2 golpes**. Después del segundo golpe a la pelota, la paleta recuperará su tamaño normal y color blanco puro.
