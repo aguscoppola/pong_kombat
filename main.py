@@ -19,6 +19,7 @@ GREEN = (50, 255, 50)   # Verde para el Escudo Gigante
 POWER_NONE = 0       # Sin poder
 POWER_FIREBALL = 1   # Poder de Bola de Fuego
 POWER_SHIELD = 2     # Poder de Paleta Gigante
+POWER_SPEED = 3      # ¡NUEVO! Poder Velocista (Amarillo)
 
 # Cosas de las Paletas
 PADDLE_WIDTH = 15      
@@ -29,11 +30,11 @@ PADDLE_OFFSET = 30
 # Cosas de la Pelota
 BALL_SIZE = 15           
 BALL_START_SPEED = 300   
-BALL_SPEED_MULTIPLIER = 1.05 
+BALL_SPEED_MULTIPLIER = 1.025 # Reducido para permitir rondas más largas (acumular poderes)
 MAX_BOUNCE_ANGLE = math.radians(60) 
 
 # Reglas del juego
-MAX_SCORE = 12 
+MAX_SCORE = 6 # Partidas más cortas e intensas 
 
 # Estados del Juego
 STATE_MENU = 0       
@@ -55,6 +56,8 @@ class Paddle:
         self.power_active = POWER_NONE # Poder que se está usando AHORA mismo
         self.shield_hits_left = 0  # Cuántos golpes le quedan al escudo gigante
         self.shield_shrink_timer = 0.0 # ¡NUEVO! Tiempo de espera antes de encogerse
+        self.speed_multiplier = 1.0    # Acumulable: 1.0 (Normal), 1.5 (+50%), 2.0 (+100%)
+        self.yellow_power_hits = 0     # Contador de golpes sin activar para el "Reroll"
 
     # Función que reinicia la paleta cuando alguien anota un gol
     def reset(self):
@@ -65,6 +68,8 @@ class Paddle:
         self.power_active = POWER_NONE
         self.shield_hits_left = 0
         self.shield_shrink_timer = 0.0
+        self.speed_multiplier = 1.0
+        self.yellow_power_hits = 0
     
     # Función que activa el poder guardado cuando presionamos 'D' o 'L'
     def activate_power(self):
@@ -82,12 +87,17 @@ class Paddle:
                 if self.rect.bottom > SCREEN_HEIGHT:
                     self.rect.bottom = SCREEN_HEIGHT
                     self.y_float = float(self.rect.y)
+                    
+            elif self.power_active == POWER_SPEED:
+                self.speed_multiplier += 0.5 # Aumenta un 50% extra su velocidad
+                self.color = WHITE # La paleta vuelve a ser blanca
+                self.power_active = POWER_NONE # Se limpia porque ya aplicamos la mejora infinita
             
             # Si es la Bola de Fuego, no hacemos nada extra aquí. 
             # El color rojo ya lo tiene y el efecto ocurrirá cuando toque la pelota.
 
     def move(self, direction, dt):
-        self.y_float += direction * PADDLE_SPEED * dt
+        self.y_float += direction * (PADDLE_SPEED * self.speed_multiplier) * dt
         self.rect.y = int(self.y_float)
         
         if self.rect.top < 0: 
@@ -130,9 +140,10 @@ class Ball:
         self.vx = self.speed * math.cos(angle) * direction_x
         self.vy = self.speed * math.sin(angle)
 
-    def update(self, dt):
-        self.x_float += self.vx * dt
-        self.y_float += self.vy * dt
+    def update(self, dt, speed_multiplier=1.0):
+        # Multiplicamos por speed_multiplier para hacer cámara lenta sin romper las físicas
+        self.x_float += self.vx * speed_multiplier * dt
+        self.y_float += self.vy * speed_multiplier * dt
         self.rect.x = int(self.x_float)
         self.rect.y = int(self.y_float)
 
@@ -163,9 +174,23 @@ class Game:
         self.serve_direction = 1 
         self.winner_text = ""    
         
+        # ¡NUEVO! Variables para el Reloj de Arena
+        self.global_hits = 0        # Toques totales en la ronda
+        self.hourglass_rect = None  # Si hay un reloj, guardamos su posición aquí
+        self.hourglass_type = 0     # 1 = Reloj Azul, 2 = Reloj Rojo
+        self.zone_type = 0          # 1 = Zona Azul (Lenta), 2 = Zona Roja (Rápida)
+        self.slow_zone_owner = 0    # 0 = Nadie, 1 = Zona Izquierda, 2 = Zona Derecha
+        self.last_hitter = 0        # 1 o 2, dependiendo quién golpeó último
+        
         # Cargamos los archivos de sonido desde la nueva carpeta "sounds"
         self.hit_sound = pygame.mixer.Sound(os.path.join("sounds", "hit.wav"))
         self.pop_sound = pygame.mixer.Sound(os.path.join("sounds", "pop.wav"))
+        
+        self.item_sound = pygame.mixer.Sound(os.path.join("sounds", "item_get.wav")) # Sonido Turututuu
+        self.item_sound.set_volume(0.5) # Le bajamos el volumen a la mitad para que no aturda
+        
+        self.error_sound = pygame.mixer.Sound(os.path.join("sounds", "error.wav")) # Sonido de Acceso Denegado
+        self.error_sound.set_volume(0.5)
         
         self.fire_sound = pygame.mixer.Sound(os.path.join("sounds", "fire.wav"))
         self.fire_sound.set_volume(0.5) # Le bajamos el volumen a la mitad (50%)
@@ -175,6 +200,15 @@ class Game:
     def reset_game(self):
         self.score1 = 0
         self.score2 = 0
+        
+        # Reiniciamos las variables de la zona temporal
+        self.global_hits = 0
+        self.hourglass_rect = None
+        self.hourglass_type = 0
+        self.zone_type = 0
+        self.slow_zone_owner = 0
+        self.last_hitter = 0
+        
         # Volvemos a centrar las paletas y usamos nuestra nueva función reset() para borrar poderes
         self.paddle1.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle1.y_float = float(self.paddle1.rect.y)
@@ -240,6 +274,18 @@ class Game:
                 self.hit_sound.play() # Sonido al chocar el piso
                 self.wall_sound_cooldown = 0.25 # Reiniciamos el cooldown
 
+        # Colisión con el Reloj de Arena (Si existe)
+        if self.hourglass_rect and self.ball.rect.colliderect(self.hourglass_rect):
+            if self.hourglass_type == 1:
+                self.item_sound.play() # Suena la fanfarria de victoria
+            else:
+                self.error_sound.play() # Suena el error grave
+                
+            self.zone_type = self.hourglass_type # Copiamos el tipo de reloj a la zona
+            self.hourglass_rect = None # Desaparece el reloj
+            if self.last_hitter != 0:
+                self.slow_zone_owner = self.last_hitter # Activamos la zona (Azul o Roja)
+
         # Colisiones de Gol
         if self.ball.rect.right < 0: 
             self.score2 += 1         
@@ -258,6 +304,22 @@ class Game:
         # ¡NUEVO! Reproducimos el sonido de burbuja (POP) al tocar la paleta
         self.pop_sound.play() 
         
+        # Guardamos quién le pegó y sumamos un toque global
+        self.last_hitter = 1 if paddle == self.paddle1 else 2
+        self.global_hits += 1
+        
+        # ¡NUEVO! Aparición Constante: A los 10 toques, y luego cada 5 toques (15, 20, 25...)
+        if self.global_hits >= 10 and self.global_hits % 5 == 0:
+            # Si no había reloj, lo creamos
+            if self.hourglass_rect is None:
+                self.hourglass_rect = pygame.Rect(SCREEN_WIDTH//2 - 15, SCREEN_HEIGHT//2 - 20, 30, 40)
+            
+            # Siempre que se cumpla esta condición, sorteamos el color de nuevo (Reroll o Nuevo Reloj)
+            if random.random() < 0.75:
+                self.hourglass_type = 1 # Azul
+            else:
+                self.hourglass_type = 2 # Rojo
+        
         # 1. Si la pelota viene como Bola de Fuego (y acaba de chocar mi paleta), se apaga.
         if self.ball.is_fireball:
             self.ball.is_fireball = False
@@ -274,14 +336,18 @@ class Game:
         # ¿Llegó a 7 golpes y NO tiene poderes encima?
         if paddle.hits >= 7:
             if paddle.power_stored == POWER_NONE and paddle.power_active == POWER_NONE:
-                # ¡Sorteo de poderes! (random.choice elige uno de la lista al azar)
-                paddle.power_stored = random.choice([POWER_FIREBALL, POWER_SHIELD])
+                paddle.yellow_power_hits = 0 # Reiniciamos el contador por si le toca el amarillo
+                
+                # Sorteamos entre los 3 poderes (33% probabilidad c/u)
+                paddle.power_stored = random.choice([POWER_FIREBALL, POWER_SHIELD, POWER_SPEED])
                 
                 # Le cambiamos el color a la paleta para avisarle al jugador
                 if paddle.power_stored == POWER_FIREBALL:
                     paddle.color = RED
                 elif paddle.power_stored == POWER_SHIELD:
                     paddle.color = GREEN
+                elif paddle.power_stored == POWER_SPEED:
+                    paddle.color = (255, 255, 0) # Amarillo Velocista
             
             # Reiniciamos sus toques a 0
             paddle.hits = 0
@@ -300,6 +366,19 @@ class Game:
             if paddle.shield_hits_left <= 0: # Si ya se acabaron los golpes...
                 paddle.shield_shrink_timer = 0.1 # Iniciamos el cooldown de 0.1s
                 # (No la encogemos aquí para evitar el bug matemático, se encoge en el update)
+
+        # ¡NUEVO! Mecánica de Reroll del poder amarillo
+        if paddle.power_stored == POWER_SPEED:
+            paddle.yellow_power_hits += 1
+            if paddle.yellow_power_hits >= 2: # Si golpeó 2 veces sin activarlo...
+                # Se transforma al azar en Rojo o Verde
+                if random.random() < 0.5:
+                    paddle.power_stored = POWER_FIRE
+                    paddle.color = (255, 50, 50)
+                else:
+                    paddle.power_stored = POWER_SHIELD
+                    paddle.color = (50, 255, 50)
+                paddle.yellow_power_hits = 0 # Reiniciamos el contador por si acaso
         
         # 5. Matemáticas de rebote
         relative_intersect_y = (paddle.rect.y + (paddle.rect.height / 2)) - self.ball.rect.centery
@@ -318,6 +397,14 @@ class Game:
     def goal_scored(self, serve_direction):
         # Apagamos el fuego de a poco si alguien hace gol
         self.fire_sound.fadeout(500)
+        
+        # Reiniciamos las mecánicas globales
+        self.global_hits = 0
+        self.hourglass_rect = None
+        self.hourglass_type = 0
+        self.zone_type = 0
+        self.slow_zone_owner = 0
+        self.last_hitter = 0
         
         # Cuando hay gol, borramos todos los poderes y toques de las paletas. ¡Empiezan limpios!
         self.paddle1.reset()
@@ -355,7 +442,20 @@ class Game:
                         p.rect.height = PADDLE_HEIGHT # ¡Ahora sí encogemos la paleta!
                         p.color = WHITE               # Vuelve a ser blanca
                 
-            self.ball.update(dt) 
+            # Calculamos si la pelota está adentro de una Zona Alterada
+            zone_multiplier = 1.0
+            
+            in_player1_side = (self.ball.rect.centerx < SCREEN_WIDTH // 2)
+            in_player2_side = (self.ball.rect.centerx > SCREEN_WIDTH // 2)
+            
+            # Si la pelota está cruzando por la zona de quien la activó...
+            if (self.slow_zone_owner == 1 and in_player1_side) or (self.slow_zone_owner == 2 and in_player2_side):
+                if self.zone_type == 1:
+                    zone_multiplier = 0.5  # Zona Azul: 50% de velocidad (Más lento, te ayuda)
+                elif self.zone_type == 2:
+                    zone_multiplier = 1.25 # Zona Roja: 25% MÁS velocidad (Más rápido, te perjudica)
+                
+            self.ball.update(dt, zone_multiplier) 
             self.check_collisions() 
 
     def draw_dashed_line(self, surface, color, start_pos, end_pos, width=1, dash_length=10):
@@ -388,7 +488,48 @@ class Game:
     def draw(self):
         self.screen.fill(BLACK) 
         
+        # Dibujamos la Zona Alterada si alguien la activó
+        if self.slow_zone_owner != 0:
+            color_zona = (0, 0, 80) if self.zone_type == 1 else (80, 0, 0) # Azul o Rojo oscuro
+            
+            if self.slow_zone_owner == 1:
+                pygame.draw.rect(self.screen, color_zona, (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+            elif self.slow_zone_owner == 2:
+                pygame.draw.rect(self.screen, color_zona, (SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+            
         self.draw_dashed_line(self.screen, WHITE, (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), width=2, dash_length=15)
+        
+        # Dibujamos el Reloj de Arena en el centro si corresponde (ESTILO PIXEL ART)
+        if self.hourglass_rect:
+            # Matriz de 9x7 (1 = pintar píxel, 0 = vacío)
+            pixel_art = [
+                [1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,1],
+                [0,1,1,1,1,1,0],
+                [0,0,1,1,1,0,0],
+                [0,0,0,1,0,0,0],
+                [0,0,1,0,1,0,0],
+                [0,1,1,1,1,1,0],
+                [1,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1],
+            ]
+            
+            pixel_size = 4 # Tamaño de cada "cuadradito" en pantalla
+            
+            # Decidimos el color dependiendo de si es el Bueno (Azul) o el Malo (Rojo)
+            color_reloj = (50, 150, 255) if self.hourglass_type == 1 else (255, 50, 50)
+            
+            # Calculamos dónde empezar a dibujar para que quede bien centrado
+            start_x = self.hourglass_rect.centerx - (len(pixel_art[0]) * pixel_size) // 2
+            start_y = self.hourglass_rect.centery - (len(pixel_art) * pixel_size) // 2
+            
+            # Recorremos el dibujo cuadrito por cuadrito
+            for fila in range(len(pixel_art)):
+                for col in range(len(pixel_art[fila])):
+                    if pixel_art[fila][col] == 1:
+                        px = start_x + (col * pixel_size)
+                        py = start_y + (fila * pixel_size)
+                        pygame.draw.rect(self.screen, color_reloj, (px, py, pixel_size, pixel_size))
         
         score_text = self.font.render(f"{self.score1}    {self.score2}", True, WHITE)
         score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 40))
@@ -401,7 +542,7 @@ class Game:
             self.ball.draw(self.screen)
             
         if self.state == STATE_MENU:
-            title_text = self.large_font.render("PONG KOMBAT v2.0", True, WHITE)
+            title_text = self.large_font.render("PONG KOMBAT v2.5", True, WHITE)
             title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
             start_text = self.font.render("Presiona ESPACIO para Empezar", True, WHITE)
             start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))

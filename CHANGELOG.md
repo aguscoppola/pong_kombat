@@ -2,6 +2,21 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [2.5.0] - 2026-04-24
+### Agregado (Nuevas cosas)
+- Nuevo Poder de Paleta: "Velocista" (Color Amarillo). Aumenta la velocidad de movimiento de la paleta un 50%.
+- Sistema de Poder Acumulativo: El poder amarillo no tiene límite de tiempo y se puede apilar (hasta +100% de velocidad o más) si logras sacarlo dos veces en la misma ronda sin que te anoten un gol.
+- Nueva Mecánica de "Reroll": Si obtienes el poder Amarillo pero decides no activarlo, tras golpear la pelota 2 veces, se transformará aleatoriamente en el Rojo o en el Verde.
+- Nuevo Ítem de Campo: El "Reloj de Arena". Aparece en el centro del campo a los 10 toques globales, y luego reaparece/re-sortea cada 5 toques (15, 20, 25...).
+- Zona de Cámara Lenta (Reloj Azul): 75% de probabilidad de aparición. Al tocarlo, el dueño de la zona verá la velocidad de la pelota reducida a la mitad (50%) en su mitad de la cancha. Acompañado de fanfarria estilo "Zelda".
+- Zona de Maldición (Reloj Rojo): 25% de probabilidad de aparición. Aumenta la velocidad de la pelota un 25% (x1.25) en la mitad de la cancha del jugador afectado. Acompañado de un sonido de "Acceso Denegado".
+- Mecánica de "Robo de Zona" (Tira y Afloja): Como el reloj reaparece cada 5 toques, un jugador en desventaja puede intentar capturar el nuevo reloj para robarle la zona a su oponente.
+
+### Cambiado (Ajustes de Balance)
+- Las rondas ahora son más cortas e intensas: el ganador es el primero en llegar a 6 puntos (antes 12).
+- Se redujo el incremento de velocidad de la pelota por cada toque a un 2.5% (multiplicador de 1.025) para permitir rondas más largas y favorecer la acumulación de poderes y relojes.
+- Se ha actualizado la versión del Menú Principal a "PONG KOMBAT v2.5".
+
 ## [2.0.0] - 2026-04-23
 ### Agregado (Nuevas cosas)
 - ¡Implementación oficial del Modo Kombat! 

@@ -76,7 +76,15 @@ Para que el jugador sepa qué poder le tocó, su paleta cambiará de color al ll
 El jugador puede decidir en qué momento exacto usar su poder guardado presionando una tecla:
 *   **Jugador 1:** Tecla `D`
 *   **Jugador 2:** Tecla `Flecha Derecha`
-
 **4. Lista de Poderes Especiales:**
 1.  **Bola Roja (Ofensivo):** Al activar este poder (paleta roja), el próximo impacto convertirá la pelota en color rojo y esta saldrá disparada al **doble de velocidad (x2)**. La pelota mantendrá esta súper-velocidad hasta que el oponente logre golpearla. Luego de usarlo, la paleta vuelve a ser blanca.
 2.  **Escudo Gigante (Defensivo):** Al activar este poder (paleta verde), la paleta mutará y se volverá el **doble de grande (x2 de altura)**, haciendo muy fácil atajar la pelota. Esta ventaja durará exactamente **2 golpes**. Después del segundo golpe a la pelota, la paleta recuperará su tamaño normal y color blanco puro.
+3.  **Velocista (Pasivo / Acumulable):** Al activar este poder (paleta amarilla), la velocidad de movimiento de la paleta aumentará un **50% extra**. Este poder es infinito hasta que se anote un gol. Además, ¡es acumulable! Si lo consigues dos veces seguidas sin que te anoten un gol, tendrás +100% de velocidad. **Mecánica de Reroll:** Si consigues este poder pero decides NO activarlo, al golpear la pelota 2 veces tu paleta mutará y el poder amarillo se transformará aleatoriamente en el Rojo o en el Verde.
+
+**5. Ítem de Campo: Reloj de Arena (Cámara Lenta vs Maldición)**
+*   **Aparición Continua:** El primer reloj de arena aparece al llegar a **10 golpes globales**. A partir de ahí, **cada 5 toques adicionales** (golpes 15, 20, 25...), aparecerá un nuevo reloj en el centro, incluso si alguien ya había capturado uno antes o si ya había uno en pantalla. Hay un **75% de probabilidad** de que sea Azul (beneficio) y un **25% de probabilidad** de que sea Rojo (maldición).
+*   **Mecánica de Robo (Tira y Afloja):** Al agarrar un nuevo reloj, el beneficio (o maldición) sobreescribe al anterior. Esto permite a un jugador que está en desventaja aguantar hasta el siguiente reloj para **"robar"** la zona azul y pasarla a su propio lado, o pasarle la maldición roja a su oponente. Si el mismo jugador lo vuelve a agarrar, simplemente le deniega la oportunidad al rival.
+*   **Captura:** La pelota debe tocar el reloj para activarlo. El jugador que le haya pegado a la pelota antes del impacto será el dueño de la nueva zona (borrando la anterior).
+*   **Efecto Reloj Azul (Victoria):** La mitad de la pantalla perteneciente al jugador se tiñe de Azul Oscuro. Mientras la pelota viaje dentro de esa zona, su velocidad se reduce a la mitad (50%), dando muchísimo más tiempo para atajarla.
+*   **Efecto Reloj Rojo (Maldición):** La mitad de la pantalla se tiñe de Rojo Oscuro. Mientras la pelota viaja por esa zona, su velocidad **aumenta un 25% (x1.25)**, volviéndose un castigo peligroso para el jugador que lo tocó.
+*   **Reinicio:** La zona alterada (Azul o Roja) y el contador global de toques se reinician automáticamente cuando se anota un gol.
