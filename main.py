@@ -14,12 +14,17 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)       
 RED = (255, 50, 50)     # Rojo para la Bola de Fuego
 GREEN = (50, 255, 50)   # Verde para el Escudo Gigante
+YELLOW = (255, 255, 0)  # Amarillo para Velocista
+ORANGE = (255, 128, 0)  # Naranja para el Espejismo
+PURPLE = (180, 100, 255) # Violeta Claro para el Reloj y su Zona
+VIOLET_ZONE = (100, 0, 150) # Versión para el fondo de la zona
 
 # Constantes de los Poderes (para que el código sea más fácil de leer)
 POWER_NONE = 0       # Sin poder
 POWER_FIREBALL = 1   # Poder de Bola de Fuego
 POWER_SHIELD = 2     # Poder de Paleta Gigante
-POWER_SPEED = 3      # ¡NUEVO! Poder Velocista (Amarillo)
+POWER_SPEED = 3      # Poder Velocista (Amarillo)
+POWER_ORANGE = 4     # ¡NUEVO! Poder Naranja (Espejismo)
 
 # Cosas de las Paletas
 PADDLE_WIDTH = 15      
@@ -33,21 +38,22 @@ BALL_START_SPEED = 300
 BALL_SPEED_MULTIPLIER = 1.025 # Reducido para permitir rondas más largas (acumular poderes)
 MAX_BOUNCE_ANGLE = math.radians(60) 
 
-# Reglas del juego
-MAX_SCORE = 6 # Partidas más cortas e intensas 
-
 # Estados del Juego
-STATE_MENU = 0       
+STATE_MAIN_MENU = 0  
 STATE_PLAYING = 1    
 STATE_GAME_OVER = 2  
 STATE_SERVE = 3      
+STATE_PRESS_TO_START = 4
+STATE_MODIFIERS = 5
 
 # --- CLASES ---
 
 class Paddle:
+    
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, PADDLE_WIDTH, PADDLE_HEIGHT)
         self.y_float = float(y)
+        self.original_x = x        # Guardamos su posición original en X
         
         # ¡Nuevas variables para la v2.0 Kombat!
         self.color = WHITE         # La paleta empieza siendo blanca
@@ -57,19 +63,79 @@ class Paddle:
         self.shield_hits_left = 0  # Cuántos golpes le quedan al escudo gigante
         self.shield_shrink_timer = 0.0 # ¡NUEVO! Tiempo de espera antes de encogerse
         self.speed_multiplier = 1.0    # Acumulable: 1.0 (Normal), 1.5 (+50%), 2.0 (+100%)
-        self.yellow_power_hits = 0     # Contador de golpes sin activar para el "Reroll"
+        self.yellow_power_hits = 0     # Contador de golpes sin activar para el "Reroll" amarillo
+        self.orange_power_hits = 0     # Contador de golpes sin activar para el "Reroll" naranja
+        self.red_power_hits = 0        # Para el All Reroll
+        self.green_power_hits = 0      # Para el All Reroll
+        self.has_extra_life = False    # ¡NUEVO! Barrera amarilla (Crucifijo)
 
     # Función que reinicia la paleta cuando alguien anota un gol
     def reset(self):
         self.rect.height = PADDLE_HEIGHT # Vuelve al tamaño normal por las dudas
+        self.rect.width = PADDLE_WIDTH   # Vuelve al ancho normal
+        self.rect.x = self.original_x    # Vuelve a su posición original
+        
         self.color = WHITE               # Vuelve a ser blanca
         self.hits = 0                    # ¡Los toques vuelven a 0!
         self.power_stored = POWER_NONE
         self.power_active = POWER_NONE
         self.shield_hits_left = 0
         self.shield_shrink_timer = 0.0
-        self.speed_multiplier = 1.0
+        self.speed_multiplier = 1.0      # ¡CORRECCIÓN! Reiniciamos la velocidad
         self.yellow_power_hits = 0
+        self.orange_power_hits = 0
+        self.red_power_hits = 0
+        self.green_power_hits = 0
+        self.has_extra_life = False      # ¡NUEVO! Reiniciamos la vida extra
+        
+        # Nuevas variables del reloj blanco
+        self.white_zone_hits_left = 0
+        self.white_activation_timer = 0.0
+        
+        # Variable del Reloj Amarillo (Vida Extra / Crucifijo)
+        self.has_extra_life = False
+        
+    def grant_random_power(self, game):
+        # Sorteamos entre los 4 poderes
+        # Por defecto: Rojo 30%, Verde 30%, Amarillo 30%, Naranja 10%
+        # Si Equal Powers está activo: 25% cada uno
+        available_powers = [
+            (POWER_FIREBALL, RED, 25 if game.equal_powers_enabled else 30),
+            (POWER_SHIELD, GREEN, 25 if game.equal_powers_enabled else 30),
+            (POWER_SPEED, YELLOW, 25 if game.equal_powers_enabled else 30),
+            (POWER_ORANGE, ORANGE, 25 if game.equal_powers_enabled else 10)
+        ]
+        
+        total_weight = sum(p[2] for p in available_powers)
+        r = random.random() * total_weight
+        acc = 0
+        for p_type, p_color, weight in available_powers:
+            acc += weight
+            if r <= acc:
+                self.power_stored = p_type
+                self.color = p_color
+                break
+
+    def reroll_power(self, game):
+        # El Reroll busca un poder diferente al actual
+        available_powers = [
+            (POWER_FIREBALL, RED, 25 if game.equal_powers_enabled else 30),
+            (POWER_SHIELD, GREEN, 25 if game.equal_powers_enabled else 30),
+            (POWER_SPEED, YELLOW, 25 if game.equal_powers_enabled else 30),
+            (POWER_ORANGE, ORANGE, 25 if game.equal_powers_enabled else 10)
+        ]
+        # Filtramos el actual
+        available_powers = [p for p in available_powers if p[0] != self.power_stored]
+        
+        total_weight = sum(p[2] for p in available_powers)
+        r = random.random() * total_weight
+        acc = 0
+        for p_type, p_color, weight in available_powers:
+            acc += weight
+            if r <= acc:
+                self.power_stored = p_type
+                self.color = p_color
+                break
     
     # Función que activa el poder guardado cuando presionamos 'D' o 'L'
     def activate_power(self):
@@ -81,7 +147,7 @@ class Paddle:
             # Si el poder que activamos es el Escudo Gigante...
             if self.power_active == POWER_SHIELD:
                 self.rect.height = PADDLE_HEIGHT * 2 # ¡La paleta se hace el doble de alta!
-                self.shield_hits_left = 2            # Nos va a durar 2 golpes
+                self.shield_hits_left = 3            # Nos va a durar 3 golpes (balance)
                 
                 # Chequeamos que al crecer no se haya salido de la pantalla por abajo
                 if self.rect.bottom > SCREEN_HEIGHT:
@@ -125,8 +191,13 @@ class Ball:
         # ¡Nuevas variables de la pelota!
         self.color = WHITE
         self.is_fireball = False # Nos indica si la pelota está "prendida fuego"
+        self.is_orange = False   # Nos indica si es la pelota tramposa (Espejismo)
 
     def serve(self, direction_x):
+        # Reiniciamos su tamaño por si acaso era Naranja gigante
+        self.rect.width = BALL_SIZE
+        self.rect.height = BALL_SIZE
+        
         self.rect.center = (self.start_x, self.start_y)
         self.x_float = float(self.rect.x)
         self.y_float = float(self.rect.y)
@@ -135,6 +206,7 @@ class Ball:
         # Reiniciamos el estado de la pelota en cada saque
         self.color = WHITE
         self.is_fireball = False
+        self.is_orange = False
         
         angle = random.uniform(-math.pi/4, math.pi/4) 
         self.vx = self.speed * math.cos(angle) * direction_x
@@ -156,11 +228,13 @@ class Game:
         pygame.init() 
         pygame.mixer.init() # ¡NUEVO! Encendemos el sistema de sonido
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Pong Kombat v2.0") # ¡Subimos de versión!
+        pygame.display.set_caption("Pong Kombat v3.0") # ¡Subimos de versión!
         
         self.clock = pygame.time.Clock() 
         self.font = pygame.font.SysFont("Arial", 36, bold=True)
         self.large_font = pygame.font.SysFont("Arial", 72, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 24, bold=True)
+        self.tiny_font = pygame.font.SysFont("Arial", 16, bold=False)
         
         self.paddle1 = Paddle(PADDLE_OFFSET, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2)
         self.paddle2 = Paddle(SCREEN_WIDTH - PADDLE_OFFSET - PADDLE_WIDTH, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2)
@@ -169,16 +243,107 @@ class Game:
         self.score1 = 0
         self.score2 = 0
         
-        self.state = STATE_MENU 
+        self.state = STATE_MAIN_MENU 
         self.serve_timer = 0    
         self.serve_direction = 1 
         self.winner_text = ""    
         
+        # Botones del Menú Principal
+        button_width = 300
+        button_height = 80
+        spacing = 40
+        start_y = SCREEN_HEIGHT // 2
+        
+        self.btn_play_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, start_y, button_width, button_height)
+        self.btn_modifiers_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, start_y + button_height + spacing, button_width, button_height)
+        
+        # Panel de Modificadores (Más grande: 20 cm)
+        panel_w = 700
+        panel_h = 400
+        self.modifiers_panel_rect = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2, panel_w, panel_h)
+        self.score_btn_rect = pygame.Rect(SCREEN_WIDTH//2 - 40, self.modifiers_panel_rect.y + 100, 80, 50)
+        self.back_btn_rect = pygame.Rect(self.modifiers_panel_rect.right - 90, self.modifiers_panel_rect.y + 10, 80, 40)
+        self.max_score = 6 
+        
+        # Scrollbar
+        self.scroll_y = 0
+        self.max_scroll = 150 # Comienza en 150 porque el menú está colapsado por defecto
+        self.is_dragging_scrollbar = False
+        self.scrollbar_rect = pygame.Rect(self.modifiers_panel_rect.right - 20, self.modifiers_panel_rect.y + 60, 10, self.modifiers_panel_rect.height - 70)
+        self.scrollbar_thumb_height = 50
+        self.scrollbar_thumb_rect = pygame.Rect(self.scrollbar_rect.x, self.scrollbar_rect.y, 10, self.scrollbar_thumb_height)
+        self.scroll_offset_y = 0
+        self.max_score = 6 
+        self.ball_speed_multiplier_options = [1.01, 1.025, 1.05]
+        self.ball_speed_multiplier_idx = 1 # Por defecto 1.025
+        self.ball_speed_btn_rect = pygame.Rect(SCREEN_WIDTH//2 - 40, 0, 80, 50)
+        
+        # Variables de Modificadores
+        self.match_point_enabled = False
+        self.match_point_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, self.modifiers_panel_rect.y + 180, 30, 30) # Checkbox
+        self.match_point_text_rect = pygame.Rect(0, 0, 0, 0) # Se actualizará al dibujar
+        
+        self.reroll_enabled = True
+        self.reroll_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, self.modifiers_panel_rect.y + 260, 30, 30) # Checkbox
+        self.reroll_text_rect = pygame.Rect(0, 0, 0, 0) # Se actualizará al dibujar
+        
+        self.all_reroll_enabled = False
+        self.all_reroll_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, self.modifiers_panel_rect.y + 310, 30, 30) # Checkbox
+        self.all_reroll_text_rect = pygame.Rect(0, 0, 0, 0) # Se actualizará al dibujar
+        
+        self.equal_watches_enabled = False
+        self.equal_watches_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, self.modifiers_panel_rect.y + 360, 30, 30) # Checkbox
+        self.equal_watches_text_rect = pygame.Rect(0, 0, 0, 0) # Se actualizará al dibujar
+        
+        self.equal_powers_enabled = False
+        self.equal_powers_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.equal_powers_text_rect = pygame.Rect(0, 0, 0, 0)
+        
+        # Animación de Match Point
+        self.show_match_point_anim = False
+        self.match_point_anim_timer = 0.0
+        
+        self.watches_kept_enabled = False
+        self.p1_zone_type = 0
+        self.p2_zone_type = 0
+        
+        self.hourglass_spawn_hits_options = [1, 3, 5, 10, 15]
+        self.hourglass_spawn_hits_idx = 3 # Por defecto 10
+        self.hourglass_spawn_hits_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.hourglass_spawn_hits_text_rect = pygame.Rect(0, 0, 0, 0)
+        
+        self.remove_watches_expanded = False
+        self.remove_watches_toggle_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.remove_watches_toggle_text_rect = pygame.Rect(0, 0, 0, 0)
+        
+        # Botones para remover relojes
+        self.remove_blue = False
+        self.remove_red = False
+        self.remove_purple = False
+        self.remove_white = False
+        self.remove_yellow = False
+        
+        self.remove_blue_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.remove_red_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.remove_purple_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.remove_white_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.remove_yellow_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        
+        self.remove_blue_text_rect = pygame.Rect(0, 0, 0, 0)
+        self.remove_red_text_rect = pygame.Rect(0, 0, 0, 0)
+        self.remove_purple_text_rect = pygame.Rect(0, 0, 0, 0)
+        self.remove_white_text_rect = pygame.Rect(0, 0, 0, 0)
+        self.remove_yellow_text_rect = pygame.Rect(0, 0, 0, 0)
+        
+        # Botones de Game Over
+        self.btn_gameover_restart = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 20, 300, 60)
+        self.btn_gameover_menu = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 100, 300, 60)
+        
         # ¡NUEVO! Variables para el Reloj de Arena
         self.global_hits = 0        # Toques totales en la ronda
         self.hourglass_rect = None  # Si hay un reloj, guardamos su posición aquí
-        self.hourglass_type = 0     # 1 = Reloj Azul, 2 = Reloj Rojo
-        self.zone_type = 0          # 1 = Zona Azul (Lenta), 2 = Zona Roja (Rápida)
+        self.hourglass_type = 0     # 1 = Reloj Azul, 2 = Reloj Rojo, 3 = Violeta, 4 = Blanco, 5 = Amarillo
+        self.zone_type = 0          # 1 = Zona Azul (Lenta), 2 = Zona Roja (Rápida), 3 = Violeta, 4 = Blanco
         self.slow_zone_owner = 0    # 0 = Nadie, 1 = Zona Izquierda, 2 = Zona Derecha
         self.last_hitter = 0        # 1 o 2, dependiendo quién golpeó último
         
@@ -194,6 +359,21 @@ class Game:
         
         self.fire_sound = pygame.mixer.Sound(os.path.join("sounds", "fire.wav"))
         self.fire_sound.set_volume(0.5) # Le bajamos el volumen a la mitad (50%)
+        
+        self.uuui_sound = pygame.mixer.Sound(os.path.join("sounds", "uuui.wav"))
+        self.uuui_sound.set_volume(0.8) # Buen volumen para indicar el zoom
+        
+        self.bell_sound = pygame.mixer.Sound(os.path.join("sounds", "campana.wav"))
+        self.bell_sound.set_volume(0.6) # Volumen campana violeta
+        
+        self.divine_sound = pygame.mixer.Sound(os.path.join("sounds", "divino.wav"))
+        self.divine_sound.set_volume(0.8) # Volumen del reloj blanco
+        
+        self.life_sound = pygame.mixer.Sound(os.path.join("sounds", "vida.wav"))
+        self.life_sound.set_volume(0.8) # Volumen de la vida extra
+
+        self.match_point_sound = pygame.mixer.Sound(os.path.join("sounds", "match_point_bell.wav"))
+        self.match_point_sound.set_volume(0.8) # Volumen del TING-TING-TING
         
         self.wall_sound_cooldown = 0.0 # Cooldown para evitar el bug del ruido múltiple
 
@@ -213,10 +393,12 @@ class Game:
         self.paddle1.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle1.y_float = float(self.paddle1.rect.y)
         self.paddle1.reset()
+        self.paddle1.grant_random_power(self) # ¡KOMBAT INICIA AHORA!
         
         self.paddle2.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle2.y_float = float(self.paddle2.rect.y)
         self.paddle2.reset()
+        self.paddle2.grant_random_power(self) # ¡KOMBAT INICIA AHORA!
         
         self.state = STATE_SERVE 
         self.serve_timer = 1.0 
@@ -228,12 +410,104 @@ class Game:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+                
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1: # Click izquierdo
+                    if self.state == STATE_MAIN_MENU:
+                        if self.btn_play_rect.collidepoint(event.pos):
+                            self.hit_sound.play()
+                            self.state = STATE_PRESS_TO_START
+                        elif self.btn_modifiers_rect.collidepoint(event.pos):
+                            self.hit_sound.play()
+                            self.state = STATE_MODIFIERS
+                    elif self.state == STATE_MODIFIERS:
+                        if self.scrollbar_thumb_rect.collidepoint(event.pos):
+                            self.is_dragging_scrollbar = True
+                            self.scroll_offset_y = event.pos[1] - self.scrollbar_thumb_rect.y
+                        elif self.back_btn_rect.collidepoint(event.pos):
+                            self.hit_sound.play()
+                            self.state = STATE_MAIN_MENU
+                            self.scroll_y = 0
+                            self.scrollbar_thumb_rect.y = self.scrollbar_rect.y
+                            self.remove_watches_expanded = False
+                            self.max_scroll = 150
+                        # Validar si el click está dentro de la zona clipeada del panel (evita clicks fuera del scroll)
+                        elif self.modifiers_panel_rect.collidepoint(event.pos) and event.pos[1] > self.back_btn_rect.bottom:
+                            if self.score_btn_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                if self.max_score == 3:
+                                    self.max_score = 6
+                                elif self.max_score == 6:
+                                    self.max_score = 9
+                                else:
+                                    self.max_score = 3
+                            elif self.ball_speed_btn_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.ball_speed_multiplier_idx = (self.ball_speed_multiplier_idx + 1) % len(self.ball_speed_multiplier_options)
+                            elif self.match_point_rect.collidepoint(event.pos) or self.match_point_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.match_point_enabled = not self.match_point_enabled
+                            elif self.reroll_rect.collidepoint(event.pos) or self.reroll_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.reroll_enabled = not self.reroll_enabled
+                            elif self.reroll_enabled and (self.all_reroll_rect.collidepoint(event.pos) or self.all_reroll_text_rect.collidepoint(event.pos)):
+                                self.pop_sound.play()
+                                self.all_reroll_enabled = not self.all_reroll_enabled
+                            elif self.equal_watches_rect.collidepoint(event.pos) or self.equal_watches_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.equal_watches_enabled = not self.equal_watches_enabled
+                            elif self.equal_powers_rect.collidepoint(event.pos) or self.equal_powers_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.equal_powers_enabled = not self.equal_powers_enabled
+                            elif self.watches_kept_rect.collidepoint(event.pos) or self.watches_kept_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.watches_kept_enabled = not self.watches_kept_enabled
+                            elif self.hourglass_spawn_hits_rect.collidepoint(event.pos) or self.hourglass_spawn_hits_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.hourglass_spawn_hits_idx = (self.hourglass_spawn_hits_idx + 1) % len(self.hourglass_spawn_hits_options)
+                            elif self.remove_watches_toggle_rect.collidepoint(event.pos) or self.remove_watches_toggle_text_rect.collidepoint(event.pos):
+                                self.pop_sound.play()
+                                self.remove_watches_expanded = not self.remove_watches_expanded
+                            elif self.remove_watches_expanded:
+                                if self.remove_blue_rect.collidepoint(event.pos) or self.remove_blue_text_rect.collidepoint(event.pos):
+                                    self.pop_sound.play()
+                                    self.remove_blue = not self.remove_blue
+                                elif self.remove_red_rect.collidepoint(event.pos) or self.remove_red_text_rect.collidepoint(event.pos):
+                                    self.pop_sound.play()
+                                    self.remove_red = not self.remove_red
+                                elif self.remove_purple_rect.collidepoint(event.pos) or self.remove_purple_text_rect.collidepoint(event.pos):
+                                    self.pop_sound.play()
+                                    self.remove_purple = not self.remove_purple
+                                elif self.remove_white_rect.collidepoint(event.pos) or self.remove_white_text_rect.collidepoint(event.pos):
+                                    self.pop_sound.play()
+                                    self.remove_white = not self.remove_white
+                                elif self.remove_yellow_rect.collidepoint(event.pos) or self.remove_yellow_text_rect.collidepoint(event.pos):
+                                    self.pop_sound.play()
+                                    self.remove_yellow = not self.remove_yellow
+                    elif self.state == STATE_GAME_OVER:
+                        if self.btn_gameover_restart.collidepoint(event.pos):
+                            self.hit_sound.play()
+                            self.reset_game()
+                        elif self.btn_gameover_menu.collidepoint(event.pos):
+                            self.hit_sound.play()
+                            self.state = STATE_MAIN_MENU
+            
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.is_dragging_scrollbar = False
+                    
+            if event.type == pygame.MOUSEMOTION:
+                if getattr(self, 'state', None) == STATE_MODIFIERS and getattr(self, 'is_dragging_scrollbar', False):
+                    new_y = event.pos[1] - self.scroll_offset_y
+                    new_y = max(self.scrollbar_rect.top, min(new_y, self.scrollbar_rect.bottom - self.scrollbar_thumb_height))
+                    self.scrollbar_thumb_rect.y = new_y
+                    
+                    # Update scroll_y
+                    scroll_fraction = (self.scrollbar_thumb_rect.y - self.scrollbar_rect.top) / (self.scrollbar_rect.height - self.scrollbar_thumb_height)
+                    self.scroll_y = scroll_fraction * self.max_scroll
             
             if event.type == pygame.KEYDOWN:
-                if self.state == STATE_MENU:
-                    if event.key == pygame.K_SPACE:
-                        self.reset_game()
-                elif self.state == STATE_GAME_OVER:
+                if self.state == STATE_PRESS_TO_START:
                     if event.key == pygame.K_SPACE:
                         self.reset_game()
                 
@@ -278,21 +552,100 @@ class Game:
         if self.hourglass_rect and self.ball.rect.colliderect(self.hourglass_rect):
             if self.hourglass_type == 1:
                 self.item_sound.play() # Suena la fanfarria de victoria
-            else:
+            elif self.hourglass_type == 2:
                 self.error_sound.play() # Suena el error grave
+            elif self.hourglass_type == 3:
+                self.bell_sound.play() # Campana misteriosa violeta
+            elif self.hourglass_type == 4:
+                self.divine_sound.play() # Sonido angelical blanco
+            elif self.hourglass_type == 5:
+                self.life_sound.play() # Sonido celestial amarillo (Crucifijo)
                 
-            self.zone_type = self.hourglass_type # Copiamos el tipo de reloj a la zona
-            self.hourglass_rect = None # Desaparece el reloj
-            if self.last_hitter != 0:
-                self.slow_zone_owner = self.last_hitter # Activamos la zona (Azul o Roja)
+            if self.hourglass_type == 5:
+                # El reloj amarillo otorga una vida extra, no es una zona
+                self.global_hits = 0 # Reseteamos toques globales al capturar
+                if self.last_hitter == 1:
+                    self.paddle1.has_extra_life = True
+                elif self.last_hitter == 2:
+                    self.paddle2.has_extra_life = True
+                self.hourglass_rect = None
+            else:
+                h_type = self.hourglass_type
+                self.hourglass_rect = None # Desaparece el reloj
+                self.global_hits = 0 # Reseteamos toques globales al capturar
+                if self.last_hitter != 0:
+                    if self.watches_kept_enabled:
+                        if self.last_hitter == 1:
+                            self.p1_zone_type = h_type
+                        else:
+                            self.p2_zone_type = h_type
+                    else:
+                        self.zone_type = h_type # Copiamos el tipo de reloj a la zona
+                        self.slow_zone_owner = self.last_hitter # Activamos la zona
+                    
+                    # ¡Si agarró el reloj violeta, sus toques actuales se resetean!
+                    if h_type == 3:
+                        if self.last_hitter == 1:
+                            self.paddle1.hits = 0
+                        elif self.last_hitter == 2:
+                            self.paddle2.hits = 0
+                            
+                    # ¡Si agarró el reloj blanco, activamos el timer, reseteamos sus toques y borramos cualquier poder!
+                    if h_type == 4:
+                        if self.last_hitter == 1:
+                            self.paddle1.reset()
+                            self.paddle1.white_activation_timer = 0.05
+                        elif self.last_hitter == 2:
+                            self.paddle2.reset()
+                            self.paddle2.white_activation_timer = 0.05
 
-        # Colisiones de Gol
+        # Colisiones de Gol / Rebote Naranja / Barrera Amarilla
         if self.ball.rect.right < 0: 
-            self.score2 += 1         
-            self.goal_scored(-1)     
+            if self.ball.is_orange:
+                # Primero restauramos su tamaño normal
+                self.ball.rect.width = BALL_SIZE
+                self.ball.rect.height = BALL_SIZE
+                # Luego la colocamos justo pegada al borde izquierdo
+                self.ball.rect.left = 0
+                self.ball.x_float = float(self.ball.rect.x)
+                self.ball.vx *= -1
+                self.ball.speed /= 1.5 # Le quitamos el buff de velocidad
+                self.ball.is_orange = False
+                self.ball.color = WHITE
+                self.hit_sound.play() # Sonido de rebote contra la pared virtual
+            elif self.paddle1.has_extra_life:
+                # ¡La barrera amarilla (Crucifijo) nos salva del gol!
+                self.ball.rect.left = 0
+                self.ball.x_float = float(self.ball.rect.x)
+                self.ball.vx *= -1
+                self.paddle1.has_extra_life = False # Perdemos la vida extra
+                self.hit_sound.play() # Sonido de rebote
+            else:
+                self.score2 += 1         
+                self.goal_scored(-1)     
         elif self.ball.rect.left > SCREEN_WIDTH: 
-            self.score1 += 1         
-            self.goal_scored(1)      
+            if self.ball.is_orange:
+                # Primero restauramos su tamaño normal
+                self.ball.rect.width = BALL_SIZE
+                self.ball.rect.height = BALL_SIZE
+                # Luego la colocamos justo pegada al borde derecho
+                self.ball.rect.right = SCREEN_WIDTH
+                self.ball.x_float = float(self.ball.rect.x)
+                self.ball.vx *= -1
+                self.ball.speed /= 1.5 # Le quitamos el buff de velocidad
+                self.ball.is_orange = False
+                self.ball.color = WHITE
+                self.hit_sound.play() # Sonido de rebote contra la pared virtual
+            elif self.paddle2.has_extra_life:
+                # ¡La barrera amarilla (Crucifijo) nos salva del gol!
+                self.ball.rect.right = SCREEN_WIDTH
+                self.ball.x_float = float(self.ball.rect.x)
+                self.ball.vx *= -1
+                self.paddle2.has_extra_life = False # Perdemos la vida extra
+                self.hit_sound.play() # Sonido de rebote
+            else:
+                self.score1 += 1         
+                self.goal_scored(1)      
 
         # Colisiones con las Paletas
         if self.ball.vx < 0 and self.ball.rect.colliderect(self.paddle1.rect):
@@ -301,6 +654,18 @@ class Game:
             self.handle_paddle_collision(self.paddle2, -1) 
 
     def handle_paddle_collision(self, paddle, direction_x):
+        # Si la pelota era naranja y alguien le pegó... ¡Pierde el punto!
+        if self.ball.is_orange:
+            self.ball.speed /= 1.5 # Le quitamos el buff de velocidad antes de resetear
+            self.pop_sound.play()
+            if paddle == self.paddle1:
+                self.score2 += 1
+                self.goal_scored(-1)
+            else:
+                self.score1 += 1
+                self.goal_scored(1)
+            return # Cortamos la colisión acá porque ya fue punto
+            
         # ¡NUEVO! Reproducimos el sonido de burbuja (POP) al tocar la paleta
         self.pop_sound.play() 
         
@@ -309,16 +674,43 @@ class Game:
         self.global_hits += 1
         
         # ¡NUEVO! Aparición Constante: A los 10 toques, y luego cada 5 toques (15, 20, 25...)
-        if self.global_hits >= 10 and self.global_hits % 5 == 0:
-            # Si no había reloj, lo creamos
-            if self.hourglass_rect is None:
-                self.hourglass_rect = pygame.Rect(SCREEN_WIDTH//2 - 15, SCREEN_HEIGHT//2 - 20, 30, 40)
-            
-            # Siempre que se cumpla esta condición, sorteamos el color de nuevo (Reroll o Nuevo Reloj)
-            if random.random() < 0.75:
-                self.hourglass_type = 1 # Azul
-            else:
-                self.hourglass_type = 2 # Rojo
+        # 2. Spawn / Re-roll del Reloj de Arena
+        # Solo si NO HAY UN MURO BLANCO ACTIVO (Tipo 4)
+        is_white_active = (self.zone_type == 4 or self.p1_zone_type == 4 or self.p2_zone_type == 4)
+        required_taps = self.hourglass_spawn_hits_options[self.hourglass_spawn_hits_idx]
+        
+        if self.global_hits >= required_taps and not is_white_active:
+            # Si no hay reloj o si toca re-roll
+            if self.hourglass_rect is None or (self.global_hits % required_taps == 0):
+                # Calculamos relojes disponibles
+                available_watches = []
+                if not self.remove_blue: available_watches.append((1, 25))
+                if not self.remove_red: available_watches.append((2, 20))
+                if not self.remove_purple: available_watches.append((3, 20))
+                if not self.remove_white: available_watches.append((4, 10))
+                if not self.remove_yellow: available_watches.append((5, 25))
+                
+                if available_watches:
+                    if self.hourglass_rect is None:
+                        self.hourglass_rect = pygame.Rect(SCREEN_WIDTH//2 - 15, SCREEN_HEIGHT//2 - 20, 30, 40)
+                    
+                    # Sorteamos el nuevo tipo (evitando que sea el mismo si es re-roll)
+                    old_type = self.hourglass_type
+                    while True:
+                        if self.equal_watches_enabled:
+                            new_type = random.choice([w[0] for w in available_watches])
+                        else:
+                            total_weight = sum([w[1] for w in available_watches])
+                            r_clock = random.random() * total_weight
+                            acum = 0
+                            for w, weight in available_watches:
+                                acum += weight
+                                if r_clock <= acum:
+                                    new_type = w
+                                    break
+                        if len(available_watches) <= 1 or new_type != old_type:
+                            self.hourglass_type = new_type
+                            break
         
         # 1. Si la pelota viene como Bola de Fuego (y acaba de chocar mi paleta), se apaga.
         if self.ball.is_fireball:
@@ -328,26 +720,30 @@ class Game:
             self.fire_sound.fadeout(500) # Hacemos que el sonido se desvanezca más rápido (0.5 seg)
 
         # 2. Aumento de dificultad estándar del Pong Clásico
-        self.ball.speed *= BALL_SPEED_MULTIPLIER
+        self.ball.speed *= self.ball_speed_multiplier_options[self.ball_speed_multiplier_idx]
         
-        # 3. ¡Sumamos un golpe a la paleta!
-        paddle.hits += 1
-        
-        # ¿Llegó a 7 golpes y NO tiene poderes encima?
-        if paddle.hits >= 7:
+        # 3. ¡Sumamos un golpe a la paleta (a menos que sea el dueño de la súper paleta blanca)!
+        if paddle == self.paddle1 and self.slow_zone_owner == 1 and self.zone_type == 4:
+            pass # No suma puntos para power up
+        elif paddle == self.paddle2 and self.slow_zone_owner == 2 and self.zone_type == 4:
+            pass # No suma puntos para power up
+        else:
+            paddle.hits += 1
+            
+        # ¿Cuántos golpes necesita la paleta? Normalmente 7, pero si tiene zona violeta, solo 3
+        required_hits = 7
+        if self.zone_type == 3:
+            if paddle == self.paddle1 and self.slow_zone_owner == 1:
+                required_hits = 3
+            elif paddle == self.paddle2 and self.slow_zone_owner == 2:
+                required_hits = 3
+                
+        # ¿Llegó a la cantidad necesaria y NO tiene poderes encima?
+        if paddle.hits >= required_hits:
             if paddle.power_stored == POWER_NONE and paddle.power_active == POWER_NONE:
-                paddle.yellow_power_hits = 0 # Reiniciamos el contador por si le toca el amarillo
-                
-                # Sorteamos entre los 3 poderes (33% probabilidad c/u)
-                paddle.power_stored = random.choice([POWER_FIREBALL, POWER_SHIELD, POWER_SPEED])
-                
-                # Le cambiamos el color a la paleta para avisarle al jugador
-                if paddle.power_stored == POWER_FIREBALL:
-                    paddle.color = RED
-                elif paddle.power_stored == POWER_SHIELD:
-                    paddle.color = GREEN
-                elif paddle.power_stored == POWER_SPEED:
-                    paddle.color = (255, 255, 0) # Amarillo Velocista
+                paddle.yellow_power_hits = 0
+                paddle.orange_power_hits = 0
+                paddle.grant_random_power(self)
             
             # Reiniciamos sus toques a 0
             paddle.hits = 0
@@ -359,26 +755,54 @@ class Game:
             self.ball.is_fireball = True     # ¡Bola se enciende!
             self.ball.color = RED
             self.ball.speed *= 2             # ¡Súper velocidad!
-            self.fire_sound.play(-1)         # ¡NUEVO! Reproduce el fuego en bucle infinito (-1)
+            self.fire_sound.play(-1)         # Reproduce el fuego en bucle infinito (-1)
+            
+        elif paddle.power_active == POWER_ORANGE:
+            paddle.power_active = POWER_NONE
+            paddle.color = WHITE
+            self.ball.is_orange = True
+            self.ball.color = ORANGE
+            
+            # ¡Hacemos la pelota del doble de tamaño y un 50% más rápida!
+            self.ball.rect.width = BALL_SIZE * 2
+            self.ball.rect.height = BALL_SIZE * 2
+            self.ball.rect.x -= BALL_SIZE // 2
+            self.ball.rect.y -= BALL_SIZE // 2
+            self.ball.speed *= 1.5 # Buff extra de velocidad
+            
+            self.uuui_sound.play()           # Sonido de caricatura "Uuui"
             
         elif paddle.power_active == POWER_SHIELD:
             paddle.shield_hits_left -= 1     # Gastamos 1 golpe del escudo gigante
             if paddle.shield_hits_left <= 0: # Si ya se acabaron los golpes...
                 paddle.shield_shrink_timer = 0.1 # Iniciamos el cooldown de 0.1s
-                # (No la encogemos aquí para evitar el bug matemático, se encoge en el update)
 
-        # ¡NUEVO! Mecánica de Reroll del poder amarillo
-        if paddle.power_stored == POWER_SPEED:
-            paddle.yellow_power_hits += 1
-            if paddle.yellow_power_hits >= 2: # Si golpeó 2 veces sin activarlo...
-                # Se transforma al azar en Rojo o Verde
-                if random.random() < 0.5:
-                    paddle.power_stored = POWER_FIRE
-                    paddle.color = (255, 50, 50)
-                else:
-                    paddle.power_stored = POWER_SHIELD
-                    paddle.color = (50, 255, 50)
-                paddle.yellow_power_hits = 0 # Reiniciamos el contador por si acaso
+        # Rerolls de Poderes (Amarillo y Naranja)
+        if self.reroll_enabled:
+            if paddle.power_stored == POWER_SPEED:
+                paddle.yellow_power_hits += 1
+                if paddle.yellow_power_hits >= 2:
+                    paddle.reroll_power(self)
+                    paddle.yellow_power_hits = 0
+                    
+            elif paddle.power_stored == POWER_ORANGE:
+                paddle.orange_power_hits += 1
+                if paddle.orange_power_hits >= 2:
+                    paddle.reroll_power(self)
+                    paddle.orange_power_hits = 0
+            
+            # Rerolls para Rojo y Verde si All Reroll está activado
+            if self.all_reroll_enabled:
+                if paddle.power_stored == POWER_FIREBALL:
+                    paddle.red_power_hits += 1
+                    if paddle.red_power_hits >= 2:
+                        paddle.reroll_power(self)
+                        paddle.red_power_hits = 0
+                elif paddle.power_stored == POWER_SHIELD:
+                    paddle.green_power_hits += 1
+                    if paddle.green_power_hits >= 2:
+                        paddle.reroll_power(self)
+                        paddle.green_power_hits = 0
         
         # 5. Matemáticas de rebote
         relative_intersect_y = (paddle.rect.y + (paddle.rect.height / 2)) - self.ball.rect.centery
@@ -393,6 +817,33 @@ class Game:
         else:
             self.ball.rect.right = paddle.rect.left
         self.ball.x_float = float(self.ball.rect.x)
+        
+        # --- ¡CORRECCIÓN! Lógica de expiración del Muro Blanco ---
+        if self.watches_kept_enabled:
+            if paddle == self.paddle1 and self.p1_zone_type == 4:
+                self.paddle1.white_zone_hits_left -= 1
+                if self.paddle1.white_zone_hits_left <= 0:
+                    self.paddle1.reset()
+                    self.p1_zone_type = 0
+            elif paddle == self.paddle2 and self.p2_zone_type == 4:
+                self.paddle2.white_zone_hits_left -= 1
+                if self.paddle2.white_zone_hits_left <= 0:
+                    self.paddle2.reset()
+                    self.p2_zone_type = 0
+        else:
+            if self.zone_type == 4:
+                if paddle == self.paddle1 and self.slow_zone_owner == 1:
+                    self.paddle1.white_zone_hits_left -= 1
+                    if self.paddle1.white_zone_hits_left <= 0:
+                        self.paddle1.reset()
+                        self.zone_type = 0
+                        self.slow_zone_owner = 0
+                elif paddle == self.paddle2 and self.slow_zone_owner == 2:
+                    self.paddle2.white_zone_hits_left -= 1
+                    if self.paddle2.white_zone_hits_left <= 0:
+                        self.paddle2.reset()
+                        self.zone_type = 0
+                        self.slow_zone_owner = 0
 
     def goal_scored(self, serve_direction):
         # Apagamos el fuego de a poco si alguien hace gol
@@ -401,32 +852,71 @@ class Game:
         # Reiniciamos las mecánicas globales
         self.global_hits = 0
         self.hourglass_rect = None
-        self.hourglass_type = 0
         self.zone_type = 0
         self.slow_zone_owner = 0
+        self.p1_zone_type = 0
+        self.p2_zone_type = 0
         self.last_hitter = 0
         
         # Cuando hay gol, borramos todos los poderes y toques de las paletas. ¡Empiezan limpios!
         self.paddle1.reset()
-        self.paddle2.reset()
+        self.paddle1.grant_random_power(self) # ¡Nuevo poder aleatorio para el próximo saque!
         
-        if self.score1 >= MAX_SCORE:
-            self.winner_text = "¡Jugador 1 Gana!"
-            self.state = STATE_GAME_OVER 
-        elif self.score2 >= MAX_SCORE:
-            self.winner_text = "¡Jugador 2 Gana!"
-            self.state = STATE_GAME_OVER 
+        self.paddle2.reset()
+        self.paddle2.grant_random_power(self) # ¡Nuevo poder aleatorio para el próximo saque!
+        
+        # --- Lógica de Victoria / Match Point ---
+        if self.match_point_enabled and (self.score1 >= self.max_score or self.score2 >= self.max_score):
+            if abs(self.score1 - self.score2) >= 2:
+                self.winner_text = "¡Jugador 1 Gana!" if self.score1 > self.score2 else "¡Jugador 2 Gana!"
+                self.state = STATE_GAME_OVER
+            else:
+                # Siguen jugando (ventaja menor a 2)
+                self.state = STATE_SERVE
+                self.serve_direction = serve_direction
+                self.ball.serve(self.serve_direction)
         else:
-            self.state = STATE_SERVE
-            self.serve_timer = 1.0 
-            self.serve_direction = serve_direction
-            self.ball.serve(self.serve_direction)
+            if self.score1 >= self.max_score:
+                self.winner_text = "¡Jugador 1 Gana!"
+                self.state = STATE_GAME_OVER 
+            elif self.score2 >= self.max_score:
+                self.winner_text = "¡Jugador 2 Gana!"
+                self.state = STATE_GAME_OVER 
+            else:
+                self.state = STATE_SERVE
+                self.serve_direction = serve_direction
+                self.ball.serve(self.serve_direction)
+        
+        # --- ¡CORRECCIÓN FINAL! Detección de Animación de Match Point ---
+        # Si el juego va a continuar (estamos en STATE_SERVE), calculamos si es Match Point
+        if self.state == STATE_SERVE:
+            if self.match_point_enabled:
+                pts_to_win1 = max(self.max_score, self.score2 + 2) - self.score1
+                pts_to_win2 = max(self.max_score, self.score1 + 2) - self.score2
+            else:
+                pts_to_win1 = self.max_score - self.score1
+                pts_to_win2 = self.max_score - self.score2
+            
+            if pts_to_win1 == 1 or pts_to_win2 == 1:
+                self.show_match_point_anim = True
+                self.match_point_anim_timer = 2.1
+                self.serve_timer = 2.5
+                self.match_point_sound.play() # ¡TING-TING-TING!
+            else:
+                self.show_match_point_anim = False
+                self.serve_timer = 1.0
 
     def update(self, dt):
         if self.state == STATE_SERVE:
             self.serve_timer -= dt 
             if self.serve_timer <= 0: 
                 self.state = STATE_PLAYING 
+            
+            # Actualizamos el timer de la animación de Match Point
+            if self.show_match_point_anim and self.match_point_anim_timer > 0:
+                self.match_point_anim_timer -= dt
+                if self.match_point_anim_timer <= 0:
+                    self.show_match_point_anim = False
                 
         elif self.state == STATE_PLAYING:
             # Bajamos el reloj del cooldown si es mayor a cero
@@ -442,18 +932,39 @@ class Game:
                         p.rect.height = PADDLE_HEIGHT # ¡Ahora sí encogemos la paleta!
                         p.color = WHITE               # Vuelve a ser blanca
                 
+                # ¡NUEVO! Lógica del Reloj Blanco (Crecimiento suave)
+                if p.white_activation_timer > 0:
+                    p.white_activation_timer -= dt
+                    if p.white_activation_timer <= 0:
+                        # La paleta ahora ocupa TODA la mitad de la cancha
+                        p.rect.height = SCREEN_HEIGHT
+                        p.rect.width = SCREEN_WIDTH // 2
+                        p.rect.y = 0
+                        p.y_float = 0.0
+                        if p == self.paddle1:
+                            p.rect.x = 0
+                        else:
+                            p.rect.x = SCREEN_WIDTH // 2
+                        p.white_zone_hits_left = 5
+                
             # Calculamos si la pelota está adentro de una Zona Alterada
             zone_multiplier = 1.0
             
             in_player1_side = (self.ball.rect.centerx < SCREEN_WIDTH // 2)
             in_player2_side = (self.ball.rect.centerx > SCREEN_WIDTH // 2)
             
-            # Si la pelota está cruzando por la zona de quien la activó...
-            if (self.slow_zone_owner == 1 and in_player1_side) or (self.slow_zone_owner == 2 and in_player2_side):
-                if self.zone_type == 1:
-                    zone_multiplier = 0.5  # Zona Azul: 50% de velocidad (Más lento, te ayuda)
-                elif self.zone_type == 2:
-                    zone_multiplier = 1.25 # Zona Roja: 25% MÁS velocidad (Más rápido, te perjudica)
+            # --- NUEVA LÓGICA DE MULTIPLICADORES POR LADO ---
+            z_type = 0
+            if self.watches_kept_enabled:
+                if in_player1_side: z_type = self.p1_zone_type
+                else: z_type = self.p2_zone_type
+            else:
+                # Lógica clásica: solo si la pelota está en el lado del dueño
+                if (self.slow_zone_owner == 1 and in_player1_side) or (self.slow_zone_owner == 2 and in_player2_side):
+                    z_type = self.zone_type
+
+            if z_type == 1: zone_multiplier = 0.5  # Azul
+            elif z_type == 2: zone_multiplier = 1.25 # Rojo
                 
             self.ball.update(dt, zone_multiplier) 
             self.check_collisions() 
@@ -488,74 +999,415 @@ class Game:
     def draw(self):
         self.screen.fill(BLACK) 
         
-        # Dibujamos la Zona Alterada si alguien la activó
-        if self.slow_zone_owner != 0:
-            color_zona = (0, 0, 80) if self.zone_type == 1 else (80, 0, 0) # Azul o Rojo oscuro
+        # Solo dibujamos la cancha si estamos en juego, saque, game over o en el menú principal
+        if self.state in [STATE_PLAYING, STATE_SERVE, STATE_PRESS_TO_START, STATE_GAME_OVER, STATE_MAIN_MENU]:
+            # Dibujamos las Zonas Alteradas
+            def draw_zone(owner, z_type):
+                if z_type == 1: color_z = (0, 0, 80)
+                elif z_type == 2: color_z = (80, 0, 0)
+                elif z_type == 3: color_z = VIOLET_ZONE
+                elif z_type == 4: color_z = WHITE
+                else: return
+
+                rect_z = (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT) if owner == 1 else (SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT)
+                pygame.draw.rect(self.screen, color_z, rect_z)
+
+            if self.watches_kept_enabled:
+                draw_zone(1, self.p1_zone_type)
+                draw_zone(2, self.p2_zone_type)
+            elif self.slow_zone_owner != 0:
+                draw_zone(self.slow_zone_owner, self.zone_type)
+                
+            self.draw_dashed_line(self.screen, WHITE, (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), width=2, dash_length=15)
             
-            if self.slow_zone_owner == 1:
-                pygame.draw.rect(self.screen, color_zona, (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-            elif self.slow_zone_owner == 2:
-                pygame.draw.rect(self.screen, color_zona, (SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+            # Dibujamos el Reloj de Arena en el centro si corresponde (ESTILO PIXEL ART)
+            if self.hourglass_rect:
+                # Matriz de 9x7 (1 = pintar píxel, 0 = vacío)
+                pixel_art = [
+                    [1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,1],
+                    [0,1,1,1,1,1,0],
+                    [0,0,1,1,1,0,0],
+                    [0,0,0,1,0,0,0],
+                    [0,0,1,1,1,0,0],
+                    [0,1,1,1,1,1,0],
+                    [1,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1],
+                ]
+                
+                pixel_size = 4 # Tamaño de cada "cuadradito" en pantalla
+                
+                # Decidimos el color dependiendo del tipo
+                color_reloj = (50, 150, 255) # Por defecto azul
+                if self.hourglass_type == 2: color_reloj = (255, 50, 50) # Rojo
+                elif self.hourglass_type == 3: color_reloj = PURPLE
+                elif self.hourglass_type == 4: color_reloj = WHITE
+                elif self.hourglass_type == 5: color_reloj = YELLOW
+                
+                # Calculamos dónde empezar a dibujar para que quede bien centrado
+                start_x = self.hourglass_rect.centerx - (len(pixel_art[0]) * pixel_size) // 2
+                start_y = self.hourglass_rect.centery - (len(pixel_art) * pixel_size) // 2
+                
+                # Recorremos el dibujo cuadrito por cuadrito
+                for fila in range(len(pixel_art)):
+                    for col in range(len(pixel_art[fila])):
+                        if pixel_art[fila][col] == 1:
+                            px = start_x + (col * pixel_size)
+                            py = start_y + (fila * pixel_size)
+                            pygame.draw.rect(self.screen, color_reloj, (px, py, pixel_size, pixel_size))
             
-        self.draw_dashed_line(self.screen, WHITE, (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), width=2, dash_length=15)
-        
-        # Dibujamos el Reloj de Arena en el centro si corresponde (ESTILO PIXEL ART)
-        if self.hourglass_rect:
-            # Matriz de 9x7 (1 = pintar píxel, 0 = vacío)
-            pixel_art = [
-                [1,1,1,1,1,1,1],
-                [1,0,0,0,0,0,1],
-                [0,1,1,1,1,1,0],
-                [0,0,1,1,1,0,0],
-                [0,0,0,1,0,0,0],
-                [0,0,1,0,1,0,0],
-                [0,1,1,1,1,1,0],
-                [1,0,0,0,0,0,1],
-                [1,1,1,1,1,1,1],
-            ]
+            self.paddle1.draw(self.screen)
+            self.paddle2.draw(self.screen)
             
-            pixel_size = 4 # Tamaño de cada "cuadradito" en pantalla
+            # --- Dibujo de la Barrera Amarilla (Crucifijo / Vida Extra) ---
+            if self.paddle1.has_extra_life:
+                # Barrera detrás del Jugador 1 (Izquierda)
+                pygame.draw.line(self.screen, YELLOW, (2, 0), (2, SCREEN_HEIGHT), 5)
+            if self.paddle2.has_extra_life:
+                # Barrera detrás del Jugador 2 (Derecha)
+                pygame.draw.line(self.screen, YELLOW, (SCREEN_WIDTH - 2, 0), (SCREEN_WIDTH - 2, SCREEN_HEIGHT), 5)
             
-            # Decidimos el color dependiendo de si es el Bueno (Azul) o el Malo (Rojo)
-            color_reloj = (50, 150, 255) if self.hourglass_type == 1 else (255, 50, 50)
+            if self.state in [STATE_PLAYING, STATE_SERVE]:
+                self.ball.draw(self.screen)
+            elif self.state == STATE_PRESS_TO_START:
+                # Texto de ayuda para el saque
+                start_text = self.font.render("Presiona ESPACIO para Sacar", True, WHITE)
+                start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100))
+                self.screen.blit(start_text, start_rect)
+
+            # --- Dibujo del Marcador Dinámico (AL FINAL PARA QUE ESTÉ AL FRENTE) ---
+            if self.watches_kept_enabled:
+                color_score1 = BLACK if self.p1_zone_type == 4 else WHITE
+                color_score2 = BLACK if self.p2_zone_type == 4 else WHITE
+            else:
+                color_score1 = BLACK if (self.zone_type == 4 and self.slow_zone_owner == 1) else WHITE
+                color_score2 = BLACK if (self.zone_type == 4 and self.slow_zone_owner == 2) else WHITE
             
-            # Calculamos dónde empezar a dibujar para que quede bien centrado
-            start_x = self.hourglass_rect.centerx - (len(pixel_art[0]) * pixel_size) // 2
-            start_y = self.hourglass_rect.centery - (len(pixel_art) * pixel_size) // 2
+            score1_txt = self.font.render(str(self.score1), True, color_score1)
+            score2_txt = self.font.render(str(self.score2), True, color_score2)
             
-            # Recorremos el dibujo cuadrito por cuadrito
-            for fila in range(len(pixel_art)):
-                for col in range(len(pixel_art[fila])):
-                    if pixel_art[fila][col] == 1:
-                        px = start_x + (col * pixel_size)
-                        py = start_y + (fila * pixel_size)
-                        pygame.draw.rect(self.screen, color_reloj, (px, py, pixel_size, pixel_size))
-        
-        score_text = self.font.render(f"{self.score1}    {self.score2}", True, WHITE)
-        score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 40))
-        self.screen.blit(score_text, score_rect) 
-        
-        self.paddle1.draw(self.screen)
-        self.paddle2.draw(self.screen)
-        
-        if self.state in [STATE_PLAYING, STATE_SERVE]:
-            self.ball.draw(self.screen)
+            self.screen.blit(score1_txt, (SCREEN_WIDTH // 2 - 70, 20))
+            self.screen.blit(score2_txt, (SCREEN_WIDTH // 2 + 40, 20))
+
+            # --- DIBUJO DE ANIMACIÓN MATCH POINT (Escalonado) ---
+            if self.show_match_point_anim:
+                anim_elapsed = 2.1 - self.match_point_anim_timer
+                
+                txt_match = self.large_font.render("MATCH", True, WHITE)
+                txt_point = self.large_font.render("POINT", True, WHITE)
+                
+                # Calculamos el offset para que POINT empiece en la T de MATCH
+                offset_t = self.large_font.render("MA", True, WHITE).get_width()
+                
+                # El ancho total del bloque es desde el inicio de MATCH hasta el final de POINT
+                total_w = offset_t + txt_point.get_width()
+                h_match = txt_match.get_height()
+                
+                # Lógica de movimiento: IN (0.8s), PAUSE (0.5s), OUT (0.8s)
+                if anim_elapsed < 0.8:
+                    t = anim_elapsed / 0.8
+                    ease_out = 1 - (1 - t) * (1 - t)
+                    current_x = SCREEN_WIDTH - (SCREEN_WIDTH // 2 + total_w // 2) * ease_out
+                elif anim_elapsed < 1.3:
+                    current_x = SCREEN_WIDTH // 2 - total_w // 2
+                else:
+                    t = (anim_elapsed - 1.3) / 0.8
+                    ease_in = t * t
+                    current_x = (SCREEN_WIDTH // 2 - total_w // 2) - (SCREEN_WIDTH // 2 + total_w) * ease_in
+                
+                # Dibujamos las dos palabras escalonadas
+                center_y = SCREEN_HEIGHT // 2
+                self.screen.blit(txt_match, (current_x, center_y - h_match))
+                self.screen.blit(txt_point, (current_x + offset_t, center_y))
+                
+        if self.state == STATE_MAIN_MENU:
+            # Efecto de oscurecido sobre la cancha
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(160) # Nivel de oscuridad (0 a 255)
+            overlay.fill(BLACK)
+            self.screen.blit(overlay, (0,0))
+
+            # Título y Botones del Menú Principal
+            # Título: PONG KOMBAT 3.0 (Con "KOMBAT" en Rojo)
+            pong_txt = self.large_font.render("PONG ", True, WHITE)
+            kombat_txt = self.large_font.render("KOMBAT", True, RED)
+            version_txt = self.large_font.render(" 3.0", True, WHITE)
             
-        if self.state == STATE_MENU:
-            title_text = self.large_font.render("PONG KOMBAT v2.5", True, WHITE)
-            title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
-            start_text = self.font.render("Presiona ESPACIO para Empezar", True, WHITE)
-            start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
+            total_w = pong_txt.get_width() + kombat_txt.get_width() + version_txt.get_width()
+            start_x = SCREEN_WIDTH // 2 - total_w // 2
+            title_y = SCREEN_HEIGHT // 4
+            
+            self.screen.blit(pong_txt, (start_x, title_y - pong_txt.get_height() // 2))
+            self.screen.blit(kombat_txt, (start_x + pong_txt.get_width(), title_y - kombat_txt.get_height() // 2))
+            self.screen.blit(version_txt, (start_x + pong_txt.get_width() + kombat_txt.get_width(), title_y - version_txt.get_height() // 2))
+            
+            # Botón Play
+            pygame.draw.rect(self.screen, BLACK, self.btn_play_rect)
+            pygame.draw.rect(self.screen, WHITE, self.btn_play_rect, 4)
+            play_text = self.font.render("PLAY", True, WHITE)
+            play_rect = play_text.get_rect(center=self.btn_play_rect.center)
+            self.screen.blit(play_text, play_rect)
+            
+            # Botón Modifiers
+            pygame.draw.rect(self.screen, BLACK, self.btn_modifiers_rect)
+            pygame.draw.rect(self.screen, WHITE, self.btn_modifiers_rect, 4)
+            mod_text = self.font.render("MODIFIERS", True, WHITE)
+            mod_rect = mod_text.get_rect(center=self.btn_modifiers_rect.center)
+            self.screen.blit(mod_text, mod_rect)
+            
+        elif self.state == STATE_MODIFIERS:
+            # Fondo del panel
+            pygame.draw.rect(self.screen, BLACK, self.modifiers_panel_rect)
+            pygame.draw.rect(self.screen, WHITE, self.modifiers_panel_rect, 4)
+            
+            # Título
+            title_text = self.font.render("MATCH MODIFIERS", True, WHITE)
+            title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, self.modifiers_panel_rect.y + 30))
             self.screen.blit(title_text, title_rect)
-            self.screen.blit(start_text, start_rect)
             
-        elif self.state == STATE_GAME_OVER:
+            # Botón BACK
+            pygame.draw.rect(self.screen, BLACK, self.back_btn_rect)
+            pygame.draw.rect(self.screen, WHITE, self.back_btn_rect, 2)
+            back_text = self.small_font.render("BACK", True, WHITE)
+            back_rect = back_text.get_rect(center=self.back_btn_rect.center)
+            self.screen.blit(back_text, back_rect)
+            
+            # --- MATCH MODIFIERS (Mueve con scroll) ---
+            # Clipping: Dibujamos solo dentro del panel central
+            old_clip = self.screen.get_clip()
+            clip_rect = pygame.Rect(self.modifiers_panel_rect.x + 10, self.modifiers_panel_rect.y + 60, 
+                                    self.modifiers_panel_rect.width - 40, self.modifiers_panel_rect.height - 70)
+            self.screen.set_clip(clip_rect)
+            
+            offset = self.scroll_y
+            left_margin = self.modifiers_panel_rect.x + 50
+            options_x = self.modifiers_panel_rect.centerx + 50
+            max_y_rendered = 0 # Trackeamos el elemento más bajo
+            
+            def draw_remove_option(y_pos, text, enabled, rect, text_rect, is_checkbox=True, active_color=GREEN):
+                nonlocal max_y_rendered
+                ty = self.modifiers_panel_rect.y + y_pos - offset
+                
+                # Renderizamos el texto
+                txt_surf = self.small_font.render(text, True, WHITE)
+                txt_rect_actual = txt_surf.get_rect(midleft=(left_margin, ty))
+                text_rect.update(txt_rect_actual)
+                self.screen.blit(txt_surf, txt_rect_actual)
+                
+                if is_checkbox:
+                    # Dibujamos el cuadro del checkbox a la derecha
+                    rect.update(options_x + 25, ty - 15, 30, 30)
+                    pygame.draw.rect(self.screen, BLACK, rect)
+                    pygame.draw.rect(self.screen, WHITE, rect, 2)
+                    if enabled:
+                        pygame.draw.rect(self.screen, active_color, rect.inflate(-10, -10))
+                else:
+                    # Para selectores de valor, el rect es el área del texto para clics
+                    rect.update(txt_rect_actual)
+                
+                max_y_rendered = max(max_y_rendered, y_pos)
+
+            # 1. Score Limit
+            score_y = 100
+            score_lbl = self.small_font.render("Score limit:", True, WHITE)
+            self.screen.blit(score_lbl, (left_margin, self.modifiers_panel_rect.y + score_y - offset))
+            self.score_btn_rect.update(options_x, self.modifiers_panel_rect.y + score_y - 5 - offset, 80, 40)
+            pygame.draw.rect(self.screen, BLACK, self.score_btn_rect)
+            pygame.draw.rect(self.screen, WHITE, self.score_btn_rect, 2)
+            score_val = self.small_font.render(str(self.max_score), True, WHITE)
+            self.screen.blit(score_val, score_val.get_rect(center=self.score_btn_rect.center))
+            max_y_rendered = max(max_y_rendered, score_y)
+            
+            # 2. Ball Speed increase per hit
+            speed_y = 180
+            speed_lbl = self.small_font.render("Ball speed increase per hit:", True, WHITE)
+            self.screen.blit(speed_lbl, (left_margin, self.modifiers_panel_rect.y + speed_y - offset))
+            self.ball_speed_btn_rect.update(options_x, self.modifiers_panel_rect.y + speed_y - 5 - offset, 80, 40)
+            pygame.draw.rect(self.screen, BLACK, self.ball_speed_btn_rect)
+            pygame.draw.rect(self.screen, WHITE, self.ball_speed_btn_rect, 2)
+            speed_val = self.small_font.render(str(self.ball_speed_multiplier_options[self.ball_speed_multiplier_idx]), True, WHITE)
+            self.screen.blit(speed_val, speed_val.get_rect(center=self.ball_speed_btn_rect.center))
+            max_y_rendered = max(max_y_rendered, speed_y)
+
+            # 3. Match Point
+            draw_remove_option(260, "Match Point (win by 2):", self.match_point_enabled, self.match_point_rect, self.match_point_text_rect)
+            
+            # 4. Re-rolls
+            draw_remove_option(340, "Re-rolls (Yellow/Orange):", self.reroll_enabled, self.reroll_rect, self.reroll_text_rect)
+            
+            # 5. All Re-roll (Solo visible si Reroll está activo)
+            if self.reroll_enabled:
+                draw_remove_option(420, "All Re-roll (Red/Green):", self.all_reroll_enabled, self.all_reroll_rect, self.all_reroll_text_rect)
+            
+            # 6. Equal Watches
+            draw_remove_option(500, "Equal watches (20% each):", self.equal_watches_enabled, self.equal_watches_rect, self.equal_watches_text_rect)
+            
+            # 7. Equal Power-ups
+            draw_remove_option(580, "Equal power-ups (25% each):", self.equal_powers_enabled, self.equal_powers_rect, self.equal_powers_text_rect)
+
+            # 8. The watches are kept
+            self.watches_kept_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+            self.watches_kept_text_rect = pygame.Rect(0, 0, 0, 0)
+            draw_remove_option(660, "The watches are kept:", self.watches_kept_enabled, self.watches_kept_rect, self.watches_kept_text_rect)
+
+            # 9. Taps for next watch
+            taps_y = 740
+            taps_lbl = self.small_font.render("Taps for next watch:", True, WHITE)
+            self.screen.blit(taps_lbl, (left_margin, self.modifiers_panel_rect.y + taps_y - offset))
+            self.hourglass_spawn_hits_rect.update(options_x, self.modifiers_panel_rect.y + taps_y - 5 - offset, 80, 40)
+            pygame.draw.rect(self.screen, BLACK, self.hourglass_spawn_hits_rect)
+            pygame.draw.rect(self.screen, WHITE, self.hourglass_spawn_hits_rect, 2)
+            req_hits = self.hourglass_spawn_hits_options[self.hourglass_spawn_hits_idx]
+            hits_val = self.small_font.render(str(req_hits), True, WHITE)
+            self.screen.blit(hits_val, hits_val.get_rect(center=self.hourglass_spawn_hits_rect.center))
+            self.hourglass_spawn_hits_text_rect.update(left_margin, self.modifiers_panel_rect.y + taps_y - offset, taps_lbl.get_width(), taps_lbl.get_height())
+            max_y_rendered = max(max_y_rendered, taps_y)
+
+            # 10. --- REMOVE A WATCH (Toggle) ---
+            watch_toggle_y = max_y_rendered + 80
+            w_toggle_text = self.small_font.render("Remove a watch", True, WHITE)
+            self.remove_watches_toggle_text_rect.update(w_toggle_text.get_rect(midleft=(left_margin, self.modifiers_panel_rect.y + watch_toggle_y - offset)))
+            self.screen.blit(w_toggle_text, self.remove_watches_toggle_text_rect)
+            
+            self.remove_watches_toggle_rect.centery = self.remove_watches_toggle_text_rect.centery
+            self.remove_watches_toggle_rect.left = options_x + 25
+            pygame.draw.rect(self.screen, BLACK, self.remove_watches_toggle_rect)
+            pygame.draw.rect(self.screen, WHITE, self.remove_watches_toggle_rect, 3)
+            
+            pcx, pcy = self.remove_watches_toggle_rect.center
+            w = 8
+            if self.remove_watches_expanded:
+                # Dibujar "Ʌ" (Collapse)
+                pygame.draw.line(self.screen, WHITE, (pcx - w, pcy + w//2), (pcx, pcy - w//2), 3)
+                pygame.draw.line(self.screen, WHITE, (pcx, pcy - w//2), (pcx + w, pcy + w//2), 3)
+                
+                # Opciones de relojes
+                draw_remove_option(watch_toggle_y + 60, "  - Remove Blue Watch", self.remove_blue, self.remove_blue_rect, self.remove_blue_text_rect, active_color=RED)
+                draw_remove_option(watch_toggle_y + 120, "  - Remove Red Watch", self.remove_red, self.remove_red_rect, self.remove_red_text_rect, active_color=RED)
+                draw_remove_option(watch_toggle_y + 180, "  - Remove Purple Watch", self.remove_purple, self.remove_purple_rect, self.remove_purple_text_rect, active_color=RED)
+                draw_remove_option(watch_toggle_y + 240, "  - Remove White Watch", self.remove_white, self.remove_white_rect, self.remove_white_text_rect, active_color=RED)
+                draw_remove_option(watch_toggle_y + 300, "  - Remove Yellow Watch", self.remove_yellow, self.remove_yellow_rect, self.remove_yellow_text_rect, active_color=RED)
+            else:
+                # Dibujar "V" (Expand)
+                pygame.draw.line(self.screen, WHITE, (pcx - w, pcy - w//2), (pcx, pcy + w//2), 3)
+                pygame.draw.line(self.screen, WHITE, (pcx, pcy + w//2), (pcx + w, pcy - w//2), 3)
+                
+                # Mover rects de colisión fuera
+                self.remove_blue_rect.y = -1000
+                self.remove_red_rect.y = -1000
+                self.remove_purple_rect.y = -1000
+                self.remove_white_rect.y = -1000
+                self.remove_yellow_rect.y = -1000
+                self.remove_blue_text_rect.y = -1000
+                self.remove_red_text_rect.y = -1000
+                self.remove_purple_text_rect.y = -1000
+                self.remove_white_text_rect.y = -1000
+                self.remove_yellow_text_rect.y = -1000
+
+            # --- CÁLCULO DINÁMICO DEL SCROLL ---
+            # Siempre calculará el max_scroll necesario basado en el elemento más bajo.
+            content_bottom = max_y_rendered + 60 # Margen inferior reducido para evitar espacio vacío
+            calculated_max_scroll = max(0, content_bottom - 330) # 330 es el área visible real
+            
+            if self.max_scroll != calculated_max_scroll:
+                self.max_scroll = calculated_max_scroll
+                if self.scroll_y > self.max_scroll:
+                    self.scroll_y = self.max_scroll
+                scroll_fraction = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
+                self.scrollbar_thumb_rect.y = self.scrollbar_rect.top + scroll_fraction * (self.scrollbar_rect.height - self.scrollbar_thumb_height)
+            
+            # Restauramos el clip antes de dibujar tooltips
+            self.screen.set_clip(old_clip)
+            
+            # Scrollbar
+            pygame.draw.rect(self.screen, (50, 50, 50), self.scrollbar_rect)
+            pygame.draw.rect(self.screen, WHITE, self.scrollbar_thumb_rect)
+            
+            # Hover Tooltips (Dibujar siempre AL FINAL para que quede por encima)
+            mouse_pos = pygame.mouse.get_pos()
+            tooltip_lines = []
+            
+            # Ajustamos si el mouse hace colisión solo si está dentro del panel visible
+            if clip_rect.collidepoint(mouse_pos):
+                if self.match_point_text_rect.collidepoint(mouse_pos) or self.match_point_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "If both players are one point away from winning (5-5),",
+                        "the match will not end until one player gains a 2-point lead."
+                    ]
+                elif self.reroll_text_rect.collidepoint(mouse_pos) or self.reroll_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "The orange and yellow power-ups will change into",
+                        "another power-up after 2 hits."
+                    ]
+                elif self.equal_watches_text_rect.collidepoint(mouse_pos) or self.equal_watches_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "All watches have a 20% chance of appearing."
+                    ]
+                elif self.equal_powers_text_rect.collidepoint(mouse_pos) or self.equal_powers_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "All power-ups (Red, Green, Yellow, Orange)",
+                        "have a 25% chance of appearing."
+                    ]
+                elif self.watches_kept_text_rect.collidepoint(mouse_pos) or self.watches_kept_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "Picking up a new watch DOES NOT cancel",
+                        "the opponent's active zone effect."
+                    ]
+                elif self.hourglass_spawn_hits_text_rect.collidepoint(mouse_pos) or self.hourglass_spawn_hits_rect.collidepoint(mouse_pos):
+                    tooltip_lines = [
+                        "Number of paddle hits required to spawn",
+                        "or re-roll the next hourglass."
+                    ]
+                
+            if tooltip_lines:
+                # Renderizamos todas las líneas dinámicamente
+                rendered_lines = [self.tiny_font.render(line, True, BLACK) for line in tooltip_lines]
+                tooltip_w = max([t.get_width() for t in rendered_lines]) + 20
+                tooltip_h = sum([t.get_height() for t in rendered_lines]) + 10 + (5 * len(rendered_lines))
+                
+                tooltip_x = mouse_pos[0] + 15
+                tooltip_y = mouse_pos[1] + 15
+                
+                # Evitar que se salga de la pantalla
+                if tooltip_x + tooltip_w > SCREEN_WIDTH:
+                    tooltip_x = SCREEN_WIDTH - tooltip_w - 10
+                if tooltip_y + tooltip_h > SCREEN_HEIGHT:
+                    tooltip_y = SCREEN_HEIGHT - tooltip_h - 10
+                    
+                tooltip_bg = pygame.Rect(tooltip_x, tooltip_y, tooltip_w, tooltip_h)
+                pygame.draw.rect(self.screen, WHITE, tooltip_bg)
+                pygame.draw.rect(self.screen, BLACK, tooltip_bg, 2)
+                
+                # Dibujamos las líneas
+                current_y = tooltip_y + 10
+                for rendered_text in rendered_lines:
+                    self.screen.blit(rendered_text, (tooltip_x + 10, current_y))
+                    current_y += rendered_text.get_height() + 5
+            
+        if self.state == STATE_GAME_OVER:
+            # Efecto de oscurecido sobre la cancha congelada
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(160) # Nivel de oscuridad (0 a 255)
+            overlay.fill(BLACK)
+            self.screen.blit(overlay, (0,0))
+
             win_text = self.large_font.render(self.winner_text, True, WHITE)
             win_rect = win_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
-            restart_text = self.font.render("Presiona ESPACIO para Reiniciar", True, WHITE)
-            restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
             self.screen.blit(win_text, win_rect)
+            
+            # Botón Restart
+            pygame.draw.rect(self.screen, BLACK, self.btn_gameover_restart)
+            pygame.draw.rect(self.screen, WHITE, self.btn_gameover_restart, 4)
+            restart_text = self.font.render("Restart", True, WHITE)
+            restart_rect = restart_text.get_rect(center=self.btn_gameover_restart.center)
             self.screen.blit(restart_text, restart_rect)
+            
+            # Botón Back to menu
+            pygame.draw.rect(self.screen, BLACK, self.btn_gameover_menu)
+            pygame.draw.rect(self.screen, WHITE, self.btn_gameover_menu, 4)
+            menu_text = self.font.render("Back to menu", True, WHITE)
+            menu_rect = menu_text.get_rect(center=self.btn_gameover_menu.center)
+            self.screen.blit(menu_text, menu_rect)
 
         pygame.display.flip() 
 
@@ -568,4 +1420,4 @@ class Game:
 
 if __name__ == "__main__":
     game = Game() 
-    game.run()    
+    game.run()

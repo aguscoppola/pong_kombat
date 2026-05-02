@@ -2,6 +2,35 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [3.0.0] - 2026-05-02
+### ¡LA GRAN ACTUALIZACIÓN KOMBAT!
+Esta versión transforma el juego por completo, añadiendo profundidad táctica, una interfaz renovada y mucho más carisma.
+
+#### Agregado (Nuevas cosas)
+- **Nuevo Poder de Paleta: "Bola de Demolición" (Naranja)**. Aumenta el tamaño de la pelota al doble y su velocidad un 50%. ¡Ideal para confundir al rival!
+- **Nuevos Relojes de Arena (Mecánicas de Campo)**:
+    - **Reloj Violeta (Zona de Velocidad)**: Reduce los toques necesarios para cargar poderes de 7 a solo 3. ¡Carga rápida activada!
+    - **Reloj Amarillo (Vida Extra / Crucifijo)**: Crea una barrera divina detrás de tu paleta que te salva de un gol seguro.
+    - **Reloj Blanco (Muro Absoluto)**: El poder definitivo. Convierte toda tu mitad de la cancha en una paleta gigante invencible durante 5 toques.
+- **Nuevo Sistema de Menús**:
+    - **Menú Principal**: Interfaz limpia con títulos dinámicos y acceso rápido.
+    - **Panel de Modificadores (Match Modifiers)**: Un centro de control con scroll para personalizar cada aspecto de la partida.
+    - **Tooltips Dinámicos**: Pasa el ratón por encima de cualquier modificador para ver una explicación detallada de su funcionamiento.
+- **Nuevos Modificadores de Partida**:
+    - **The Watches are Kept**: Las zonas de los jugadores ya no se cancelan entre sí. ¡Caos de colores simultáneo!
+    - **Taps for Next Watch**: Configura cuántos golpes deben pasar para que aparezca un reloj (1, 3, 5, 10 o 15).
+    - **Equal Power-ups**: Probabilidades equilibradas (25%) para todos los poderes.
+    - **Match Point (Win by 2)**: Animación épica de "MATCH POINT" con movimiento suavizado y sonido de campanas de boxeo.
+- **Sonido y Estética**:
+    - **Efectos de Sonido**: Añadidos sonidos de "Hit" (golpe seco) y "Pop" (burbuja) para botones e interacciones.
+    - **Pixel Art**: Reloj de arena rediseñado con estética retro de píxeles.
+    - **Capa de Interfaz**: Marcadores inteligentes que cambian de color (blanco/negro) según el fondo para ser siempre legibles.
+
+#### Arreglado (Bugs y Pulido)
+- Corregido el bug donde los poderes se cancelaban de forma extraña.
+- Optimizada la aparición de relojes para evitar solapamientos con el Muro Blanco.
+- Mejorada la lógica de Deuce (empate) para que la animación de Match Point sea precisa en cualquier puntaje.
+
 ## [2.5.0] - 2026-04-24
 ### Agregado (Nuevas cosas)
 - Nuevo Poder de Paleta: "Velocista" (Color Amarillo). Aumenta la velocidad de movimiento de la paleta un 50%.
