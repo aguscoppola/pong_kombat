@@ -1,7 +1,7 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.1.1)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.3)
 
 ## 1. Visión General
-**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está construido sobre un motor de físicas AABB personalizado en Python con `pygame`.
+**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está construido sobre un motor de físicas AABB personalizado en Python con `pygame-ce`.
 
 ---
 
@@ -26,69 +26,70 @@ El manejo de entradas es continuo (sin retraso de repetición del SO).
 ## 3. Mecánicas del Core Engine
 
 ### Físicas de Rebote (Ángulo Dinámico)
-El ángulo de salida de la pelota no es un simple reflejo. Se calcula según el punto de impacto en la paleta:
+El ángulo de salida de la pelota se calcula según el punto de impacto en la paleta:
 *   **Fórmula:** `ángulo = (distancia_al_centro / (altura_paleta / 2)) * MAX_BOUNCE_ANGLE`
-*   **Resultado:** Golpear con los extremos de la paleta da ángulos más cerrados; golpear con el centro dispara la pelota de forma más horizontal.
+*   **Resultado:** Golpear con los extremos da ángulos cerrados; el centro dispara de forma horizontal.
 
-### Aceleración Progresiva
-*   La velocidad de la pelota aumenta tras cada impacto con una paleta.
-*   El factor de aumento es configurable mediante el modificador **"Ball speed increase per hit"**.
+### Gestión de Velocidad (v0.3.3)
+1.  **Initial Speed:** Velocidad base al sacar (`x0.75` hasta `x2.0 FLASH`).
+2.  **Speed Increase:** Aceleración acumulativa tras cada rebote (`0.01` a `0.075`).
 
 ---
 
 ## 4. Diccionario de Modificadores (Match Modifiers)
 
 ### Pestaña "ALL" (Configuración Global)
-1.  **Score Limit:** Define la puntuación necesaria para ganar (`5, 7, 10, 12, 15, 20`).
-2.  **Ball Speed Increase:** Multiplicador de aceleración por impacto (`1.01` a `1.10`).
-3.  **MATCH POINT:** Si está activo, requiere ganar por **2 puntos de diferencia** al llegar al final.
-4.  **GOLDEN GOAL Animation:** Activa/Desactiva la cinemática de advertencia cuando se llega a un 5-5 (o punto crítico).
-5.  **Re-rolls (Yellow/Orange):** Si un jugador tiene el poder Amarillo o Naranja guardado y golpea la pelota 2 veces sin activarlo, el poder cambia automáticamente a otro al azar.
-6.  **All Re-roll (Red/Green):** Extiende la mecánica de cambio automático a los poderes Rojo y Verde.
-7.  **Equal Watches / Powers:** Iguala las probabilidades de aparición al 20% para relojes y 25% para poderes (eliminando la rareza del Naranja).
-8.  **The watches are kept:** Si se activa, capturar un reloj nuevo **no cancela** el efecto de zona activo del oponente. Permite que ambos jugadores tengan zonas activas simultáneamente.
-9.  **Watch spawn frequency:** Hits globales necesarios para que aparezca un reloj (`[3, 5, 10, 15]`).
-10. **Power spawn frequency:** Hits individuales de cada paleta para recibir un poder (`[3, 5, 7, 10, 12]`).
-11. **Start with a Power:** Si está activo, ambos jugadores comienzan cada ronda con un poder aleatorio ya cargado (predeterminado: ON).
-12. **Remove a watch/power:** Menús desplegables para prohibir la aparición de elementos específicos.
+1.  **Score Limit:** Puntuación para ganar (`3, 6, 9`).
+2.  **Ball Speed Increase:** Incremento por hit. Niveles: Low (0.01), Default (0.025), Original (0.05), Fast (0.075).
+3.  **Initial Ball Speed:** Velocidad de saque. Niveles: Low, Default, Mid, Fast, FLASH.
+4.  **MATCH POINT:** Regla de ventaja de 2 puntos para ganar.
+5.  **GOLDEN Goal Animation:** Brillo dorado de advertencia en puntos críticos.
+6.  **Re-rolls:** Los poderes Amarillo/Naranja mutan tras 2 hits si no se usan.
+7.  **All Re-roll:** Extiende la mutación a los poderes Rojo/Verde.
+8.  **Equal Watches / Powers:** Iguala las probabilidades de aparición.
+9.  **Watches Kept:** Permite zonas activas simultáneas para ambos jugadores.
+10. **Spawn Frequencies:** Hits necesarios para relojes y poderes.
+11. **Remove watch/power:** Desactiva elementos específicos (Nombres en MAYÚSCULAS).
 
-### Pestaña "EXTRAS" (Experimental Features)
-*   **Orange Watch Enabled:** Permite la aparición del reloj naranja (Instant Chaos) en el campo.
-*   **Magnet Power Enabled:** Añade el poder Gris (Imán) a la rotación de poderes de paleta.
-*   **Random GOLDEN GOAL:** Añade un 10% de probabilidad de que cualquier ronda se convierta en muerte súbita (1 solo punto para ganar) sin previo aviso.
+### Pestaña "EXTRAS" (Mecánicas Avanzadas)
+*   **Allow Floating Planets:** Añade dos astros con gravedad física.
+    *   **Jerarquía:** Moon, Planet (Tierra/Marte), Gas Giant (Júpiter/Saturno), Star.
+    *   **Explosiones:** Partículas temáticas según el astro (Azul, Rojo, Beige, Tan, Amarillo, Gris).
+*   **X2 Multiplier:** Aparece un ícono dorado; capturarlo duplica el valor del siguiente gol.
+*   **Magnet Power Enabled:** Añade el Imán (Poder Gris) a la rotación.
+*   **Random GOLDEN GOAL:** 15% de probabilidad de muerte súbita por ronda.
 
----
-
-## 5. Enciclopedia de Poderes (v0.3.2)
-
-*   **FIREBALL (Rojo):** Duplica la velocidad actual de la pelota (`speed * 2`) and la enciende en llamas. El efecto dura hasta que el rival la devuelve.
-*   **SHIELD (Verde):** La paleta duplica su altura. Protege contra 3 impactos antes de encogerse. *Regla especial:* Mientras esté activo, los golpes no cuentan para el siguiente poder.
-*   **SPEED (Amarillo):** Aumenta la velocidad de desplazamiento de la paleta en un 50%. Es acumulable y dura hasta el próximo gol.
-*   **DEMOLITION (Naranja):** La pelota se vuelve gigante. Rebota en los bordes laterales (no hay gol normal). Si la paleta rival la toca, esta "explota" y el punto va para el atacante.
-*   **MAGNET (Gris):** Atrae la pelota hacia el centro de la paleta cuando está en el campo del jugador, permitiendo teledirigir el disparo.
+### Pestaña "SKINS" (Personalización v0.3.3)
+*   **Change ORANGE power:** Skins "Default" y "Hadouken" (Color Cyan).
+*   **Change YELLOW watch:** Skins "Default" y **"CROSS"** (Cruz Bíblica de madera marrón).
 
 ---
 
-## 6. Enciclopedia de Relojes (Items de Campo)
-
-*   **Azul (Cámara Lenta):** Crea una zona en tu campo que reduce la velocidad de la pelota al 50%.
-*   **Rojo (Aceleración):** Zona de trampa que aumenta la velocidad de la pelota un 25% en tu campo.
-*   **Violeta (Amnesia):** Resetea los hits del rival y lo obliga a usar sus poderes en máximo 2 toques o mutarán.
-*   **Blanco (Muro):** Crea una barrera total de 5 rebotes. Si el rival sobrevive a los 5, recibe un poder de regalo. *Regla especial:* Mientras esté activo, el spawn de otros relojes se congela.
-*   **Amarillo (Vida Extra):** Crea una barrera al fondo de la cancha. Si la pelota pasa la paleta, rebota en la barrera y se salva el punto. *Sonido: vida.wav*.
-*   **Naranja (Instant Chaos):** Activa el efecto de la pelota gigante (Demolition) para quien lo golpee.
+## 5. Enciclopedia de Poderes
+*   **FIREBALL (Rojo):** Duplica la velocidad y enciende la pelota.
+*   **SHIELD (Verde):** Paleta doble altura (3 impactos).
+*   **SPEED (Amarillo):** +50% velocidad de movimiento de paleta.
+*   **DEMOLITION (Naranja):** Pelota gigante y rebotes laterales.
+*   **MAGNET (Gris):** Control de trayectoria teledirigida.
 
 ---
 
-## 7. Estética y Sistema de Visualización
-*   **Color GOLD:** `(255, 200, 0)`. Reservado para "GOLDEN GOAL" y textos de victoria especiales.
-*   **Sistema de Tooltips:** Al posicionar el mouse sobre un modificador, se despliega una caja blanca con texto negro detallando su uso técnico.
-*   **Rich Text Rendering:** El motor detecta palabras clave en los strings (como "RED", "BLUE", "GOLD") y les asigna su color correspondiente de forma automática durante el renderizado.
+## 6. Enciclopedia de Relojes
+*   **Azul:** Zona de cámara lenta (50%).
+*   **Rojo:** Zona de trampa (+25% velocidad).
+*   **Violeta:** Carga de poderes rápida (3 hits).
+*   **Blanco:** Muro total de 5 rebotes.
+*   **Amarillo:** Vida Extra / Barrera trasera. *Skin CROSS disponible*.
+*   **Naranja:** Activación instantánea de Demolition.
+
+---
+
+## 7. Estética y UI
+*   **V-Arrows:** Acordeones con flechas "V" dentro de cuadrados.
+*   **Rich Text:** Soporte para colores dinámicos (`|COLOR|`) en textos.
+*   **Audio Fix:** Buffer optimizado a 2048 para evitar ruidos en Windows.
 
 ---
 
 ## 8. Lógica de Versionado (SemVer)
-El proyecto utiliza un sistema de tres dígitos `X.Y.Z` para el seguimiento del progreso:
-*   **X (Lanzamiento)**: Se mantiene en `0` durante el desarrollo. Pasará a `1.0.0` en el lanzamiento oficial.
-*   **Y (Adiciones Grandes)**: Se incrementa cuando se añaden múltiples poderes, relojes o sistemas de modificadores complejos (ej: de `0.2.x` a `0.3.x`).
-*   **Z (Cambios Pequeños)**: Se incrementa para arreglos de bugs, optimizaciones o la implementación de una sola mejora puntual (ej: de `0.3.0` a `0.3.1`).
+*   **v0.3.3**: Versión actual de Pulido Estético y Mecánicas Planetarias.

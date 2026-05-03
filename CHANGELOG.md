@@ -2,6 +2,49 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [0.3.3] - 2026-05-03
+### The Celestial & Aesthetics Update (v0.3.3 Final)
+Esta versión marca el cierre de la etapa de pulido visual y expansión de modificadores, introduciendo personalización de skins y una identidad única para cada cuerpo celeste.
+
+#### Agregado (Nuevas cosas)
+- **Identidad Planetaria**: Los planetas ahora tienen nombres y colores específicos (Tierra, Marte, Júpiter, Saturno).
+- **Explosiones Temáticas**: Partículas de colores coordinadas con el astro destruido (Azul, Rojo, Beige, Tan, Amarillo, Gris).
+- **Sistema de Skins (Pestaña SKINS)**:
+    - **Orange Power**: Skins "Default" y "Hadouken".
+    - **Yellow Watch**: Skins "Default" y **"CROSS"** (Cruz Bíblica de madera).
+- **Modificador "Initial ball speed"**: 5 niveles de velocidad de saque (Low a FLASH).
+- **Modificador "Ball speed increase"**: Nombres descriptivos (Low, Default, Original, Fast) y valores técnicos.
+- **Visualización Técnica**: Los selectores muestran valores numéricos (multiplicadores, gravedad, radio) debajo de los nombres.
+
+#### Arreglado (Bugs y Pulido)
+- **Cura de Audio**: Buffer optimizado a 2048 y pre-inicialización para eliminar crujidos en Windows.
+- **Tooltips Inteligentes**: Filtrado de mensajes de ayuda por pestaña activa.
+- **Independencia de Acordeones**: Los clics en "Remove a power" funcionan de forma independiente.
+- **Scroll Dinámico**: Recálculo automático del límite de desplazamiento al expandir secciones.
+- **Iconografía Unificada**: Flechas tipo "V" dentro de cuadrados consistentes.
+- **Formato Numérico**: Corrección de decimales (p. ej. "0.01" en lugar de "0.010").
+- **Fijación de la Cruz**: Simetría perfecta de 10x8 píxeles para la skin de la cruz bíblica.
+
+#### Cambiado (Estética)
+- **Nombres en MAYÚSCULAS**: Colores resaltados en mayúsculas en las opciones de eliminación.
+- **Feedback de Color**: Las opciones de skins cambian de color al seleccionarlas.
+- **Grosor de Paletas**: Ajuste definitivo a **15px**.
+
+## [0.3.2] - 2026-05-03
+### Orbital Chaos Update
+Esta versión revolucionó las físicas del juego introduciendo la interacción con cuerpos celestes y nuevas formas de puntuar.
+
+#### Agregado (Nuevas cosas)
+- **Modificador "Allow floating planets"**: Añade dos planetas que atraen la pelota con gravedad real.
+- **Jerarquía Astronómica**: Niveles de gravedad y radio configurables (Moon, Planet, Gas Giant, Star).
+- **Planetas Destruibles**: Los planetas ahora tienen resistencia y explotan tras recibir impactos.
+- **Multiplicador X2**: Nuevo ítem de campo dorado que duplica el valor del siguiente gol anotado.
+- **X2 Goal Animation**: Texto de puntuación dorado para goles con multiplicador activo.
+
+#### Arreglado (Bugs y Estabilidad)
+- **Físicas de Atracción**: Optimización de los vectores de gravedad para evitar que la pelota se quede orbitando infinitamente.
+- **Spawn de Ítems**: El ícono X2 ahora respeta el área de juego y no aparece dentro de las paletas.
+
 ## [0.3.1.1] - 2026-05-02
 ### Inicio Potente & Hotfixes (Power Start Update)
 Esta versión introduce una nueva dinámica de inicio de ronda y soluciona varios errores visuales y de lógica detectados en la 0.3.1.
