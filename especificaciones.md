@@ -1,95 +1,93 @@
-# Pong Kombat - Documento de Especificaciones Técnicas
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.1)
 
-## Visión General del Proyecto
-**Objetivo:** Implementar la **Versión 1.0 (MVP)** basada estrictamente en la arquitectura mecánica del Pong clásico. Las mecánicas experimentales ("Kombat") se planificarán en iteraciones posteriores (v2.0+). 
-
-El proyecto está diseñado para ser implementado en Python, utilizando un Game Loop estandarizado y renderizado 2D (se sugiere la librería `pygame`). El código debe estar orientado a objetos (POO), desacoplando la lógica de físicas, renderizado y manejo de estado.
+## 1. Visión General
+**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está construido sobre un motor de físicas AABB personalizado en Python con `pygame`.
 
 ---
 
-## Especificaciones de la Versión 1.0 (Core Engine)
+## 2. Sistema de Controles (Input Mapping)
+El manejo de entradas es continuo (sin retraso de repetición del SO).
 
-### 1. Entidades del Juego (Game Objects)
+### Jugador 1 (Izquierda)
+*   **W / S**: Movimiento Vertical (Subir / Bajar).
+*   **D**: Activar Poder Especial guardado.
 
-*   **Paletas (Paddles):**
-    *   **Geometría:** Rectángulos estáticos en el eje X, dinámicos en el eje Y.
-    *   **Renderizado:** Color sólido (blanco puro `#FFFFFF`), sin sprites complejos en la v1.
-    *   **Posicionamiento:** 
-        *   Jugador 1 (Izquierda): Eje X fijado con un margen (offset) del borde izquierdo.
-        *   Jugador 2 (Derecha): Eje X fijado con un margen simétrico del borde derecho.
-    *   **Restricciones de Pantalla (Clamping):** Las coordenadas Y (`rect.top` y `rect.bottom`) deben estar delimitadas (`clamp`) por el alto de la ventana `SCREEN_HEIGHT` para evitar que las paletas salgan del área de juego utilizable.
+### Jugador 2 (Derecha)
+*   **Flecha Arriba / Abajo**: Movimiento Vertical.
+*   **Flecha Derecha**: Activar Poder Especial guardado.
 
-*   **Pelota (Ball):**
-    *   **Geometría:** Cuadrada (alto = ancho). Color blanco puro.
-    *   **Cinemática:** Se desplaza actualizando su posición en función de un vector de velocidad en 2D `(Vx, Vy)`, preferiblemente normalizado y ajustado por el `delta_time` (independencia de framerate).
-    *   **Aceleración (Escalamiento de Dificultad):** Tras cada colisión válida con una paleta, el módulo del vector velocidad aumentará por un factor constante (ej. `SPEED_MULTIPLIER = 1.05`) para evitar *loops* infinitos (partidas eternas).
-
-### 2. Sistema de Controles (Input Handling)
-El procesamiento de teclas debe evaluar el estado continuo del teclado por *frame* (tecla mantenida), evitando el *key repeat delay* nativo del sistema operativo.
-*   **Jugador 1 (Izquierda):** Teclas `W` (Vector Y negativo / Subir) y `S` (Vector Y positivo / Bajar).
-*   **Jugador 2 (Derecha):** Tecla `Flecha Arriba` (Vector Y negativo) y `Flecha Abajo` (Vector Y positivo).
-
-### 3. Sistema de Físicas y Colisiones (AABB)
-Todo el sistema de colisiones se basará en el teorema de intersección de rectángulos alineados a los ejes (Axis-Aligned Bounding Box).
-
-*   **Colisiones con el Entorno (Limites Y):**
-    *   **Techo y Suelo:** Si `ball.rect.top <= 0` o `ball.rect.bottom >= SCREEN_HEIGHT`, se invierte el componente Y del vector de velocidad de la pelota (`Vy = -Vy`).
-*   **Anotación (Límites X):**
-    *   Si la pelota supera `x <= 0`, se desencadena el evento `GOAL_PLAYER_2`.
-    *   Si la pelota supera `x >= SCREEN_WIDTH`, se desencadena el evento `GOAL_PLAYER_1`.
-*   **Colisión Entidad-Entidad (Pelota vs Paletas):**
-    *   Al detectar intersección (`AABB collision`), se invierte el componente X del vector (`Vx = -Vx`).
-    *   **Modificador de Ángulo:** El ángulo de rebote (vector `Vy`) se calculará dinámicamente según el punto de impacto. Si la pelota golpea el centro de la paleta, rebota horizontalmente. Si golpea los extremos, el ángulo de salida vertical se incrementa, ofreciendo control táctico a los jugadores.
-
-### 4. Bucle Principal y Máquina de Estados (Game Loop & State)
-El juego debe manejar al menos tres estados (`MENU`, `PLAYING`, `GAME_OVER`).
-
-*   **Sistema de Puntuación:**
-    *   Marcador renderizado en la parte superior central.
-    *   UI: Línea punteada dividiendo el centro del campo (la "red").
-*   **Reset de Punto (Servicio):**
-    *   Tras un evento `GOAL`, la pelota se centra en `(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)`.
-    *   Pausa de un (1) segundo antes de iniciar el movimiento.
-    *   El vector inicial se dispara aleatoriamente hacia la dirección del jugador que acaba de recibir el punto en contra.
-*   **Condición de Victoria (Win Condition):**
-    *   Límite establecido por constante `MAX_SCORE = 12`.
-    *   Al llegar a este umbral, el estado pasa a `GAME_OVER`, deteniendo las actualizaciones de físicas y mostrando el texto del ganador ("Player 1 Wins!" o "Player 2 Wins!"). Se habilita un *listener* para reiniciar la partida con una tecla (Ej: `SPACEBAR`).
+### Controles Globales
+*   **ENTER**: Iniciar juego desde el menú / Reiniciar tras Game Over.
+*   **ESCAPE**: Volver al menú principal desde una partida activa.
+*   **MOUSE**: Navegación por el panel de modificadores, pestañas y acordeones.
 
 ---
 
-## Roadmap v2.0+ 
-### Mecánicas Nuevas: Modo Kombat (Poderes Especiales)
+## 3. Mecánicas del Core Engine
 
-Se introducirá un sistema de poderes especiales para darle un giro dinámico y táctico al juego clásico.
+### Físicas de Rebote (Ángulo Dinámico)
+El ángulo de salida de la pelota no es un simple reflejo. Se calcula según el punto de impacto en la paleta:
+*   **Fórmula:** `ángulo = (distancia_al_centro / (altura_paleta / 2)) * MAX_BOUNCE_ANGLE`
+*   **Resultado:** Golpear con los extremos de la paleta da ángulos más cerrados; golpear con el centro dispara la pelota de forma más horizontal.
 
-**1. Sistema de Carga (Meter):**
-* **Contador de Golpes:** Cada vez que un jugador golpea la pelota con su paleta, se suma 1 toque a su contador personal.
-* **Reinicio de Contador:** Cada vez que un jugador anota un punto (hay un gol), los contadores de *ambos* jugadores se reinician automáticamente a 0.
-* **Obtención de Poder:** Al acumular **7 toques** en una misma ronda, el jugador recibe un poder especial de forma aleatoria (suerte).
+### Aceleración Progresiva
+*   La velocidad de la pelota aumenta tras cada impacto con una paleta.
+*   El factor de aumento es configurable mediante el modificador **"Ball speed increase per hit"**.
 
-**2. Indicadores Visuales:**
-Para que el jugador sepa qué poder le tocó, su paleta cambiará de color al llegar a los 7 toques:
-*   **Paleta Roja:** Indica que obtuvo el Poder 1 (Bola Rápida).
-*   **Paleta Verde:** Indica que obtuvo el Poder 2 (Paleta Gigante).
+---
 
-**3. Teclas de Activación:**
-El jugador puede decidir en qué momento exacto usar su poder guardado presionando una tecla:
-*   **Jugador 1:** Tecla `D`
-*   **Jugador 2:** Tecla `Flecha Derecha`
-**4. Lista de Poderes Especiales:**
-*(Aparición al llegar a 7 toques: Rojo 30%, Verde 30%, Amarillo 30%, Naranja 10%)*
-1.  **Bola Roja (Ofensivo):** Al activar este poder (paleta roja), el próximo impacto convertirá la pelota en color rojo y esta saldrá disparada al **doble de velocidad (x2)**. La pelota mantendrá esta súper-velocidad hasta que el oponente logre golpearla. Luego de usarlo, la paleta vuelve a ser blanca.
-2.  **Escudo Gigante (Defensivo):** Al activar este poder (paleta verde), la paleta mutará y se volverá el **doble de grande (x2 de altura)**, haciendo muy fácil atajar la pelota. Esta ventaja durará exactamente **3 golpes**. Después del tercer golpe a la pelota, la paleta recuperará su tamaño normal y color blanco puro.
-3.  **Velocista (Pasivo / Acumulable):** Al activar este poder (paleta amarilla), la velocidad de movimiento de la paleta aumentará un **50% extra**. Este poder es infinito hasta que se anote un gol. Además, ¡es acumulable! Si lo consigues dos veces seguidas sin que te anoten un gol, tendrás +100% de velocidad. **Mecánica de Reroll:** Si consigues este poder pero decides NO activarlo, al golpear la pelota 2 veces tu paleta mutará y se transformará en otro poder al azar.
-4.  **Poder Naranja (Espejismo):** Sonido de caricatura ("uuui.wav"). La pelota se vuelve de color naranja, duplica su tamaño (x2) y **aumenta su velocidad un 50% extra (x1.5)**, volviéndose enorme, rápida y aterradora. A partir de ese momento, la pelota cruzará los bordes izquierdo y derecho como si fueran paredes, rebotando en lugar de ser gol y perdiendo el efecto al instante. Pero si un jugador la llega a tocar con su paleta, ¡esa paleta explota (sonido de "pop") y el rival anota un punto automáticamente! El poder se desactiva cuando alguien la toca o cuando rebota 1 vez en los bordes.
+## 4. Panel de Modificadores (Detalle Meticuloso)
 
-**5. Ítem de Campo: Reloj de Arena (Cámara Lenta, Maldición y Doble Filo)**
-*   **Aparición Continua:** El primer reloj de arena aparece al llegar a **10 golpes globales**. A partir de ahí, **cada 5 toques adicionales** (golpes 15, 20, 25...), aparecerá un nuevo reloj en el centro, incluso si alguien ya había capturado uno antes o si ya había uno en pantalla.
-*   **Probabilidades de Aparición:** Azul (25%), Amarillo (25%), Violeta (20%), Rojo (20%), Blanco (10%).
+### Pestaña "ALL" (Configuración Global)
+1.  **Score Limit:** Define la puntuación necesaria para ganar (`5, 7, 10, 12, 15, 20`).
+2.  **Ball Speed Increase:** Multiplicador de aceleración por impacto (`1.01` a `1.10`).
+3.  **MATCH POINT:** Si está activo, requiere ganar por **2 puntos de diferencia** al llegar al final.
+4.  **GOLDEN GOAL Animation:** Activa/Desactiva la cinemática de advertencia cuando se llega a un 5-5 (o punto crítico).
+5.  **Re-rolls (Yellow/Orange):** Si un jugador tiene el poder Amarillo o Naranja guardado y golpea la pelota 2 veces sin activarlo, el poder cambia automáticamente a otro al azar.
+6.  **All Re-roll (Red/Green):** Extiende la mecánica de cambio automático a los poderes Rojo y Verde.
+7.  **Equal Watches / Powers:** Iguala las probabilidades de aparición al 20% para relojes y 25% para poderes (eliminando la rareza del Naranja).
+8.  **The watches are kept:** Si se activa, capturar un reloj nuevo **no cancela** el efecto de zona activo del oponente. Permite que ambos jugadores tengan zonas activas simultáneamente.
+9.  **Watch spawn frequency:** Hits globales necesarios para que aparezca un reloj (`[3, 5, 10, 15]`).
+10. **Power spawn frequency:** Hits individuales de cada paleta para recibir un poder (`[3, 5, 7, 10, 12]`).
+11. **Remove a watch/power:** Menús desplegables para prohibir la aparición de elementos específicos.
 
-*   **Zona Azul (25% - Beneficio):** Suena una trompeta de victoria. La mitad de la pantalla de quien lo agarró se vuelve de color azul oscuro. Mientras la pelota viaje por esa zona, su velocidad se reducirá a la **mitad (0.5x)**. Esto le da a ese jugador muchísimo tiempo extra para predecir trayectorias, prepararse para atajar y usar sus poderes tácticos con total calma.
-*   **Zona Roja (20% - Maldición):** Suena una alarma de error grave. La mitad de la pantalla de quien lo agarró se vuelve de color rojo oscuro. Mientras la pelota viaje por esa zona, su velocidad aumentará un **25%**. Esto funciona como una trampa, ya que el jugador tendrá mucho menos tiempo para reaccionar a los rebotes en su propia mitad.
-*   **Reloj Violeta (Maldición):** 20% de probabilidad. "¡Ring!" misterioso (campana.wav). El fondo se vuelve violeta oscuro. Maldice a quien le dio el último golpe a la pelota. El jugador maldecido sufre amnesia y sus golpes acumulados vuelven a 0. Además, ahora solo necesitará 3 golpes para conseguir un poder (en lugar de 7), pero está obligado a usarlo apenas lo consiga o de lo contrario mutará súper rápido (cada 2 toques). El efecto dura hasta que se haga un gol.
-*   **Reloj Blanco (Súper Paleta):** 10% de probabilidad. Sonido angelical divino (divino.wav). Quien lo captura obtiene una "Súper Paleta" blanca temporal. Tras un retraso de 0.05s, la paleta crece ocupando toda su mitad de la cancha. Mientras esté activa, la paleta te protege pero sus golpes no suman puntos para conseguir un power-up. Esta Súper Paleta dura exactamente 5 golpes (es decir, cada vez que la súper paleta rechaza la pelota). Al llegar al quinto rebote, la paleta vuelve instantáneamente a su tamaño normal, pierde cualquier poder que tuviera guardado y resetea sus toques a 0. Si el rival logra sobrevivir a los 5 embates y la paleta se rompe, ¡el rival es recompensado con un power-up aleatorio instantáneo! Además, mientras este reloj esté activo, no pueden aparecer nuevos relojes en la cancha.
-*   **Reloj Amarillo (Crucifijo / Vida Extra):** 25% de probabilidad. Sonido mágico de vida (vida.wav). El jugador que logre golpear la pelota contra el reloj recibirá una Vida Extra. Esto se representa como una barrera gigante amarilla justo detrás de su paleta, en el límite de la pantalla. Si la pelota logra pasar su defensa, en lugar de ser un gol, chocará contra la barrera amarilla y rebotará de vuelta hacia la cancha, salvándole la vida. Al rebotar la pelota, la barrera se consume y desaparece instantáneamente. El efecto persiste aunque se agarre otro reloj, pero se reinicia si alguien marca un gol de manera normal. La captura implica que la pelota debe tocar el reloj para activarlo. El jugador que le haya pegado a la pelota antes del impacto será el dueño de la nueva zona (borrando la anterior).
-*   **Reinicio:** La zona alterada (Azul, Roja, Violeta, Amarillo y Blanco) y el contador global de toques se reinician automáticamente cuando se anota un gol.
+### Pestaña "EXTRAS" (Experimental Features)
+1.  **Enable Orange Watch:** Permite la aparición del reloj naranja que activa el efecto Demolition Ball al impacto.
+2.  **Enable MAG|NET Power:** Habilita el poder de atracción magnética.
+3.  **Random GOLDEN Goal:** 10% de probabilidad por ronda de que el próximo gol gane la partida inmediatamente.
+
+---
+
+## 5. Enciclopedia de Poderes (v3.5)
+
+*   **FIREBALL (Rojo):** Duplica la velocidad actual de la pelota (`speed * 2`) y la enciende en llamas. El efecto dura hasta que el rival la devuelve.
+*   **SHIELD (Verde):** La paleta duplica su altura. Protege contra 3 impactos antes de encogerse. *Regla especial:* Mientras esté activo, los golpes no cuentan para el siguiente poder.
+*   **SPEED (Amarillo):** Aumenta la velocidad de desplazamiento de la paleta en un 50%. Es acumulable y dura hasta el próximo gol.
+*   **DEMOLITION (Naranja):** La pelota se vuelve gigante. Rebota en los bordes laterales (no hay gol normal). Si la paleta rival la toca, esta "explota" y el punto va para el atacante.
+*   **MAGNET (Gris):** Atrae la pelota hacia el centro de la paleta cuando está en el campo del jugador, permitiendo teledirigir el disparo.
+
+---
+
+## 6. Enciclopedia de Relojes (Items de Campo)
+
+*   **Azul (Cámara Lenta):** Crea una zona en tu campo que reduce la velocidad de la pelota al 50%.
+*   **Rojo (Aceleración):** Zona de trampa que aumenta la velocidad de la pelota un 25% en tu campo.
+*   **Violeta (Amnesia):** Resetea los hits del rival y lo obliga a usar sus poderes en máximo 2 toques o mutarán.
+*   **Blanco (Muro):** Crea una barrera total de 5 rebotes. Si el rival sobrevive a los 5, recibe un poder de regalo. *Regla especial:* Mientras esté activo, el spawn de otros relojes se congela.
+*   **Amarillo (Vida Extra):** Crea una barrera al fondo de la cancha. Si la pelota pasa la paleta, rebota en la barrera y se salva el punto. *Sonido: vida.wav*.
+*   **Naranja (Instant Chaos):** Activa el efecto de la pelota gigante (Demolition) para quien lo golpee.
+
+---
+
+## 7. Estética y Sistema de Visualización
+*   **Color GOLD:** `(255, 200, 0)`. Reservado para "GOLDEN GOAL" y textos de victoria especiales.
+*   **Sistema de Tooltips:** Al posicionar el mouse sobre un modificador, se despliega una caja blanca con texto negro detallando su uso técnico.
+*   **Rich Text Rendering:** El motor detecta palabras clave en los strings (como "RED", "BLUE", "GOLD") y les asigna su color correspondiente de forma automática durante el renderizado.
+
+---
+
+## 8. Lógica de Versionado (SemVer)
+El proyecto utiliza un sistema de tres dígitos `X.Y.Z` para el seguimiento del progreso:
+*   **X (Lanzamiento)**: Se mantiene en `0` durante el desarrollo. Pasará a `1.0.0` en el lanzamiento oficial.
+*   **Y (Adiciones Grandes)**: Se incrementa cuando se añaden múltiples poderes, relojes o sistemas de modificadores complejos (ej: de `0.2.x` a `0.3.x`).
+*   **Z (Cambios Pequeños)**: Se incrementa para arreglos de bugs, optimizaciones o la implementación de una sola mejora puntual (ej: de `0.3.0` a `0.3.1`).
