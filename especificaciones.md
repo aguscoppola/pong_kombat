@@ -1,4 +1,4 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.1)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.1.1)
 
 ## 1. Visión General
 **Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está construido sobre un motor de físicas AABB personalizado en Python con `pygame`.
@@ -36,7 +36,7 @@ El ángulo de salida de la pelota no es un simple reflejo. Se calcula según el 
 
 ---
 
-## 4. Panel de Modificadores (Detalle Meticuloso)
+## 4. Diccionario de Modificadores (Match Modifiers)
 
 ### Pestaña "ALL" (Configuración Global)
 1.  **Score Limit:** Define la puntuación necesaria para ganar (`5, 7, 10, 12, 15, 20`).
@@ -49,18 +49,19 @@ El ángulo de salida de la pelota no es un simple reflejo. Se calcula según el 
 8.  **The watches are kept:** Si se activa, capturar un reloj nuevo **no cancela** el efecto de zona activo del oponente. Permite que ambos jugadores tengan zonas activas simultáneamente.
 9.  **Watch spawn frequency:** Hits globales necesarios para que aparezca un reloj (`[3, 5, 10, 15]`).
 10. **Power spawn frequency:** Hits individuales de cada paleta para recibir un poder (`[3, 5, 7, 10, 12]`).
-11. **Remove a watch/power:** Menús desplegables para prohibir la aparición de elementos específicos.
+11. **Start with a Power:** Si está activo, ambos jugadores comienzan cada ronda con un poder aleatorio ya cargado (predeterminado: ON).
+12. **Remove a watch/power:** Menús desplegables para prohibir la aparición de elementos específicos.
 
 ### Pestaña "EXTRAS" (Experimental Features)
-1.  **Enable Orange Watch:** Permite la aparición del reloj naranja que activa el efecto Demolition Ball al impacto.
-2.  **Enable MAG|NET Power:** Habilita el poder de atracción magnética.
-3.  **Random GOLDEN Goal:** 10% de probabilidad por ronda de que el próximo gol gane la partida inmediatamente.
+*   **Orange Watch Enabled:** Permite la aparición del reloj naranja (Instant Chaos) en el campo.
+*   **Magnet Power Enabled:** Añade el poder Gris (Imán) a la rotación de poderes de paleta.
+*   **Random GOLDEN GOAL:** Añade un 10% de probabilidad de que cualquier ronda se convierta en muerte súbita (1 solo punto para ganar) sin previo aviso.
 
 ---
 
-## 5. Enciclopedia de Poderes (v3.5)
+## 5. Enciclopedia de Poderes (v0.3.2)
 
-*   **FIREBALL (Rojo):** Duplica la velocidad actual de la pelota (`speed * 2`) y la enciende en llamas. El efecto dura hasta que el rival la devuelve.
+*   **FIREBALL (Rojo):** Duplica la velocidad actual de la pelota (`speed * 2`) and la enciende en llamas. El efecto dura hasta que el rival la devuelve.
 *   **SHIELD (Verde):** La paleta duplica su altura. Protege contra 3 impactos antes de encogerse. *Regla especial:* Mientras esté activo, los golpes no cuentan para el siguiente poder.
 *   **SPEED (Amarillo):** Aumenta la velocidad de desplazamiento de la paleta en un 50%. Es acumulable y dura hasta el próximo gol.
 *   **DEMOLITION (Naranja):** La pelota se vuelve gigante. Rebota en los bordes laterales (no hay gol normal). Si la paleta rival la toca, esta "explota" y el punto va para el atacante.

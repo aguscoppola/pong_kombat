@@ -2,6 +2,18 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [0.3.1.1] - 2026-05-02
+### Inicio Potente & Hotfixes (Power Start Update)
+Esta versión introduce una nueva dinámica de inicio de ronda y soluciona varios errores visuales y de lógica detectados en la 0.3.1.
+
+#### Agregado (Nuevas cosas)
+- **Modificador "Start with a Power"**: Ahora puedes elegir empezar cada ronda con un poder aleatorio ya cargado. Activado por defecto para maximizar la acción.
+
+#### Arreglado (Bugs y Pulido)
+- **Tooltips Fantasmas**: Corregido el error que permitía ver tooltips de modificadores invisibles o de otras pestañas.
+- **Relojes Acelerados**: Solucionado el error de conteo doble de hits globales; ahora los relojes aparecen exactamente según la frecuencia configurada.
+- **Poderes Iniciales**: Corregido el bug que otorgaba poderes al empezar la partida incluso con el modificador desactivado.
+
 ## [0.3.1] - 2026-05-02
 ### Kombat Evolved (Aesthetics & Stability Patch)
 Esta es la versión más estable y completa hasta la fecha, introduciendo mecánicas experimentales ("EXTRAS") y un panel de control total sobre la partida.

@@ -269,7 +269,7 @@ class Game:
         pygame.init() 
         pygame.mixer.init() # ¡NUEVO! Encendemos el sistema de sonido
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Pong Kombat v0.3.1")
+        pygame.display.set_caption("Pong Kombat v0.3.1.1")
         
         self.clock = pygame.time.Clock() 
         self.font = pygame.font.SysFont("Arial", 36, bold=True)
@@ -432,6 +432,11 @@ class Game:
         self.power_auto_grant_hits_text_rect = pygame.Rect(0, 0, 0, 0)
         self.global_power_hits = 0 # Contador separado para los poderes
         
+        # Modificador 3: Empezar con un poder
+        self.start_with_power_enabled = True
+        self.start_with_power_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
+        self.start_with_power_text_rect = pygame.Rect(0, 0, 0, 0)
+        
         # Modificadores para eliminar poderes de paleta
         self.remove_power_expanded = False
         self.remove_power_toggle_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, 0, 30, 30)
@@ -541,12 +546,15 @@ class Game:
         self.paddle1.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle1.y_float = float(self.paddle1.rect.y)
         self.paddle1.reset()
-        self.paddle1.grant_random_power(self) # ¡KOMBAT INICIA AHORA!
         
         self.paddle2.rect.y = SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2
         self.paddle2.y_float = float(self.paddle2.rect.y)
         self.paddle2.reset()
-        self.paddle2.grant_random_power(self) # ¡KOMBAT INICIA AHORA!
+
+        # ¡KOMBAT INICIA AHORA! Solo si el modificador está activo
+        if self.start_with_power_enabled:
+            self.paddle1.grant_random_power(self)
+            self.paddle2.grant_random_power(self)
         
         self.state = STATE_SERVE 
         self.serve_timer = 1.0 
@@ -625,6 +633,8 @@ class Game:
                                     elif self.power_auto_grant_hits_rect.collidepoint(event.pos) or self.power_auto_grant_hits_text_rect.collidepoint(event.pos):
                                         self.pop_sound.play()
                                         self.power_auto_grant_hits_idx = (self.power_auto_grant_hits_idx + 1) % len(self.power_auto_grant_hits_options)
+                                    elif self.start_with_power_rect.collidepoint(event.pos) or self.start_with_power_text_rect.collidepoint(event.pos):
+                                        self.pop_sound.play(); self.start_with_power_enabled = not self.start_with_power_enabled
                                     elif self.remove_watches_toggle_rect.collidepoint(event.pos) or self.remove_watches_toggle_text_rect.collidepoint(event.pos):
                                         self.pop_sound.play(); self.remove_watches_expanded = not self.remove_watches_expanded
                                     elif self.remove_power_toggle_rect.collidepoint(event.pos) or self.remove_power_toggle_text_rect.collidepoint(event.pos):
@@ -874,19 +884,8 @@ class Game:
         # ¡NUEVO! Reproducimos el sonido de burbuja (POP) al tocar la paleta
         self.pop_sound.play() 
         
-        # Guardamos quién le pegó y sumamos un toque global
+        # Guardamos quién le pegó
         self.last_hitter = 1 if paddle == self.paddle1 else 2
-        self.global_hits += 1
-        
-        # ¡NUEVO! Aparición Constante: A los 10 toques, y luego cada 5 toques (15, 20, 25...)
-        # 2. Spawn / Re-roll del Reloj de Arena
-        is_white_active = (self.zone_type == 4 or self.p1_zone_type == 4 or self.p2_zone_type == 4)
-        required_taps = self.watch_spawn_hits_options[self.watch_spawn_hits_idx]
-        
-        if self.global_hits >= required_taps and not is_white_active:
-            # Si no hay reloj o si toca re-roll
-            if self.hourglass_rect is None or (self.global_hits % required_taps == 0):
-                self.spawn_random_watch()
         
         # 1. Si la pelota viene como Bola de Fuego (y acaba de chocar mi paleta), se apaga.
         if self.ball.is_fireball:
@@ -1099,9 +1098,12 @@ class Game:
         
         # Reiniciamos paletas
         self.paddle1.reset()
-        self.paddle1.grant_random_power(self)
         self.paddle2.reset()
-        self.paddle2.grant_random_power(self)
+        
+        # Si el modificador está activo, otorgamos poderes al empezar
+        if self.start_with_power_enabled:
+            self.paddle1.grant_random_power(self)
+            self.paddle2.grant_random_power(self)
         
         # 3. Lógica normal de anotación
         if player == 1:
@@ -1666,6 +1668,11 @@ class Game:
                 p_val_surf = self.small_font.render(str(p_hits), True, WHITE)
                 self.screen.blit(p_val_surf, p_val_surf.get_rect(center=self.power_auto_grant_hits_rect.center))
                 self.power_auto_grant_hits_text_rect.update(left_margin, self.modifiers_panel_rect.y + current_y - offset, pwr_lbl.get_width(), pwr_lbl.get_height())
+                
+                # 11. Start with a power
+                current_y += 80
+                draw_remove_option(current_y, "Start with a Power:", self.start_with_power_enabled, self.start_with_power_rect, self.start_with_power_text_rect)
+                
                 max_y_rendered = max(max_y_rendered, current_y)
 
                 # 10. Remove a watch (Toggle)
@@ -1771,75 +1778,84 @@ class Game:
             mouse_pos = pygame.mouse.get_pos()
             tooltip_lines = []
             
-            # Ajustamos si el mouse hace colisión solo si está dentro del panel visible
+            # SOLO procesamos si el ratón está dentro del área visible del panel (Clip Rect)
             if clip_rect.collidepoint(mouse_pos):
-                if self.match_point_text_rect.collidepoint(mouse_pos) or self.match_point_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "If both players are one point away from winning (5-5),",
-                        "the match will not end until one player gains a 2-point lead."
-                    ]
-                elif self.golden_goal_anim_text_rect.collidepoint(mouse_pos) or self.golden_goal_anim_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "Shows a golden warning during critical moments",
-                        "or sudden death rounds."
-                    ]
-                elif self.reroll_text_rect.collidepoint(mouse_pos) or self.reroll_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "The orange and yellow power-ups will change into",
-                        "another power-up after 2 hits."
-                    ]
-                elif self.equal_watches_text_rect.collidepoint(mouse_pos) or self.equal_watches_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "All watches have a 20% chance of appearing."
-                    ]
-                elif self.equal_powers_text_rect.collidepoint(mouse_pos) or self.equal_powers_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "All power-ups (Red, Green, Yellow, Orange)",
-                        "have a 25% chance of appearing."
-                    ]
-                elif self.watches_kept_text_rect.collidepoint(mouse_pos) or self.watches_kept_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "Picking up a new watch DOES NOT cancel",
-                        "the opponent's active zone effect."
-                    ]
-                elif self.watch_spawn_hits_text_rect.collidepoint(mouse_pos) or self.watch_spawn_hits_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "How many paddle hits are needed",
-                        "to spawn a random Watch on the field."
-                    ]
-                elif self.power_auto_grant_hits_text_rect.collidepoint(mouse_pos) or self.power_auto_grant_hits_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "How many paddle hits are needed",
-                        "to grant a random power-up directly."
-                    ]
-                elif self.remove_power_toggle_text_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["Expand to disable specific paddle powers."]
-                elif self.remove_power_red_text_rect.collidepoint(mouse_pos) or self.remove_power_red_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["Fireball Power will never appear."]
-                elif self.remove_power_green_text_rect.collidepoint(mouse_pos) or self.remove_power_green_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["Giant Shield Power will never appear."]
-                elif self.remove_power_yellow_text_rect.collidepoint(mouse_pos) or self.remove_power_yellow_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["Speed Power will never appear."]
-                elif self.remove_power_orange_text_rect.collidepoint(mouse_pos) or self.remove_power_orange_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["Demolition Ball Power will never appear."]
-                elif self.experimental_toggle_text_rect.collidepoint(mouse_pos):
-                    tooltip_lines = ["New and experimental game mechanics."]
-                elif self.orange_watch_text_rect.collidepoint(mouse_pos) or self.orange_watch_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "Orange Watch: If hit by the ball, it triggers",
-                        "the Demolition Ball effect instantly!"
-                    ]
-                elif self.magnet_power_text_rect.collidepoint(mouse_pos) or self.magnet_power_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "MAGNET: The ball is attracted to your paddle",
-                        "center like a planet when in your zone.",
-                        "Allows steering the ball after hitting it."
-                    ]
-                elif self.experimental_golden_goal_text_rect.collidepoint(mouse_pos) or self.experimental_golden_goal_rect.collidepoint(mouse_pos):
-                    tooltip_lines = [
-                        "Random GOLDEN Goal: 10% chance per round",
-                        "to become Sudden Death. Next goal wins the match!"
-                    ]
+                # Filtramos por pestaña activa
+                if self.modifiers_tab == "ALL":
+                    if self.match_point_text_rect.collidepoint(mouse_pos) or self.match_point_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "If both players are one point away from winning (5-5),",
+                            "the match will not end until one player gains a 2-point lead."
+                        ]
+                    elif self.golden_goal_anim_text_rect.collidepoint(mouse_pos) or self.golden_goal_anim_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "Shows a golden warning during critical moments",
+                            "or sudden death rounds."
+                        ]
+                    elif self.reroll_text_rect.collidepoint(mouse_pos) or self.reroll_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "The orange and yellow power-ups will change into",
+                            "another power-up after 2 hits."
+                        ]
+                    elif self.equal_watches_text_rect.collidepoint(mouse_pos) or self.equal_watches_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "All watches have a 20% chance of appearing."
+                        ]
+                    elif self.equal_powers_text_rect.collidepoint(mouse_pos) or self.equal_powers_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "All power-ups (Red, Green, Yellow, Orange)",
+                            "have a 25% chance of appearing."
+                        ]
+                    elif self.watches_kept_text_rect.collidepoint(mouse_pos) or self.watches_kept_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "Picking up a new watch DOES NOT cancel",
+                            "the opponent's active zone effect."
+                        ]
+                    elif self.watch_spawn_hits_text_rect.collidepoint(mouse_pos) or self.watch_spawn_hits_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "How many paddle hits are needed",
+                            "to spawn a random Watch on the field."
+                        ]
+                    elif self.power_auto_grant_hits_text_rect.collidepoint(mouse_pos) or self.power_auto_grant_hits_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "How many paddle hits are needed",
+                            "to grant a random power-up directly."
+                        ]
+                    elif self.start_with_power_text_rect.collidepoint(mouse_pos) or self.start_with_power_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "Both players start each round with a",
+                            "random power-up if enabled."
+                        ]
+                    elif self.remove_power_toggle_text_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["Expand to disable specific paddle powers."]
+                    elif self.remove_power_red_text_rect.collidepoint(mouse_pos) or self.remove_power_red_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["Fireball Power will never appear."]
+                    elif self.remove_power_green_text_rect.collidepoint(mouse_pos) or self.remove_power_green_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["Giant Shield Power will never appear."]
+                    elif self.remove_power_yellow_text_rect.collidepoint(mouse_pos) or self.remove_power_yellow_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["Speed Power will never appear."]
+                    elif self.remove_power_orange_text_rect.collidepoint(mouse_pos) or self.remove_power_orange_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["Demolition Ball Power will never appear."]
+                
+                elif self.modifiers_tab == "EXTRAS":
+                    if self.experimental_toggle_text_rect.collidepoint(mouse_pos):
+                        tooltip_lines = ["New and experimental game mechanics."]
+                    elif self.orange_watch_text_rect.collidepoint(mouse_pos) or self.orange_watch_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "Orange Watch: If hit by the ball, it triggers",
+                            "the Demolition Ball effect instantly!"
+                        ]
+                    elif self.magnet_power_text_rect.collidepoint(mouse_pos) or self.magnet_power_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "MAGNET: The ball is attracted to your paddle",
+                            "center like a planet when in your zone.",
+                            "Allows steering the ball after hitting it."
+                        ]
+                    elif self.experimental_golden_goal_text_rect.collidepoint(mouse_pos) or self.experimental_golden_goal_rect.collidepoint(mouse_pos):
+                        tooltip_lines = [
+                            "Random GOLDEN Goal: 10% chance per round",
+                            "to become Sudden Death. Next goal wins the match!"
+                        ]
                 
             if tooltip_lines:
                 # Renderizamos todas las líneas dinámicamente
