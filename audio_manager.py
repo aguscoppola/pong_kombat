@@ -6,6 +6,7 @@ class AudioManager:
         self.sounds = {}
         self.sounds_dir = "sounds"
         self.load_all_sounds()
+        pygame.mixer.set_num_channels(32) # Suficientes canales para multibola
 
     def load_all_sounds(self):
         # Mapeo de archivos y volúmenes
@@ -23,7 +24,10 @@ class AudioManager:
             "golden_goal": ("golden_goal.wav", 0.9),
             "explosion": ("explosion.wav", 1.0),
             "hadouken": ("hadouken.wav", 0.8),
-            "x2": ("x2.wav", 0.9)
+            "x2": ("x2.wav", 0.9),
+            "ghost": ("fantasma.wav", 1.0),
+            "nom": ("nom.wav", 1.0),
+            "squeak": ("squeak.wav", 0.5)
         }
 
         for name, (filename, volume) in sound_configs.items():

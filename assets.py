@@ -136,5 +136,20 @@ TOOLTIPS = {
         "X2 Multiplier: 50% chance to spawn an X2 icon at the start.",
         "Appears after the first hit. Capturing it turns the ball GOLD",
         "and the next goal will be worth 2 points."
+    ],
+    "ghost_power": [
+        "GHOST: Shoot 1 spectral ball that the rival must catch.",
+        "Ghost balls are 50% slower. If they leave the screen",
+        "behind the opponent, you score a point!"
+    ],
+    "add_mouse": [
+        "Adds a mouse that tries to eat the ball (cheese).",
+        "If it succeeds, the last hitter loses 1 point.",
+        "The mouse enters after the second bounce."
+    ],
+    "encapsulate_powers": [
+        "Stores your current power in your score number",
+        "when receiving a new one. It activates automatically",
+        "once your paddle is free and effects are over."
     ]
 }

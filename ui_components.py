@@ -10,7 +10,8 @@ def draw_rich_text(surface, text, pos, font, default_color=WHITE):
     color_keywords = {
         "BLUE": BLUE, "RED": RED, "PURPLE": PURPLE, "WHITE": WHITE,
         "YELLOW": YELLOW, "ORANGE": ORANGE, "GREEN": GREEN, "CYAN": CYAN,
-        "GOLDEN": GOLD, "GOLD": GOLD, "MAG": BLUE, "NET": RED
+        "GOLDEN": GOLD, "GOLD": GOLD, "MAG": BLUE, "NET": RED, "GHOST": GHOST_COLOR,
+        "PINK": PINK, "GRAY": GRAY
     }
     is_tag = False
     for part in parts:

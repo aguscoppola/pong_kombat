@@ -25,6 +25,8 @@ ORANGE = (255, 120, 0)
 CYAN = (0, 255, 255)
 GOLD = (255, 215, 0)
 BROWN = (139, 69, 19)
+PINK = (255, 182, 193)
+GHOST_COLOR = (150, 200, 255)
 
 # Colores de Zonas
 BLUE_ZONE = (0, 0, 100)
@@ -46,4 +48,5 @@ POWER_FIREBALL = 1
 POWER_SHIELD = 2
 POWER_SPEED = 3
 POWER_MAGNET = 4
-POWER_ORANGE = 5 # Agregado para consistencia
+POWER_ORANGE = 5
+POWER_GHOST = 6
