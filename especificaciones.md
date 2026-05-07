@@ -1,4 +1,4 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.3.4)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.5.0)
 
 ## 1. Visión General
 **Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está construido sobre un motor de físicas AABB personalizado en Python con `pygame-ce`.
@@ -20,6 +20,11 @@ El manejo de entradas es continuo (sin retraso de repetición del SO).
 *   **ENTER**: Iniciar juego desde el menú / Reiniciar tras Game Over.
 *   **ESCAPE**: Volver al menú principal desde una partida activa.
 *   **MOUSE**: Navegación por el panel de modificadores, pestañas y acordeones.
+*   **SETTINGS**: Acceso desde el menú principal para configurar sonido e idioma.
+
+### Modo SOLO (IA)
+*   **IA Táctica**: La computadora busca pelotas, esquiva amenazas (naranjas/balas), utiliza portales para anticiparse y gestiona sus poderes de forma agresiva.
+*   **Aiming (Revolver)**: La IA alineará su centro con la paleta del jugador para disparar con precisión.
 
 ---
 
@@ -60,6 +65,12 @@ El ángulo de salida de la pelota se calcula según el punto de impacto en la pa
 *   **X2 Multiplier:** Ítem dorado que duplica el valor del gol.
 *   **Ghost Power:** Dispara proyectiles espectrales lentos.
 *   **Magnet Power:** Atrae la pelota hacia la paleta.
+*   **REVOLVER (The Combat Update):** 
+    *   **Logic:** Ítem orbital que otorga 3 disparos letales.
+    *   **Precision:** Trayectoria recta horizontal con seguro de disparo de 0.1s.
+    *   **Spawn:** 25% de probabilidad al aparecer cualquier reloj.
+*   **GUM Power (The Sticky Update):** 
+    *   **Logic:** Adherencia de pelotas y disparos de chicle erráticos.
 
 ### Pestaña "SKINS"
 *   **Change ORANGE power:** Skins "Default" y "Hadouken".
@@ -74,6 +85,8 @@ El ángulo de salida de la pelota se calcula según el punto de impacto en la pa
 *   **DEMOLITION (Naranja):** Pelota gigante y rebotes laterales.
 *   **MAGNET (Gris):** Control de trayectoria.
 *   **GHOST (Blanco Azulado):** Proyectil señuelo.
+*   **REVOLVER (Gris/Marrón):** Sistema de disparos amarillos letales.
+*   **GUM (Rosa):** Adherencia y proyectiles de chicle.
 
 ---
 
@@ -95,4 +108,5 @@ El ángulo de salida de la pelota se calcula según el punto de impacto en la pa
 ---
 
 ## 8. Lógica de Versionado (SemVer)
-*   **v0.3.4**: "The PORTAL Update" - Teletransporte, estabilidad de físicas y refinamiento de UI.
+*   **v0.4.0**: "The Solo & Settings Update" - Modo contra IA y panel de ajustes (Volumen, Idioma, Shake).
+*   **v0.5.0**: "The REVOLVER Update" - Combate letal, IA pistolera, poder de chicle y estabilidad de efectos visuales.

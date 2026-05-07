@@ -6,6 +6,7 @@ from constants import *
 class VFXManager:
     def __init__(self):
         self.particles = []
+        self.enabled = True
 
     def update(self, dt):
         for p in self.particles[:]:
@@ -18,10 +19,12 @@ class VFXManager:
             p.draw(surface)
 
     def burst(self, x, y, color, count=15, lifetime=1.0):
+        if not self.enabled: return
         for _ in range(count):
             self.particles.append(Particle(x, y, color, lifetime=lifetime))
 
     def explosion(self, x, y, color, count=60):
+        if not self.enabled: return
         for _ in range(count):
             # Explosión más dispersa y duradera
             p = Particle(x, y, color, lifetime=random.uniform(0.5, 1.5))
@@ -30,6 +33,7 @@ class VFXManager:
             self.particles.append(p)
 
     def trail(self, x, y, color, count=1, lifetime=0.4):
+        if not self.enabled: return
         for _ in range(count):
             self.particles.append(Particle(x, y, color, lifetime=lifetime))
 

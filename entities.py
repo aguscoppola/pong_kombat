@@ -45,6 +45,14 @@ class Paddle:
         self.has_extra_life = False
         self.white_zone_hits_left = 0
         self.white_activation_timer = 0.0
+        # Variables para GUM Power
+        self.gum_charges = 0
+        self.is_stuck = False
+        self.stuck_ball = None
+        self.gum_decay_timer = 0.0
+        # Variables para REVOLVER
+        self.revolver_shots_left = 0
+        self.revolver_timer = 0.0
 
     def reset(self):
         self.rect.height = PADDLE_HEIGHT
@@ -65,6 +73,11 @@ class Paddle:
         self.green_power_hits = 0
         self.has_extra_life = False
         self.white_zone_hits_left = 0
+        self.white_zone_shrink_timer = 0.0
+        self.gum_charges = 0
+        self.is_stuck = False
+        self.stuck_ball = None
+        self.gum_decay_timer = 0.0
 
     def grant_random_power(self, game):
         all_p = [
@@ -73,7 +86,8 @@ class Paddle:
             (POWER_SPEED, YELLOW, 25 if game.equal_powers_enabled else 30, game.remove_power_yellow),
             (POWER_ORANGE, ORANGE, 25 if game.equal_powers_enabled else 10, game.remove_power_orange),
             (POWER_MAGNET, GRAY, 25 if game.equal_powers_enabled else 15, not game.magnet_power_enabled),
-            (POWER_GHOST, GHOST_COLOR, 25 if game.equal_powers_enabled else 15, not game.ghost_power_enabled)
+            (POWER_GHOST, GHOST_COLOR, 25 if game.equal_powers_enabled else 15, not game.ghost_power_enabled),
+            (POWER_GUM, GUM_PINK, 25 if game.equal_powers_enabled else 15, not game.gum_power_enabled)
         ]
         available_powers = [p for p in all_p if not p[3]]
         if not available_powers: return
@@ -102,6 +116,13 @@ class Paddle:
                     # Sin modificador de cápsula: Sobreescribir siempre
                     self.power_stored = p_type
                     self.color = p_color
+                
+                # AUTO-ACTIVAR GUM POWER
+                if p_type == POWER_GUM:
+                    self.power_active = POWER_GUM
+                    self.gum_charges = 3
+                    self.color = GUM_PINK
+                    self.power_stored = POWER_NONE
                 break
 
     def activate_power(self, game):
@@ -120,6 +141,9 @@ class Paddle:
                 self.power_active = POWER_NONE
             elif self.power_active == POWER_MAGNET:
                 self.magnet_hits_left = 3
+            elif self.power_active == POWER_REVOLVER:
+                self.revolver_shots_left = 3
+                self.revolver_timer = 10.0
                 self.color = GRAY
 
     def move(self, direction, dt, paddle_speed):
@@ -141,6 +165,43 @@ class Paddle:
                 self.power_encapsulated = POWER_NONE
                 self.encapsulated_color = WHITE
 
+        # Procesar encogimiento de Zona Blanca (Reloj Blanco)
+        if self.white_zone_shrink_timer > 0:
+            self.white_zone_shrink_timer -= dt
+            if self.white_zone_shrink_timer <= 0:
+                self.rect.height = PADDLE_HEIGHT
+                self.rect.width = PADDLE_WIDTH
+                if self.power_active == POWER_NONE: self.color = WHITE
+                # Resetear posición x según el jugador
+                if self.rect.x < SCREEN_WIDTH // 2: self.rect.x = 20
+                else: self.rect.x = SCREEN_WIDTH - 20 - PADDLE_WIDTH
+                self.y_float = float(self.rect.y)
+
+        # Lógica de Pegado del Chicle
+        if self.power_active == POWER_GUM and self.is_stuck and self.stuck_ball:
+            # Sincronizar posición de la pelota
+            self.stuck_ball.rect.centery = self.rect.centery
+            if self.rect.x < SCREEN_WIDTH // 2: # J1
+                self.stuck_ball.rect.left = self.rect.right
+            else: # J2
+                self.stuck_ball.rect.right = self.rect.left
+            self.stuck_ball.x_float = float(self.stuck_ball.rect.x)
+            self.stuck_ball.y_float = float(self.stuck_ball.rect.y)
+            
+            # Consumir cargas (1 por segundo)
+            self.gum_decay_timer += dt
+            if self.gum_decay_timer >= 1.0:
+                self.gum_decay_timer = 0.0
+                self.gum_charges -= 1
+                if self.gum_charges <= 0:
+                    self.is_stuck = False
+                    # Impulso al soltarse
+                    self.stuck_ball.vx = 400 if self.rect.x < SCREEN_WIDTH // 2 else -400
+                    self.stuck_ball.vy = random.uniform(-100, 100)
+                    self.stuck_ball = None
+                    self.power_active = POWER_NONE
+                    self.color = WHITE
+
     def draw(self, surface, game):
         if self.is_destroyed: return
         if self.power_active == POWER_ORANGE and game.orange_skin_idx == 1:
@@ -149,6 +210,25 @@ class Paddle:
             belt_y = self.rect.centery - belt_h // 2
             pygame.draw.rect(surface, RED, (self.rect.x, belt_y, self.rect.width, belt_h))
             pygame.draw.rect(surface, BLACK, self.rect, 1)
+        elif self.power_active == POWER_REVOLVER:
+            # 2/3 Gris Metal, 1/3 Marrón Empuñadura
+            h_metal = (self.rect.height * 2) // 3
+            h_handle = self.rect.height - h_metal
+            pygame.draw.rect(surface, GUN_METAL, (self.rect.x, self.rect.y, self.rect.width, h_metal))
+            pygame.draw.rect(surface, LIGHT_BROWN, (self.rect.x, self.rect.y + h_metal, self.rect.width, h_handle))
+            pygame.draw.rect(surface, BLACK, self.rect, 1)
+        elif self.power_active == POWER_GUM:
+            # Dibujar en 3 bloques claros
+            bh = self.rect.height // 3
+            # Bloque 3 (Abajo) - Siempre rosa si tiene >= 1 carga
+            c3 = GUM_PINK if self.gum_charges >= 1 else WHITE
+            pygame.draw.rect(surface, c3, (self.rect.x, self.rect.y + bh*2, self.rect.width, self.rect.height - bh*2))
+            # Bloque 2 (Medio) - Rosa si tiene >= 2 cargas
+            c2 = GUM_PINK if self.gum_charges >= 2 else WHITE
+            pygame.draw.rect(surface, c2, (self.rect.x, self.rect.y + bh, self.rect.width, bh))
+            # Bloque 1 (Arriba) - Rosa si tiene 3 cargas
+            c1 = GUM_PINK if self.gum_charges >= 3 else WHITE
+            pygame.draw.rect(surface, c1, (self.rect.x, self.rect.y, self.rect.width, bh))
         else:
             pygame.draw.rect(surface, self.color, self.rect)
         if self.power_active == POWER_MAGNET:
@@ -169,8 +249,11 @@ class Ball:
         self.is_fireball = False
         self.is_orange = False
         self.is_ghost = False
-        self.is_cheese = False
         self.ghost_owner = 0
+        self.is_cheese = False
+        self.is_bullet = False
+        self.is_kill_ball = False
+        self.bullet_immunity = 0.0 # Cooldown para no matarse al disparar
         self.last_portal_id = None # Puede ser "blue", "orange" o None
 
     def reset_orange(self, ball_size):
@@ -198,18 +281,47 @@ class Ball:
         self.vy = self.speed * math.sin(angle)
 
     def update(self, dt, speed_multiplier=1.0):
+        if self.bullet_immunity > 0: self.bullet_immunity -= dt
         self.x_float += self.vx * speed_multiplier * dt
         self.y_float += self.vy * speed_multiplier * dt
         self.rect.x = int(self.x_float)
         self.rect.y = int(self.y_float)
 
-    def draw(self, surface, skin="Default"):
-        if skin == "CHEESE":
+    def draw(self, surface, skin="Default", identical_ghost=False, main_color=WHITE):
+        draw_color = self.color
+        if self.is_ghost:
+            if not identical_ghost:
+                pygame.draw.rect(surface, GHOST_COLOR, self.rect)
+                pygame.draw.rect(surface, WHITE, self.rect, 1) # Borde sutil
+                return
+            else:
+                draw_color = main_color
+        
+        if self.is_bullet:
             pygame.draw.rect(surface, YELLOW, self.rect)
-            # Dibujar huecos de queso (pixeles naranja)
-            pygame.draw.rect(surface, ORANGE, (self.rect.x + 2, self.rect.y + 2, 2, 2))
-            pygame.draw.rect(surface, ORANGE, (self.rect.x + 6, self.rect.y + 5, 2, 2))
-            pygame.draw.rect(surface, ORANGE, (self.rect.x + 3, self.rect.y + 7, 1, 1))
+            pygame.draw.rect(surface, WHITE, self.rect, 1)
+            return
+
+        if skin == "CHEESE":
+            # Cuña de queso base
+            points = [(self.rect.centerx, self.rect.top), (self.rect.left, self.rect.bottom), (self.rect.right, self.rect.bottom)]
+            pygame.draw.polygon(surface, YELLOW, points)
+            
+            # OJOS GIGANTES con brillo (3x4 pixels)
+            # Ojo Izquierdo
+            pygame.draw.rect(surface, BLACK, (self.rect.x + 1, self.rect.y + 2, 3, 4))
+            pygame.draw.rect(surface, WHITE, (self.rect.x + 1, self.rect.y + 2, 1, 1)) # Brillo
+            # Ojo Derecho
+            pygame.draw.rect(surface, BLACK, (self.rect.x + 6, self.rect.y + 2, 3, 4))
+            pygame.draw.rect(surface, WHITE, (self.rect.x + 6, self.rect.y + 2, 1, 1)) # Brillo
+            
+            # SONROJO GRANDE (Pinky)
+            pygame.draw.rect(surface, (255, 120, 150), (self.rect.x, self.rect.y + 6, 2, 1))
+            pygame.draw.rect(surface, (255, 120, 150), (self.rect.x + 8, self.rect.y + 6, 2, 1))
+            
+            # BOCA ABIERTA CUTE
+            pygame.draw.rect(surface, BLACK, (self.rect.x + 4, self.rect.y + 7, 2, 2))
+            pygame.draw.rect(surface, (255, 100, 100), (self.rect.x + 4, self.rect.y + 8, 2, 1)) # Lengüita
         elif skin == "Tennis":
             pygame.draw.rect(surface, (173, 255, 47), self.rect) # Verde Tennis
             # Franja blanca "pixelada" diagonal
@@ -220,7 +332,7 @@ class Ball:
             pygame.draw.rect(surface, WHITE, (self.rect.x + 3*px, self.rect.y + px, px, px))
             pygame.draw.rect(surface, WHITE, (self.rect.x + 4*px, self.rect.y, px, px))
         else:
-            pygame.draw.rect(surface, self.color, self.rect)
+            pygame.draw.rect(surface, draw_color, self.rect)
         
         if self.is_cheese and skin != "CHEESE":
             # Si el ratón está activo pero la skin no es queso, aplicamos los huecos encima
@@ -272,38 +384,57 @@ class Mouse:
             self.rect.y = int(self.y_float)
 
     def draw(self, surface):
-        # Cuerpo del ratón (30x30)
-        pygame.draw.rect(surface, self.color, self.rect)
+        # Cuerpo blocky (Gris Pong)
+        body_color = (180, 180, 180)
+        pygame.draw.rect(surface, body_color, self.rect)
+        pygame.draw.rect(surface, WHITE, self.rect, 2) # Borde para que resalte
         
-        # Orientación de los detalles
+        # Orejas de bloque gigantes (Desproporcionadas)
+        ear_size = 12
+        pygame.draw.rect(surface, body_color, (self.rect.left - 4, self.rect.top - 8, ear_size, ear_size))
+        pygame.draw.rect(surface, body_color, (self.rect.right - ear_size + 4, self.rect.top - 8, ear_size, ear_size))
+        # Interior orejas (Rosa pixelado)
+        pygame.draw.rect(surface, (255, 150, 180), (self.rect.left - 2, self.rect.top - 6, ear_size - 4, ear_size - 4))
+        pygame.draw.rect(surface, (255, 150, 180), (self.rect.right - ear_size + 6, self.rect.top - 6, ear_size - 4, ear_size - 4))
+
+        # Cara Caricaturesca (Blocky)
         if self.facing_right:
-            tx = self.rect.left - 9 # Cola a la izquierda
-            nx = self.rect.right - 4 # Nariz a la derecha
-            w_dir = 1
+            # OJOS CUADRADOS GIGANTES
+            pygame.draw.rect(surface, WHITE, (self.rect.x + 15, self.rect.y + 2, 8, 8))
+            pygame.draw.rect(surface, BLACK, (self.rect.x + 19, self.rect.y + 4, 4, 4)) # Pupila
+            # Nariz bloque
+            pygame.draw.rect(surface, (255, 100, 150), (self.rect.right - 4, self.rect.centery, 4, 4))
+            # Diente (Un solo bloque blanco)
+            pygame.draw.rect(surface, WHITE, (self.rect.right - 8, self.rect.bottom - 4, 3, 3))
         else:
-            tx = self.rect.right # Cola a la derecha
-            nx = self.rect.left # Nariz a la izquierda
-            w_dir = -1
-            
-        ty = self.rect.centery - 4
-        
-        # 1. La cola (un cuadrado de 9x9 dividido en 3 franjas verticales)
-        pygame.draw.rect(surface, (255, 0, 255), (tx, ty, 3, 9))
-        pygame.draw.rect(surface, (255, 182, 193), (tx + 3, ty, 3, 9))
-        pygame.draw.rect(surface, (255, 0, 255), (tx + 6, ty, 3, 9))
-        
-        # 2. La nariz (Negra, dentro del cuerpo)
-        n_x = self.rect.right - 9 if self.facing_right else self.rect.left
-        pygame.draw.rect(surface, BLACK, (n_x, self.rect.centery - 4, 9, 9))
-        
-        # 3. Los bigotes (líneas grises oscuras, dentro del cuerpo)
-        b_col = (80, 80, 80)
-        # Punto de origen (base de la nariz)
-        origin_x = self.rect.right - 9 if self.facing_right else self.rect.left + 9
-        # Punto final (más cortos ahora, hacia el interior)
-        target_x = self.rect.right - 17 if self.facing_right else self.rect.left + 17
-        
-        # Bigote superior
-        pygame.draw.line(surface, b_col, (origin_x, self.rect.centery - 2), (target_x, self.rect.centery - 8), 4)
-        # Bigote inferior
-        pygame.draw.line(surface, b_col, (origin_x, self.rect.centery + 2), (target_x, self.rect.centery + 8), 4)
+            # OJOS CUADRADOS GIGANTES
+            pygame.draw.rect(surface, WHITE, (self.rect.x + 7, self.rect.y + 2, 8, 8))
+            pygame.draw.rect(surface, BLACK, (self.rect.x + 7, self.rect.y + 4, 4, 4)) # Pupila
+            # Nariz bloque
+            pygame.draw.rect(surface, (255, 100, 150), (self.rect.left, self.rect.centery, 4, 4))
+            # Diente (Un solo bloque blanco)
+            pygame.draw.rect(surface, WHITE, (self.rect.left + 5, self.rect.bottom - 4, 3, 3))
+
+        # Cola segmentada (Estilo línea de Pong)
+        tail_color = (255, 182, 193)
+        tx = self.rect.left - 12 if self.facing_right else self.rect.right
+        for i in range(3):
+            pygame.draw.rect(surface, tail_color, (tx + i*4, self.rect.centery + 4, 3, 3))
+
+class GumProjectile:
+    def __init__(self, x, y, direction):
+        size = BALL_SIZE * 3
+        self.rect = pygame.Rect(x, y - size//2, size, size)
+        self.x_float = float(self.rect.x)
+        self.vx = 500 * direction
+        self.active = True
+
+    def update(self, dt):
+        self.x_float += self.vx * dt
+        self.rect.x = int(self.x_float)
+        if self.rect.right < 0 or self.rect.left > SCREEN_WIDTH:
+            self.active = False
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, GUM_PINK, self.rect)
+        pygame.draw.rect(surface, WHITE, self.rect, 2)

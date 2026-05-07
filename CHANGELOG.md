@@ -2,6 +2,43 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [0.5.0] - 2026-05-07
+### The REVOLVER & GUM Combat Update (v0.5.0 Final)
+Esta actualización transforma el Pong en un duelo de disparos tácticos y control de masas, con armas letales y una IA que sabe defenderse y atacar.
+
+#### Agregado (Nuevas cosas)
+- **Nuevo Modificador: REVOLVER (Pestaña EXTRAS)**:
+    - **Ítem Orbital**: Aparece con un 25% de probabilidad junto a cada reloj.
+    - **Munición**: Otorga 3 balas amarillas de alta velocidad (x2 velocidad base).
+    - **Letalidad Total**: Cualquier contacto con la bala provoca una explosión instantánea y pérdida del punto.
+    - **Puntería Recta**: Las balas salen del centro de la paleta en trayectoria perfectamente horizontal.
+    - **Sonido Arcade**: Feedback auditivo "PIUM" al disparar.
+    - **IA Pistolera**: La computadora ahora reconoce el revólver, te apunta directamente y te dispara con precisión.
+- **Nuevo Poder: GUM (CHICLE)**:
+    - Las paletas se vuelven de color rosa.
+    - **Adherencia Automática**: Las pelotas se quedan pegadas a la paleta al contacto.
+    - **Proyectiles de Chicle**: Dispara bolas de chicle gigantes que confunden al rival y rebotan de forma errática.
+    - **IA Táctica**: La IA usa el chicle para atrapar la bola, esquivar al ratón y disparar chicles de cobertura.
+
+#### Arreglado (Bugs y Pulido)
+- **Seguro de Disparo**: Añadido `bullet_immunity` de 0.1s para evitar que el jugador explote por su propia bala al disparar.
+- **VFX Fluido**: Las explosiones de las balas y paletas ya no se congelan al marcar gol; las partículas siguen fluyendo durante el saque.
+- **Transparencia en Goles**: Las balas que no impactan al jugador desaparecen sin sumar puntos injustos.
+- **IA Anti-Bloqueo**: Corregido el error donde la IA se congelaba al tener la pelota pegada con el chicle.
+
+## [0.4.0] - 2026-05-06
+### The Solo & Settings Update
+Introducción del modo para un jugador y control total sobre la configuración del juego.
+
+#### Agregado (Nuevas cosas)
+- **Modo SOLO (IA)**:
+    - Menú de selección de modo (MULTIPLAYER vs SOLO).
+    - IA adaptativa que busca ítems, esquiva amenazas y utiliza poderes estratégicamente.
+- **Panel de SETTINGS**:
+    - **Control de Volumen**: Ajuste maestro para efectos de sonido.
+    - **Temblor de Pantalla (Screen Shake)**: Opción para activar/desactivar la vibración visual.
+    - **Idioma**: Soporte completo para Inglés y Español.
+
 ## [0.3.4] - 2026-05-04
 ### The PORTAL Update (v0.3.4 Final)
 Esta versión introduce la mecánica de teletransporte dimensional y una serie de mejoras críticas en la estabilidad del motor y la interfaz de usuario.

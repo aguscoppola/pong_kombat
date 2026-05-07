@@ -1,15 +1,16 @@
 # Pong Kombat 🔥🚀
 
-¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional!
+¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal y una IA que no tiene piedad.
 
-## 🔭 ¿Qué hay de nuevo en la v0.3.4?
-¡La **Portal Update** ya está aquí!
-*   **PORTALES Dimensionales:** Teletranspórtate por el campo de juego. ¡Cuidado con el impulso extra al cruzar!
-*   **Planetas Flotantes:** Astros con gravedad física que curvan la trayectoria de la pelota. ¡Pruébalos en modo destructible!
-*   **Poder FANTASMA:** Dispara proyectiles espectrales que engañan al rival.
-*   **El Intruso:** Activa al ratón que corre por el campo para añadir una capa extra de caos.
-*   **Multiplicador X2:** Captura el ícono dorado para que tu próximo gol valga doble.
-*   **Skins & Estética:** Personaliza tus poderes y disfruta de una interfaz pulida con tooltips inteligentes.
+## 🔭 ¿Qué hay de nuevo en la v0.5.0?
+¡La **REVOLVER Update** ha llegado para cambiar las reglas! 🤠🔫
+
+*   **Duelo de Revólveres:** Captura el ítem orbital y dispara 3 balas amarillas letales. ¡Un impacto y el rival explota! 💥
+*   **Modo SOLO (IA):** Enfréntate a una inteligencia artificial avanzada que esquiva, usa poderes y hasta te apunta con el revólver. 🤖
+*   **Poder de CHICLE:** Atrapa la pelota en tu paleta y dispara proyectiles pegajosos para confundir al oponente. 🌸
+*   **Panel de SETTINGS:** Controla el volumen, el idioma (Español/Inglés) y el temblor de pantalla. ⚙️
+*   **PORTALES Dimensionales:** Teletranspórtate por el campo con física mejorada y aceleración. 🌀
+*   **Caos Total:** Planetas con gravedad, ratones intrusos y multiplicadores X2. ☄️🐭
 
 ## 🛠️ Cómo instalar y jugar
 1. Necesitas tener Python instalado (recomendamos la versión 3.12).
@@ -24,13 +25,14 @@
 
 ## 🎮 Controles 🕹️
 *   **Jugador 1 (Izquierda):** Movimiento `W/S`. Poder `D`.
-*   **Jugador 2 (Derecha):** Movimiento `Flechas`. Poder `Flecha Derecha`.
-*   **Navegación:** Usa el **Mouse** para gestionar los menús y modificadores.
+*   **Jugador 2 (Derecha/IA):** Movimiento `Flechas`. Poder `Flecha Derecha`.
+*   **Globales:** `ENTER` para empezar, `ESC` para volver al menú.
+*   **Navegación:** Usa el **Mouse** para gestionar los menús, modificadores y ajustes.
 
 ## 🛡️ Mecánicas Kombat 🔥
-*   **Poderes:** Bola de Fuego, Escudo Gigante, Velocista, Bola de Demolición, Imán y Fantasma.
-*   **Relojes de Arena:** Cámara lenta, Aceleración, Carga rápida, Barrera Divina, Muro Absoluto y Demolición Instantánea.
-*   **Modificadores:** Personaliza la gravedad, el tamaño de los portales, el límite de puntos y mucho más.
+*   **Poderes:** ¡NUEVO! Revolver y Chicle, además de Fuego, Escudo, Imán, Fantasma y Demolición.
+*   **Relojes de Arena:** 6 tipos de modificadores temporales que alteran el flujo del tiempo y el espacio.
+*   **Modificadores:** Más de 30 opciones para crear la partida de tus sueños (o de tus pesadillas).
 
 ---
 ¡Prepárate para el Kombat definitivo! ☄️🌌

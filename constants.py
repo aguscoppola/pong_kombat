@@ -41,6 +41,8 @@ STATE_SERVE = "serve"
 STATE_PLAYING = "playing"
 STATE_GAME_OVER = "game_over"
 STATE_PRESS_TO_START = "press_to_start"
+STATE_SETTINGS = "settings"
+STATE_MODE_SELECTION = "mode_selection"
 
 # --- Tipos de Poderes ---
 POWER_NONE = 0
@@ -50,3 +52,9 @@ POWER_SPEED = 3
 POWER_MAGNET = 4
 POWER_ORANGE = 5
 POWER_GHOST = 6
+POWER_GUM = 7
+POWER_REVOLVER = 8
+
+GUM_PINK = (255, 105, 180) 
+LIGHT_BROWN = (181, 101, 29)
+GUN_METAL = (128, 128, 128)

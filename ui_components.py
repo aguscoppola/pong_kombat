@@ -3,31 +3,38 @@ import re
 from constants import *
 
 def draw_rich_text(surface, text, pos, font, default_color=WHITE):
-    """Dibuja texto con soporte para cambios de color persistentes"""
-    parts = re.split(r'(\s+|\(|\)|/|\|)', text)
-    curr_x, curr_y = pos
-    curr_color = default_color
+    """Dibuja texto con soporte para cambios de color y saltos de línea"""
+    lines = text.split('\n')
+    start_x, start_y = pos
     color_keywords = {
         "BLUE": BLUE, "RED": RED, "PURPLE": PURPLE, "WHITE": WHITE,
         "YELLOW": YELLOW, "ORANGE": ORANGE, "GREEN": GREEN, "CYAN": CYAN,
         "GOLDEN": GOLD, "GOLD": GOLD, "MAG": BLUE, "NET": RED, "GHOST": GHOST_COLOR,
-        "PINK": PINK, "GRAY": GRAY
+        "PINK": PINK, "GUM_PINK": GUM_PINK, "GRAY": GRAY
     }
-    is_tag = False
-    for part in parts:
-        if not part: continue
-        if part == "|":
-            is_tag = not is_tag
-            continue
+    
+    line_height = font.get_linesize()
+    for i, line in enumerate(lines):
+        curr_x = start_x
+        curr_y = start_y + i * line_height
+        parts = re.split(r'(\s+|\(|\)|/|\|)', line)
+        is_tag = False
+        curr_color = default_color
         
-        if is_tag and part.upper() in color_keywords:
-            curr_color = color_keywords[part.upper()]
-            continue
+        for part in parts:
+            if not part: continue
+            if part == "|":
+                is_tag = not is_tag
+                continue
             
-        # Si no es un tag, renderizar la palabra
-        word_surf = font.render(part, True, curr_color)
-        surface.blit(word_surf, (curr_x, curr_y))
-        curr_x += word_surf.get_width()
+            if is_tag and part.upper() in color_keywords:
+                curr_color = color_keywords[part.upper()]
+                continue
+                
+            # Si no es un tag, renderizar la palabra
+            word_surf = font.render(part, True, curr_color)
+            surface.blit(word_surf, (curr_x, curr_y))
+            curr_x += word_surf.get_width()
 
 def draw_remove_option(game, y, label, is_active, rect, text_rect, active_color=GREEN, is_checkbox=True, offset=0, surface=None):
     if surface is None: surface = game.screen
