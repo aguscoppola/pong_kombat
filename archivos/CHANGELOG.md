@@ -2,6 +2,24 @@
 
 Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
 
+## [0.5.1] - 2026-05-08
+### The Architect & Survival Update (v0.5.1)
+Esta actualización marca la madurez del proyecto con una arquitectura profesional y una IA que ha aprendido a sobrevivir a los duelos de pistolas.
+
+#### Agregado (Nuevas cosas)
+- **Refactorización de Carpetas**: El proyecto ahora sigue una estructura organizada (`codigo_fuente/`, `codigo/`, `sounds/`, `archivos/`).
+- **Sub-modificador: Probability of Appear (Revólver)**: Permite ajustar la frecuencia del ítem orbital en 4 niveles: Low (10%), Default (25%), Quite (50%) y Always (100%).
+- **Lanzador Centralizado**: Nuevo `main.py` en la raíz que conecta dinámicamente todos los módulos distribuidos.
+
+#### Mejorado (IA y Supervivencia)
+- **IA: Esquiva de Balas**: La computadora ahora detecta proyectiles amarillos en trayectoria de colisión y los esquiva activamente.
+- **IA: Táctica de Duelo**: Con el revólver, la IA prioriza defender la pelota principal antes que disparar, asegurando que no pierda el poder por un descuido.
+- **Carga de Audio Profesional**: El `AudioManager` ahora usa rutas absolutas, garantizando que los sonidos se carguen sin importar la ubicación del script.
+
+#### Arreglado (Bugs)
+- **Restauración de Audio**: Corregido el error de "juego mudo" tras la reestructuración de archivos.
+- **Estabilidad de Imports**: Eliminados los fallos de `ModuleNotFoundError` mediante configuración dinámica de `sys.path`.
+
 ## [0.5.0] - 2026-05-07
 ### The REVOLVER & GUM Combat Update (v0.5.0 Final)
 Esta actualización transforma el Pong en un duelo de disparos tácticos y control de masas, con armas letales y una IA que sabe defenderse y atacar.

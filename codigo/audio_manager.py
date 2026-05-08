@@ -4,7 +4,9 @@ import os
 class AudioManager:
     def __init__(self):
         self.sounds = {}
-        self.sounds_dir = "sounds"
+        # Ruta absoluta para evitar problemas con la estructura de carpetas
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.sounds_dir = os.path.join(base_dir, "sounds")
         self.master_volume = 0.5  # Volumen maestro (0.0 a 1.0)
         self.sound_base_volumes = {} # Guardamos los volúmenes base originales
         self.load_all_sounds()

@@ -231,6 +231,13 @@ class Game:
         self.revolver_rect = pygame.Rect(0,0,30,30)
         self.revolver_text_rect = pygame.Rect(0,0,0,0)
         
+        # Sub-modificador: Probabilidad de aparición
+        self.revolver_prob_options = [0.1, 0.25, 0.5, 1.0]
+        self.revolver_prob_names = ["Low (10%)", "Default (25%)", "Quite (50%)", "Always (100%)"]
+        self.revolver_prob_idx = 1
+        self.revolver_prob_rect = pygame.Rect(0,0,220,40)
+        self.revolver_prob_text_rect = pygame.Rect(0,0,0,0)
+        
         self.portal_red_rect = pygame.Rect(0,0,0,0)
         self.portal_green_rect = pygame.Rect(0,0,0,0)
         
@@ -598,6 +605,8 @@ class Game:
             self.audio.play('pop'); self.add_mouse_enabled = not self.add_mouse_enabled
         elif self.revolver_rect.collidepoint(event.pos) or self.revolver_text_rect.collidepoint(event.pos):
             self.audio.play('pop'); self.revolver_enabled = not self.revolver_enabled
+        elif self.revolver_enabled and self.revolver_prob_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.revolver_prob_idx = (self.revolver_prob_idx + 1) % len(self.revolver_prob_options)
         
         if self.add_mouse_enabled:
             if self.mouse_speed_rect.collidepoint(event.pos):
@@ -926,8 +935,9 @@ class Game:
             if self.global_hits >= self.watch_spawn_hits_options[self.watch_spawn_hits_idx]:
                 self.global_hits = 0
                 self.spawn_random_watch()
-                # 25% de chance de Revólver al salir un reloj
-                if self.revolver_enabled and not self.revolver_item_active and random.random() < 0.25:
+                # Chance dinámica de Revólver al salir un reloj
+                prob = self.revolver_prob_options[self.revolver_prob_idx]
+                if self.revolver_enabled and not self.revolver_item_active and random.random() < prob:
                     self.revolver_item_active = True
                     self.revolver_angle = 0.0
 
@@ -1225,29 +1235,44 @@ class Game:
                         if self.paddle2.gum_charges > 0 and random.random() < 0.01:
                             self.activate_paddle_power(self.paddle2, 2)
 
-                # 4. Lógica específica de REVOLVER (Duelo de Vaqueros)
-                if self.paddle2.power_active == POWER_REVOLVER:
-                    # Apuntar al jugador
-                    target_y = self.paddle1.rect.centery
-                    if self.paddle2.rect.centery < target_y - 5:
+                # 1. PRIORIDAD ABSOLUTA: ESQUIVAR BALAS AMARILLAS (Sobrevivir)
+                yellow_bullets = [b for b in self.balls if b.is_bullet and b.vx > 0]
+                if yellow_bullets:
+                    # Encontrar la bala más cercana
+                    closest_bullet = min(yellow_bullets, key=lambda b: abs(b.rect.centerx - self.paddle2.rect.centerx))
+                    # Moverse al lado opuesto de la bala para esquivar
+                    if closest_bullet.rect.centery < SCREEN_HEIGHT // 2:
                         self.paddle2.move(1, dt, PADDLE_SPEED)
-                    elif self.paddle2.rect.centery > target_y + 5:
-                        self.paddle2.move(-1, dt, PADDLE_SPEED)
-                    
-                    # Disparar si está alineado y no está en cooldown de bala (o azar)
-                    if abs(self.paddle2.rect.centery - target_y) < 15:
-                        if random.random() < 0.05: # No disparar las 3 balas en 1 frame
-                            self.activate_paddle_power(self.paddle2, 2)
-                    
-                    # Si la pelota está muy cerca de su lado, dejar de apuntar y defender un poco
-                    main_ball = self.balls[0]
-                    if main_ball.vx > 0 and main_ball.rect.centerx > SCREEN_WIDTH * 0.7:
-                        # Prioridad defensa (permitir que siga la lógica de abajo)
-                        pass
                     else:
-                        # Si está apuntando, terminamos la actualización de IA aquí
-                        self._process_ai_movement(dt)
-                        return # Salir del frame de actualización de IA
+                        self.paddle2.move(-1, dt, PADDLE_SPEED)
+                    # Si hay balas, ignoramos el resto de lógicas ofensivas para centrarnos en vivir
+                    self._process_ai_movement(dt)
+                    return
+
+                # 2. Lógica específica de REVOLVER (Duelo de Vaqueros)
+                if self.paddle2.power_active == POWER_REVOLVER:
+                    main_ball = self.balls[0]
+                    # PRIORIDAD DEFENSIVA: Si la pelota viene hacia mí y está cerca, defender
+                    if main_ball.vx > 0 and main_ball.rect.centerx > SCREEN_WIDTH * 0.4:
+                        # Seguir la pelota para no perder el punto ni el poder
+                        target_y = main_ball.rect.centery
+                        if self.paddle2.rect.centery < target_y - 10: self.paddle2.move(1, dt, PADDLE_SPEED)
+                        elif self.paddle2.rect.centery > target_y + 10: self.paddle2.move(-1, dt, PADDLE_SPEED)
+                    else:
+                        # MODO ASESINO: Apuntar al centro del Jugador 1
+                        target_y = self.paddle1.rect.centery
+                        if self.paddle2.rect.centery < target_y - 5:
+                            self.paddle2.move(1, dt, PADDLE_SPEED)
+                        elif self.paddle2.rect.centery > target_y + 5:
+                            self.paddle2.move(-1, dt, PADDLE_SPEED)
+                        
+                        # Disparar si está alineado
+                        if abs(self.paddle2.rect.centery - target_y) < 15:
+                            if random.random() < 0.05: # Cadencia de fuego
+                                self.activate_paddle_power(self.paddle2, 2)
+                    
+                    self._process_ai_movement(dt)
+                    return
 
                 # 2. Comprobar si hay alguna pelota naranja amenazante (viniendo hacia la IA)
                 orange_threats = [b for b in self.balls if b.is_orange and b.vx > 0]
@@ -2063,6 +2088,9 @@ class Game:
             cy += 60; self._draw_sub_selector(cy, self.t("Mouse appear time:", "Tiempo aparición:"), self.mouse_appear_names[self.mouse_appear_idx], self.mouse_appear_rect, off, ox, lm, surface, sub_val=f"{self.mouse_appear_options[self.mouse_appear_idx]}s")
         
         cy += 60; draw_remove_option(self, cy, self.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVOLVER"), self.revolver_enabled, self.revolver_rect, self.revolver_text_rect, active_color=GUN_METAL, offset=off, surface=surface)
+        if self.revolver_enabled:
+            cy += 60; self._draw_sub_selector(cy, self.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.revolver_prob_names[self.revolver_prob_idx], self.revolver_prob_rect, off, ox, lm, surface)
+        
         if self.revolver_rect.collidepoint(mpos) or self.revolver_text_rect.collidepoint(mpos):
             if self.language == "EN":
                 active_tooltip = ["Orbital item. Grants a 6-shooter (3 shots for balance).", "Yellow bullets travel at 2x speed.", "Hits are LETHAL to the opponent.", "Bullets go through and disappear if they miss."]

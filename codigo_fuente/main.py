@@ -1,12 +1,11 @@
 import sys
 import os
 
-# Configurar el path para encontrar el código en las carpetas de refactorización
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Rutas absolutas para evitar errores de importación
+BASE_DIR = r"c:\Users\agustin\Documents\workspace\pong_kombat\pong_kombat"
 sys.path.append(os.path.join(BASE_DIR, "codigo_fuente"))
 sys.path.append(os.path.join(BASE_DIR, "codigo"))
 
-# Importar y ejecutar el motor del juego
 if __name__ == "__main__":
     from game_engine import Game
     game = Game()
