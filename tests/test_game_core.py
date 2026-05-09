@@ -1,6 +1,7 @@
 import pytest
 import pygame
 from game_engine import Game
+from entities import Paddle, Ball
 from constants import *
 
 @pytest.fixture

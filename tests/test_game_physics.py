@@ -9,15 +9,18 @@ def game():
     return Game()
 
 def test_paddle_ball_collision_logic(game):
-    ball = Ball(100, 100)
-    ball.vx = -500 # Hacia la izquierda (P1)
+    # Posicionar paleta 1
+    game.paddle1.rect.center = (30, 100)
+    # Pelota justo delante, yendo hacia ella
+    ball = Ball(50, 100)
+    ball.vx = -1000
+    ball.speed = 1000 # IMPORTANTE: Definir la velocidad base para el rebote
     game.balls = [ball]
     
-    # Posicionar paleta 1 para que colisione
-    game.paddle1.rect.center = (100, 100)
-    
-    # Forzar colisión
-    game.check_ball_collisions(ball)
+    # IMPORTANTE: Mover la pelota primero
+    ball.update(0.02)
+    # Luego procesar colisiones
+    game.physics.update(0.02)
     
     # Debería haber rebotado (vx positivo ahora)
     assert ball.vx > 0
@@ -30,26 +33,29 @@ def test_magnet_force_application(game):
     game.paddle1.rect.center = (100, 200) # La paleta está abajo de la pelota
     
     initial_vy = ball.vy
-    game._apply_magnet_force(game.paddle1, 0.1, ball)
+    game.physics.apply_magnet_force(game.paddle1, 0.1, ball)
     
     # La fuerza magnética debería atraer la pelota hacia la paleta (vy aumenta)
     assert ball.vy > initial_vy
 
 def test_planet_collision(game):
-    ball = Ball(game.planet1_pos[0], game.planet1_pos[1])
+    # Pelota con velocidad para que el rebote sea notable
+    ball = Ball(game.planet1_pos[0] + 5, game.planet1_pos[1] + 5)
+    ball.vx = 100; ball.vy = 100
     game.planet1_alive = True
-    game._check_planet_collisions(ball)
+    game.physics._check_planet_collisions(ball)
     
-    # El planeta debería haber recibido daño o morir (depende del hit_count)
-    # Aquí probamos que la pelota reaccione (ej: vfx o cambio de dirección)
-    assert ball.vx != 0 or ball.vy != 0
+    # La dirección debería haber cambiado tras el rebote
+    assert ball.vx != 100 or ball.vy != 100
 
 def test_orange_bounce_at_back_wall(game):
     ball = Ball(-5, 300) # Casi fuera por la izquierda
     ball.vx = -100
     ball.is_orange = True
     
-    game._handle_orange_bounce(ball)
+    # El PhysicsEngine maneja los rebotes de muros traseros para pelotas naranjas
+    game.physics._handle_goal(ball, True) 
+    
     # Debería rebotar en lugar de marcar gol (vx cambia de signo)
     assert ball.vx > 0
     assert ball.rect.left >= 0
@@ -59,5 +65,4 @@ def test_watch_spawn_logic(game):
     game.global_hits = 10 # Umbral para spawn
     game._check_watch_spawn()
     # No es garantizado por el azar, pero probamos la función
-    # (En un test real mockearíamos random para asegurar el spawn)
     pass 

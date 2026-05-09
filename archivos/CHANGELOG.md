@@ -1,6 +1,17 @@
-# Registro de Cambios (Changelog)
+## [0.5.1.1] - 2026-05-09
+### Physics Engine Stability & UI Polish (v0.5.1.1)
+Esta es una actualización de corrección de errores (Hotfix) para estabilizar la nueva arquitectura del motor de física y pulir la experiencia de usuario.
 
-Aquí guardaremos una lista de todas las cosas nuevas que le vayamos agregando al juego o los errores que vayamos arreglando. Así no nos olvidamos de nada y cualquier persona que vea el proyecto sabrá en qué estuvimos trabajando.
+#### Arreglado (Corrección de errores)
+- **Físicas: Rebote de Paredes**: Corregido el efecto "metralleta" al sincronizar la posición flotante de la pelota tras el impacto.
+- **Físicas: Movimiento de Pelota**: Restaurada la actualización de posición que dejaba la bola estática tras la refactorización.
+- **Físicas: Planetas Fantasma**: Las colisiones con planetas ahora se desactivan correctamente si el modificador no está activo.
+- **Mecánicas: Portales**: Restaurado el sistema de cooldown (anti-spam) e impulsos de velocidad para todos los colores de portales.
+- **Mecánicas: Reloj Púrpura**: Restaurada la lógica de otorgar poderes cada 3 toques que se había perdido.
+- **Mecánicas: Revólver**: Restaurada la órbita y recolección del ítem en el centro de la pista.
+- **UI: Tooltips**: Sincronización completa de descripciones en Inglés/Español y filtrado por pestañas para evitar solapamientos.
+- **UI: Game Over**: Corregido NameError (tw/sy) que cerraba el juego al ganar por Gol de Oro y corregido el tag |YELLOW| en los textos de victoria.
+- **UI: Colores de Menú**: Añadido resaltado de color para las opciones de gravedad (MOON, STAR, etc.).
 
 ## [0.5.1] - 2026-05-08
 ### The Architect & Survival Update (v0.5.1)

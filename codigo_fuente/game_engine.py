@@ -8,6 +8,9 @@ from entities import Ball, Paddle, Particle
 from ui_components import draw_rich_text, draw_remove_option, draw_tooltip
 from audio_manager import AudioManager
 from vfx_manager import VFXManager
+from menu_manager import MenuManager
+from ai_controller import AIController
+from physics_engine import PhysicsEngine
 import assets
 
 class Game:
@@ -21,6 +24,9 @@ class Game:
         self.clock = pygame.time.Clock()
         self.audio = AudioManager()
         self.vfx = VFXManager()
+        self.menus = MenuManager(self)
+        self.ai_controller = AIController(self)
+        self.physics = PhysicsEngine(self)
         self.init_fonts()
         self.init_entities()
         self.init_game_state()
@@ -679,83 +685,9 @@ class Game:
             if keys[pygame.K_DOWN]: self.paddle2.move(1, dt, p_speed)
 
     def check_ball_collisions(self, ball):
-        is_main = (ball == self.balls[0])
-        # 1. Planetas
-        if self.floating_planets_enabled:
-            self._check_planet_collisions(ball)
-            
-        # 2. Paredes
-        if ball.rect.top <= 0:
-            ball.rect.top = 0; ball.y_float = float(ball.rect.y); ball.vy = abs(ball.vy)
-            if self.wall_sound_cooldown <= 0: self.audio.play('hit'); self.wall_sound_cooldown = 0.25
-        elif ball.rect.bottom >= SCREEN_HEIGHT:
-            ball.rect.bottom = SCREEN_HEIGHT; ball.y_float = float(ball.rect.y); ball.vy = -abs(ball.vy)
-            if self.wall_sound_cooldown <= 0: self.audio.play('hit'); self.wall_sound_cooldown = 0.25
+        # Delegado al PhysicsEngine.update()
+        pass
 
-        # 3. Multiplicador X2 (Solo principal)
-        if is_main and self.is_x2_item_active and ball.rect.colliderect(self.x2_item_rect):
-            self.is_x2_item_active = False; self.ball_is_x2 = True; ball.color = GOLD; self.audio.play('x2')
-            self.vfx.burst(self.x2_item_rect.centerx, self.x2_item_rect.centery, GOLD)
-
-        # 4. Relojes (Solo principal)
-        if is_main and self.hourglass_rect and ball.rect.colliderect(self.hourglass_rect):
-            self._handle_watch_capture()
-
-        # 5. Goles
-        if ball.rect.right < 0:
-            if ball.is_bullet:
-                if ball in self.balls: self.balls.remove(ball)
-            elif ball.is_ghost:
-                if ball.ghost_owner == 2: self.goal_scored(2)
-                if ball in self.balls: self.balls.remove(ball)
-            elif ball.is_orange: self._handle_orange_bounce(True, ball)
-            elif self.paddle1.has_extra_life: self._handle_extra_life_save(True, ball)
-            else: self.goal_scored(2)
-        elif ball.rect.left > SCREEN_WIDTH:
-            if ball.is_bullet:
-                if ball in self.balls: self.balls.remove(ball)
-            elif ball.is_ghost:
-                if ball.ghost_owner == 1: self.goal_scored(1)
-                if ball in self.balls: self.balls.remove(ball)
-            elif ball.is_orange: self._handle_orange_bounce(False, ball)
-            elif self.paddle2.has_extra_life: self._handle_extra_life_save(False, ball)
-            else: self.goal_scored(1)
-
-        # 6. Paletas
-        if ball.is_bullet and ball.bullet_immunity <= 0:
-            if ball.rect.colliderect(self.paddle1.rect):
-                self.handle_paddle_collision(self.paddle1, 1, ball)
-                return
-            if ball.rect.colliderect(self.paddle2.rect):
-                self.handle_paddle_collision(self.paddle2, -1, ball)
-                return
-
-        if ball.vx < 0 and ball.rect.colliderect(self.paddle1.rect):
-            if ball.is_ghost:
-                if ball.ghost_owner == 2: # Atrapado por el rival
-                    self.audio.play('hit'); self.balls.remove(ball)
-            else: self.handle_paddle_collision(self.paddle1, 1, ball)
-        elif ball.vx > 0 and ball.rect.colliderect(self.paddle2.rect):
-            if ball.is_ghost:
-                if ball.ghost_owner == 1: # Atrapado por el rival
-                    self.audio.play('hit'); self.balls.remove(ball)
-            else: self.handle_paddle_collision(self.paddle2, -1, ball)
-
-    def _check_planet_collisions(self, ball):
-        for p_idx, planet_pos in enumerate([self.planet1_pos, self.planet2_pos]):
-            is_alive = self.planet1_alive if p_idx == 0 else self.planet2_alive
-            if not is_alive: continue
-            dx, dy = ball.rect.centerx - planet_pos[0], ball.rect.centery - planet_pos[1]
-            dist = math.sqrt(dx**2 + dy**2)
-            if dist < self.planet_radius + ball.rect.width / 2:
-                nx, ny = dx/dist, dy/dist
-                dot = ball.vx * nx + ball.vy * ny
-                ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny
-                overlap = (self.planet_radius + ball.rect.width / 2) - dist
-                ball.rect.centerx += nx * (overlap + 2); ball.rect.centery += ny * (overlap + 2)
-                ball.x_float = float(ball.rect.x); self.audio.play('pop')
-                if self.destructible_planets_enabled:
-                    self._handle_planet_damage(p_idx, planet_pos)
 
     def _handle_planet_damage(self, p_idx, planet_pos):
         if p_idx == 0: self.planet1_hits += 1
@@ -877,7 +809,18 @@ class Game:
                     if paddle.orange_power_hits >= 2: paddle.grant_random_power(self); paddle.orange_power_hits = 0
 
             req = self.power_auto_grant_hits_options[self.power_auto_grant_hits_idx]
-            if paddle.hits >= req: paddle.grant_random_power(self); paddle.hits = 0
+            
+            # Reloj Púrpura (Efecto especial: Poder cada 3 toques)
+            current_z = (self.p1_zone_type if paddle == self.paddle1 else self.p2_zone_type) if self.watches_kept_enabled else self.zone_type
+            is_purple = (current_z == 4)
+            
+            if is_purple:
+                if paddle.hits >= 3:
+                    paddle.grant_random_power(self)
+                    paddle.hits = 0
+            elif paddle.hits >= req:
+                paddle.grant_random_power(self)
+                paddle.hits = 0
 
         self._process_active_powers(paddle, ball)
         self._calculate_bounce_physics(paddle, direction_x, ball)
@@ -1177,356 +1120,59 @@ class Game:
             
             # Lógica de IA para la paleta 2
             if self.is_ai_mode and self.balls:
-                # 1. Activar poderes automáticamente
+                # 1. Activar poderes automáticamente (Delegado a ai_controller si se quiere, 
+                # pero mantenemos la lógica de activación rápida aquí por ahora para no complicar el AIController)
                 if self.paddle2.power_stored != POWER_NONE:
-                    # 1. Estrategia para GHOST: Lanzar cuando el jugador esté lejos del centro
                     if self.paddle2.power_stored == POWER_GHOST:
                         if abs(self.paddle1.rect.centery - SCREEN_HEIGHT // 2) > 100 or random.random() < 0.01:
                             self.activate_paddle_power(self.paddle2, 2)
-                    
-                    # 2. Estrategia para MAGNET: NO activar si el jugador tiene el poder NARANJA (explosivo)
                     elif self.paddle2.power_stored == POWER_MAGNET:
                         if self.paddle1.power_active != POWER_ORANGE:
                             self.activate_paddle_power(self.paddle2, 2)
-                            
-                    # 3. Otros poderes se activan al instante
                     else:
                         self.activate_paddle_power(self.paddle2, 2)
                 
-                # 2. Lógica de CURVATURA MAGNÉTICA (Si el imán está activo y la pelota se aleja)
-                if self.paddle2.power_active == POWER_MAGNET:
-                    main_ball = self.balls[0]
-                    if main_ball.vx < 0: # La pelota se aleja de la IA hacia el jugador
-                        # Decidir hacia dónde curvar
-                        target_y = SCREEN_HEIGHT // 2
-                        if self.mouse:
-                            # Evitar al ratón a toda costa
-                            target_y = 100 if self.mouse.rect.centery > SCREEN_HEIGHT // 2 else SCREEN_HEIGHT - 100
-                        else:
-                            # Atacar: curvar al lado opuesto del jugador
-                            target_y = 50 if self.paddle1.rect.centery > SCREEN_HEIGHT // 2 else SCREEN_HEIGHT - 50
-                        
-                        # Mover paleta para tirar de la pelota
-                        if self.paddle2.rect.centery < target_y: self.paddle2.move(1, dt, PADDLE_SPEED)
-                        elif self.paddle2.rect.centery > target_y: self.paddle2.move(-1, dt, PADDLE_SPEED)
-                        # No retornar, permitir que siga otras lógicas si es necesario
-                
-                # 3. Lógica específica de CHICLE
-                if self.paddle2.power_active == POWER_GUM:
-                    if self.paddle2.is_stuck:
-                        # PRIORIDAD: Escapar del ratón si está cerca
-                        if self.mouse and self.mouse.rect.centerx > SCREEN_WIDTH // 2:
-                            target_y = 100 if self.mouse.rect.centery > SCREEN_HEIGHT // 2 else SCREEN_HEIGHT - 100
-                        else:
-                            # TROLLEAR al jugador (Moverse al lado opuesto de donde está la paleta 1)
-                            target_y = 100 if self.paddle1.rect.centery > SCREEN_HEIGHT // 2 else SCREEN_HEIGHT - 100
-                        
-                        if self.paddle2.rect.centery < target_y - 10:
-                            self.paddle2.move(1, dt, PADDLE_SPEED)
-                        elif self.paddle2.rect.centery > target_y + 10:
-                            self.paddle2.move(-1, dt, PADDLE_SPEED)
-                        
-                        # Soltar si llegó al objetivo o le queda poca carga
-                        if abs(self.paddle2.rect.centery - target_y) < 20 or self.paddle2.gum_charges <= 1:
-                            if random.random() < 0.05: # Un poco de azar para soltar
-                                self.activate_paddle_power(self.paddle2, 2)
-                    else:
-                        # Si no está pegada pero tiene cargas: Disparar chicles para confundir
-                        if self.paddle2.gum_charges > 0 and random.random() < 0.01:
-                            self.activate_paddle_power(self.paddle2, 2)
+                self.ai_controller.update(dt)
 
-                # 1. PRIORIDAD ABSOLUTA: ESQUIVAR BALAS AMARILLAS (Sobrevivir)
-                yellow_bullets = [b for b in self.balls if b.is_bullet and b.vx > 0]
-                if yellow_bullets:
-                    # Encontrar la bala más cercana
-                    closest_bullet = min(yellow_bullets, key=lambda b: abs(b.rect.centerx - self.paddle2.rect.centerx))
-                    # Moverse al lado opuesto de la bala para esquivar
-                    if closest_bullet.rect.centery < SCREEN_HEIGHT // 2:
-                        self.paddle2.move(1, dt, PADDLE_SPEED)
-                    else:
-                        self.paddle2.move(-1, dt, PADDLE_SPEED)
-                    # Si hay balas, ignoramos el resto de lógicas ofensivas para centrarnos en vivir
-                    self._process_ai_movement(dt)
-                    return
+            # Actualizar Paletas y Timers
+            for p in [self.paddle1, self.paddle2]:
+                p.update(dt, self)
+                if p.shield_shrink_timer > 0:
+                    p.shield_shrink_timer -= dt
+                    if p.shield_shrink_timer <= 0: p.power_active = POWER_NONE; p.rect.height = PADDLE_HEIGHT; p.color = WHITE
+                if p.white_activation_timer > 0:
+                    p.white_activation_timer -= dt
+                    if p.white_activation_timer <= 0:
+                        p.rect.height = SCREEN_HEIGHT; p.rect.width = SCREEN_WIDTH // 2; p.rect.y = 0; p.y_float = 0.0
+                        p.rect.x = 0 if p == self.paddle1 else SCREEN_WIDTH // 2; p.white_zone_hits_left = 5
 
-                # 2. Lógica específica de REVOLVER (Duelo de Vaqueros)
-                if self.paddle2.power_active == POWER_REVOLVER:
-                    main_ball = self.balls[0]
-                    # PRIORIDAD DEFENSIVA: Si la pelota viene hacia mí y está cerca, defender
-                    if main_ball.vx > 0 and main_ball.rect.centerx > SCREEN_WIDTH * 0.4:
-                        # Seguir la pelota para no perder el punto ni el poder
-                        target_y = main_ball.rect.centery
-                        if self.paddle2.rect.centery < target_y - 10: self.paddle2.move(1, dt, PADDLE_SPEED)
-                        elif self.paddle2.rect.centery > target_y + 10: self.paddle2.move(-1, dt, PADDLE_SPEED)
-                    else:
-                        # MODO ASESINO: Apuntar al centro del Jugador 1
-                        target_y = self.paddle1.rect.centery
-                        if self.paddle2.rect.centery < target_y - 5:
-                            self.paddle2.move(1, dt, PADDLE_SPEED)
-                        elif self.paddle2.rect.centery > target_y + 5:
-                            self.paddle2.move(-1, dt, PADDLE_SPEED)
-                        
-                        # Disparar si está alineado
-                        if abs(self.paddle2.rect.centery - target_y) < 15:
-                            if random.random() < 0.05: # Cadencia de fuego
-                                self.activate_paddle_power(self.paddle2, 2)
-                    
-                    self._process_ai_movement(dt)
-                    return
-
-                # 2. Comprobar si hay alguna pelota naranja amenazante (viniendo hacia la IA)
-                orange_threats = [b for b in self.balls if b.is_orange and b.vx > 0]
-                
-                if orange_threats:
-                    # ESQUIVAR: Moverse al lado opuesto de la amenaza más cercana
-                    danger_ball = min(orange_threats, key=lambda b: abs(b.rect.centerx - self.paddle2.rect.centerx))
-                    if danger_ball.rect.centery < SCREEN_HEIGHT // 2:
-                        # La pelota está arriba, vamos abajo
-                        self.paddle2.move(1, dt, PADDLE_SPEED)
-                    else:
-                        # La pelota está abajo, vamos arriba
-                        self.paddle2.move(-1, dt, PADDLE_SPEED)
-                else:
-                    # SEGUIR y APUNTAR (Solo si no está pegada)
-                    if not self.paddle2.is_stuck:
-                        # Filtrar pelotas: Solo seguir la principal o las fantasmas del RIVAL (J1)
-                        # Filtrar pelotas: Solo seguir la principal o las fantasmas del RIVAL (J1)
-                        valid_balls = [b for b in self.balls if not (b.is_ghost and b.ghost_owner == 2)]
-                        if valid_balls:
-                            target_ball = min(valid_balls, key=lambda b: abs(b.rect.centerx - self.paddle2.rect.centerx))
-                            target_y = target_ball.rect.centery
-                            
-                            # NUEVO: Anticipación de PORTALES
-                            if self.portals_enabled:
-                                incoming_to_portal = False
-                                exit_y = None
-                                portal_pairs = [(self.portal_blue_rect, self.portal_orange_rect), (self.portal_red_rect, self.portal_green_rect) if self.more_portals_enabled else (None, None)]
-                                for p1, p2 in portal_pairs:
-                                    if p1 and p2:
-                                        if p1.inflate(20, 20).colliderect(target_ball.rect): exit_y = p2.centery; incoming_to_portal = True; break
-                                        elif p2.inflate(20, 20).colliderect(target_ball.rect): exit_y = p1.centery; incoming_to_portal = True; break
-                                if incoming_to_portal and exit_y is not None: target_y = exit_y
-
-                            aim_offset = 0
-                            if self.mouse:
-                                if self.mouse.rect.centery < target_ball.rect.centery: aim_offset = -self.paddle2.rect.height // 3
-                                else: aim_offset = self.paddle2.rect.height // 3
-                            elif self.hourglass_rect and self.hourglass_type != 2:
-                                if self.hourglass_rect.centery < target_ball.rect.centery: aim_offset = self.paddle2.rect.height // 3
-                                else: aim_offset = -self.paddle2.rect.height // 3
-                            elif self.score2 < self.score1 and self.is_x2_item_active:
-                                if self.x2_item_rect.centery < target_ball.rect.centery: aim_offset = self.paddle2.rect.height // 3
-                                else: aim_offset = -self.paddle2.rect.height // 3
-                            elif self.portals_enabled and random.random() < 0.20:
-                                portals = [self.portal_blue_rect, self.portal_orange_rect]
-                                if self.more_portals_enabled: portals.extend([self.portal_red_rect, self.portal_green_rect])
-                                target_portal = random.choice(portals)
-                                if target_portal.centery < target_ball.rect.centery: aim_offset = self.paddle2.rect.height // 3
-                                else: aim_offset = -self.paddle2.rect.height // 3
-
-                            if target_ball.rect.centery < (self.paddle2.rect.centery + aim_offset) - 10: self.paddle2.move(-1, dt, PADDLE_SPEED)
-                            elif target_ball.rect.centery > (self.paddle2.rect.centery + aim_offset) + 10: self.paddle2.move(1, dt, PADDLE_SPEED)
-
-            self._process_ai_movement(dt)
-
-    def _process_ai_movement(self, dt):
-        for p in [self.paddle1, self.paddle2]:
-            p.update(dt, self)
-            if p.shield_shrink_timer > 0:
-                p.shield_shrink_timer -= dt
-                if p.shield_shrink_timer <= 0: p.power_active = POWER_NONE; p.rect.height = PADDLE_HEIGHT; p.color = WHITE
-            if p.white_activation_timer > 0:
-                p.white_activation_timer -= dt
-                if p.white_activation_timer <= 0:
-                    p.rect.height = SCREEN_HEIGHT; p.rect.width = SCREEN_WIDTH // 2; p.rect.y = 0; p.y_float = 0.0
-                    p.rect.x = 0 if p == self.paddle1 else SCREEN_WIDTH // 2; p.white_zone_hits_left = 5
-
-            # 6. Actualizar Proyectiles de Chicle
+            # Actualizar Proyectiles de Chicle
             for gp in self.gum_projectiles[:]:
                 gp.update(dt)
                 if not gp.active:
                     self.gum_projectiles.remove(gp)
-                    continue
-                # Colisión Chicle - Pelotas
-                for ball in self.balls:
-                    if gp.rect.colliderect(ball.rect):
-                        self.audio.play('explosion')
-                        self.vfx.burst(gp.rect.centerx, gp.rect.centery, GUM_PINK)
-                        gp.active = False
-                        # Rebote de la pelota
-                        ball.vx *= -1.2 # Pequeño impulso al chocar con chicle
-                        ball.vy += random.uniform(-50, 50)
-                        break
 
-            # Lógica del Ratón
-            if self.add_mouse_enabled:
-                required_hits = self.mouse_appear_options[self.mouse_appear_idx]
-                if self.mouse is None and self.mouse_hits_counter >= required_hits:
-                    from entities import Mouse
-                    self.mouse = Mouse(SCREEN_WIDTH // 2, SCREEN_HEIGHT + 50)
-                    self.audio.play('squeak')
-                
-                if self.mouse and self.balls:
-                    m_speed = self.mouse_speed_options[self.mouse_speed_idx]
-                    self.mouse.update(dt, self.balls[0], speed_multiplier=m_speed)
-                    # Colisión Ratón - Pelota
-                    for ball in self.balls[:]:
-                        if not ball.is_ghost and self.mouse.rect.colliderect(ball.rect):
-                            # CASO ESPECIAL: Pelota NARANJA (Explosión del ratón)
-                            if ball.is_orange:
-                                self.audio.play('explosion')
-                                self.vfx.burst(self.mouse.rect.centerx, self.mouse.rect.centery, ORANGE)
-                                self.mouse = None
-                                self.mouse_hits_counter = 0
-                                # La pelota se purifica y sigue
-                                ball.is_orange = False
-                                ball.color = WHITE
-                                ball.vx *= -1.1
-                                return # El juego sigue, el ratón murió
-                            
-                            self.audio.play('nom')
-                            p_responsible = self.last_hitter
-                            responsible_paddle = self.paddle1 if p_responsible == 1 else self.paddle2
-                            winner_id = 2 if p_responsible == 1 else 1
-                            
-                            # ¿TIENE ESCUDO EL RESPONSABLE?
-                            if responsible_paddle.shield_hits_left > 0:
-                                self.audio.play('shield_hit')
-                                responsible_paddle.shield_hits_left -= 1
-                                # La pelota rebota en lugar de desaparecer
-                                ball.vx *= -1.2 
-                                ball.vy += random.uniform(-100, 100)
-                                self.mouse = None
-                                self.mouse_hits_counter = 0
-                                return # Continúa el juego sin puntos
-                            
-                            # Si NO tiene escudo, castigo normal
-                            if p_responsible == 1: 
-                                if self.score1 > 0: self.score1 -= 1
-                            else: 
-                                if self.score2 > 0: self.score2 -= 1
-                            
-                            if ball in self.balls: self.balls.remove(ball)
-                            self.mouse = None
-                            self.mouse_hits_counter = 0
-                            
-                            # Usamos goal_scored para que respete Gol de Oro y X2 automáticamente
-                            self.goal_scored(winner_id)
-                            return 
+            # --- FÍSICAS CENTRALIZADAS ---
+            self.physics.update(dt)
 
+            # Lógica post-física (VFX, imanes visuales, etc.)
             for ball in self.balls[:]:
+                # Imanes visuales (color azul)
                 in_p1 = ball.rect.centerx < SCREEN_WIDTH // 2
                 for i, p in enumerate([self.paddle1, self.paddle2]):
                     side = (i == 0 and in_p1) or (i == 1 and not in_p1)
                     if p.power_active == POWER_MAGNET and side:
-                        self._apply_magnet_force(p, dt, ball)
+                        self.physics.apply_magnet_force(p, dt, ball)
                     elif ball.color == (100, 200, 255) and not ball.is_fireball and not ball.is_orange and not ball.is_ghost:
                         self.reset_ball_visuals(ball)
-
-                # Planetas
-                if self.floating_planets_enabled:
-                    spd = math.sqrt(ball.vx**2 + ball.vy**2)
-                    for p_idx, pos in enumerate([self.planet1_pos, self.planet2_pos]):
-                        if (p_idx == 0 and self.planet1_alive) or (p_idx == 1 and self.planet2_alive):
-                            dx, dy = pos[0]-ball.rect.centerx, pos[1]-ball.rect.centery
-                            dist = math.sqrt(dx**2 + dy**2)
-                            rad, force = self.gravity_radius_options[self.gravity_radius_idx], self.gravity_force_options[self.gravity_force_idx]
-                            if self.planet_radius < dist < rad:
-                                f = (1.0 - (dist / rad)) * force
-                                ball.vx += (dx/dist)*f*dt*60; ball.vy += (dy/dist)*f*dt*60
-                    new_spd = math.sqrt(ball.vx**2 + ball.vy**2)
-                    if new_spd > 0: ball.vx = (ball.vx/new_spd)*spd; ball.vy = (ball.vy/new_spd)*spd
                 
-        # 1. Lógica de Portales (Prioridad sobre rebotes de pared)
-        if self.portals_enabled:
-            for ball in self.balls:
-                colliding_blue = ball.rect.colliderect(self.portal_blue_rect)
-                colliding_orange = ball.rect.colliderect(self.portal_orange_rect)
-                colliding_red = self.more_portals_enabled and ball.rect.colliderect(self.portal_red_rect)
-                colliding_green = self.more_portals_enabled and ball.rect.colliderect(self.portal_green_rect)
-                
-                if not colliding_blue and not colliding_orange and not colliding_red and not colliding_green:
-                    ball.last_portal_id = None 
+                # Rastro Hadouken
+                if ball == self.balls[0] and ball.is_orange and self.orange_skin_idx == 1:
+                    self.vfx.trail(ball.rect.centerx, ball.rect.centery, (100, 200, 255))
 
-                if not ball.last_portal_id:
-                    target_portal = None
-                    if colliding_blue:
-                        # Entra por Azul (arriba), sale por Naranja (abajo)
-                        if self.portals_vertical:
-                            ball.y_float = float(self.portal_orange_rect.y + (ball.y_float - self.portal_blue_rect.y))
-                            if self.portal_orange_rect.x < SCREEN_WIDTH // 2: ball.x_float = self.portal_orange_rect.right + 2
-                            else: ball.x_float = self.portal_orange_rect.left - ball.rect.width - 2
-                        else:
-                            ball.y_float = float(self.portal_orange_rect.top - ball.rect.height)
-                            ball.x_float = float(self.portal_orange_rect.x + (ball.x_float - self.portal_blue_rect.x))
-                        
-                        ball.vy = -abs(ball.vy) 
-                        ball.last_portal_id = "orange"
-                        target_portal = BLUE
-                    elif colliding_orange:
-                        # Entra por Naranja (abajo), sale por Azul (arriba)
-                        if self.portals_vertical:
-                            ball.y_float = float(self.portal_blue_rect.y + (ball.y_float - self.portal_orange_rect.y))
-                            if self.portal_blue_rect.x < SCREEN_WIDTH // 2: ball.x_float = self.portal_blue_rect.right + 2
-                            else: ball.x_float = self.portal_blue_rect.left - ball.rect.width - 2
-                        else:
-                            ball.y_float = float(self.portal_blue_rect.bottom)
-                            ball.x_float = float(self.portal_blue_rect.x + (ball.x_float - self.portal_orange_rect.x))
-                        
-                        ball.vy = abs(ball.vy) 
-                        ball.last_portal_id = "blue"
-                        target_portal = ORANGE
-                    elif self.more_portals_enabled and ball.rect.colliderect(self.portal_red_rect) and ball.last_portal_id != "red":
-                        # Entra por Rojo (abajo, J1), sale por Verde (arriba, J2)
-                        if self.portals_vertical:
-                            ball.y_float = float(self.portal_green_rect.y + (ball.y_float - self.portal_red_rect.y))
-                            if self.portal_green_rect.x < SCREEN_WIDTH // 2: ball.x_float = self.portal_green_rect.right + 2
-                            else: ball.x_float = self.portal_green_rect.left - ball.rect.width - 2
-                        else:
-                            ball.y_float = float(self.portal_green_rect.bottom)
-                            ball.x_float = float(self.portal_green_rect.x + (ball.x_float - self.portal_red_rect.x))
-                        ball.vy = abs(ball.vy)
-                        ball.last_portal_id = "green"
-                        target_portal = RED
-                    elif self.more_portals_enabled and ball.rect.colliderect(self.portal_green_rect) and ball.last_portal_id != "green":
-                        # Entra por Verde (arriba, J2), sale por Rojo (abajo, J1)
-                        if self.portals_vertical:
-                            ball.y_float = float(self.portal_red_rect.y + (ball.y_float - self.portal_green_rect.y))
-                            if self.portal_red_rect.x < SCREEN_WIDTH // 2: ball.x_float = self.portal_red_rect.right + 2
-                            else: ball.x_float = self.portal_red_rect.left - ball.rect.width - 2
-                        else:
-                            ball.y_float = float(self.portal_red_rect.top - ball.rect.height)
-                            ball.x_float = float(self.portal_red_rect.x + (ball.x_float - self.portal_green_rect.x))
-                        ball.vy = -abs(ball.vy)
-                        ball.last_portal_id = "red"
-                        target_portal = GREEN
-
-                    if target_portal:
-                        # Giro sutil y Aumento de velocidad (0.5%)
-                        spd = math.sqrt(ball.vx**2 + ball.vy**2) * 1.005
-                        angle = math.atan2(ball.vy, ball.vx) + math.radians(5)
-                        ball.vx = spd * math.cos(angle)
-                        ball.vy = spd * math.sin(angle)
-                        
-                        ball.rect.x, ball.rect.y = int(ball.x_float), int(ball.y_float)
-                        self.audio.play('ghost'); self.vfx.explosion(ball.rect.centerx, ball.rect.centery, target_portal)
-
-        # 2. Actualización de pelotas y colisiones normales (Solo si no hay cooldown de saque)
-        if self.serve_timer > 0:
-            self.serve_timer -= dt
-        elif self.state == STATE_PLAYING:
-            for ball in self.balls:
-                ball.update(dt, self._get_zone_multiplier(ball))
-                self.check_ball_collisions(ball)
-            
-        # Actualización de Timers Especiales (Siempre, para que terminen)
-        if self.show_match_point_anim: self.match_point_anim_timer -= dt
-        if self.show_golden_goal_anim: self.golden_goal_anim_timer -= dt
-
-        # 3. Lógica de Ítem Revólver (Órbita)
-        if self.revolver_enabled and self.state == STATE_PLAYING:
-            if self.revolver_item_active:
-                self.revolver_angle += dt * 1.5 # Velocidad de rotación
+            # --- LÓGICA DE ÍTEM REVÓLVER (ÓRBITA) ---
+            if self.revolver_enabled and self.revolver_item_active:
+                self.revolver_angle += dt * 1.5 
                 center_x, center_y = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
                 rx = center_x + math.cos(self.revolver_angle) * self.revolver_orbit_radius
                 ry = center_y + math.sin(self.revolver_angle) * self.revolver_orbit_radius
@@ -1537,46 +1183,12 @@ class Game:
                     if ball.rect.colliderect(self.revolver_item_rect):
                         self.revolver_item_active = False
                         self.revolver_item_rect = None
-                        self.audio.play('speed') # Reutilizar sonido o añadir uno nuevo
-                        # Dar poder al último que tocó
+                        self.audio.play('speed') 
                         target_p = self.paddle1 if self.last_hitter == 1 else self.paddle2
                         target_p.power_stored = POWER_REVOLVER
                         target_p.color = GUN_METAL
-                        self.global_hits += 1 # Evitar re-aparición inmediata
+                        self.global_hits = 0 
                         break
-
-        # 4. Gestión de Balas Amarillas y Duración
-        for p in [self.paddle1, self.paddle2]:
-            if p.power_active == POWER_REVOLVER:
-                p.revolver_timer -= dt
-                if p.revolver_timer <= 0 or p.revolver_shots_left <= 0:
-                    p.power_active = POWER_NONE
-                    p.revolver_shots_left = 0
-                    p.revolver_timer = 0
-                    p.color = WHITE
-
-        for ball in self.balls[:]:
-            if ball.is_bullet:
-                # Si sale de la pantalla, desaparece
-                if ball.rect.right < 0 or ball.rect.left > SCREEN_WIDTH:
-                    self.balls.remove(ball)
-                # Colisión con paletas (Letal)
-                for i, p in enumerate([self.paddle1, self.paddle2]):
-                    if ball.rect.colliderect(p.rect):
-                        # Solo mata al oponente (la bala no mata al que la disparó)
-                        p_id = i + 1
-                        if (ball.vx > 0 and p_id == 2) or (ball.vx < 0 and p_id == 1):
-                            self.audio.play('explosion')
-                            self.vfx.burst(p.rect.centerx, p.rect.centery, YELLOW)
-                            self.goal_scored(1 if p_id == 2 else 2)
-                            if ball in self.balls: self.balls.remove(ball)
-                            break
-
-        # Rastro para la bola principal si es naranja
-        if self.balls:
-            main_ball = self.balls[0]
-            if self.state == STATE_PLAYING and main_ball.is_orange and self.orange_skin_idx == 1:
-                self.vfx.trail(main_ball.rect.centerx, main_ball.rect.centery, (100, 200, 255))
 
     def _get_zone_multiplier(self, ball):
         in_p1 = ball.rect.centerx < SCREEN_WIDTH // 2
@@ -1584,21 +1196,6 @@ class Game:
         return 0.5 if z_type == 1 else (1.25 if z_type == 2 else 1.0)
 
 
-    def _apply_magnet_force(self, p, dt, ball):
-        spd = math.sqrt(ball.vx**2 + ball.vy**2)
-        incoming = (p == self.paddle1 and ball.vx < 0) or (p == self.paddle2 and ball.vx > 0)
-        dx, dy = p.rect.centerx - ball.rect.centerx, p.rect.centery - ball.rect.centery
-        dist = math.sqrt(dx**2 + dy**2)
-        if dist > 0:
-            target_vx, target_vy = (dx/dist)*spd, (dy/dist)*spd
-            if incoming: ball.vx += (target_vx - ball.vx)*0.2*dt*60; ball.vy += (target_vy - ball.vy)*0.2*dt*60
-            else: ball.vy += (target_vy - ball.vy)*0.1*dt*60
-        new_spd = math.sqrt(ball.vx**2 + ball.vy**2)
-        if new_spd > 0: ball.vx = (ball.vx/new_spd)*spd; ball.vy = (ball.vy/new_spd)*spd
-        
-        # Mantener color naranja/hadouken si corresponde, si no, poner azul imán
-        if not ball.is_orange:
-            ball.color = (100, 200, 255)
 
     def trigger_shake(self, amount, duration):
         if not self.shake_enabled: return
@@ -1646,11 +1243,11 @@ class Game:
             if self.is_x2_item_active: self._draw_x2_icon(temp_surf)
             self._draw_score(temp_surf)
             
-        if self.state == STATE_MAIN_MENU: self._draw_main_menu(temp_surf)
-        elif self.state == STATE_MODIFIERS: self._draw_modifiers(temp_surf)
-        elif self.state == STATE_SETTINGS: self._draw_settings(temp_surf)
-        elif self.state == STATE_MODE_SELECTION: self._draw_mode_selection(temp_surf)
-        elif self.state == STATE_GAME_OVER: self._draw_game_over(temp_surf)
+        if self.state == STATE_MAIN_MENU: self.menus.draw_main_menu(temp_surf)
+        elif self.state == STATE_MODIFIERS: self.menus.draw_modifiers(temp_surf)
+        elif self.state == STATE_SETTINGS: self.menus.draw_settings(temp_surf)
+        elif self.state == STATE_MODE_SELECTION: self.menus.draw_mode_selection(temp_surf)
+        elif self.state == STATE_GAME_OVER: self.menus.draw_game_over(temp_surf)
         
         self.vfx.draw(temp_surf)
 
@@ -1844,466 +1441,9 @@ class Game:
             overlay.set_alpha(150); overlay.fill(GOLD); surface.blit(overlay, (0,0))
         
         t1, t2 = self.large_font.render("GOLDEN", True, GOLD), self.large_font.render(" GOAL", True, WHITE)
-        tw, sy = t1.get_width() + t2.get_width(), SCREEN_HEIGHT//2 - t1.get_height()//2
-        sx = SCREEN_WIDTH//2 - tw//2
-        surface.blit(t1, (sx, sy)); surface.blit(t2, (sx + t1.get_width(), sy))
-
-    def _draw_main_menu(self, surface):
-        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(160); ov.fill(BLACK); surface.blit(ov, (0,0))
-        t1, t2 = self.large_font.render("PONG ", True, WHITE), self.large_font.render("KOMBAT", True, RED)
         tw = t1.get_width() + t2.get_width()
-        sx, ty = SCREEN_WIDTH//2 - tw//2, SCREEN_HEIGHT//4 - 20
-        surface.blit(t1, (sx, ty)); surface.blit(t2, (sx+t1.get_width(), ty))
-        
-        mpos = pygame.mouse.get_pos()
-        buttons = [
-            (self.btn_play_rect, self.t("PLAY", "JUGAR"), WHITE),
-            (self.btn_modifiers_rect, self.t("MODIFIERS", "MODIFICADORES"), WHITE),
-            (self.btn_settings_rect, self.t("SETTINGS", "AJUSTES"), WHITE)
-        ]
-        
-        for r, txt, color in buttons:
-            is_hover = r.collidepoint(mpos)
-            bg_color = (40, 40, 40) if is_hover else BLACK
-            
-            pygame.draw.rect(surface, bg_color, r)
-            pygame.draw.rect(surface, color, r, 4)
-            
-            # Auto-encogimiento con escala intermedia
-            f_to_use = self.font
-            if f_to_use.size(txt)[0] > r.width - 20:
-                f_to_use = self.medium_font
-                # Si aún así no entra (caso extremo), bajamos a small
-                if f_to_use.size(txt)[0] > r.width - 10:
-                    f_to_use = self.small_font
-                
-            st = f_to_use.render(txt, True, WHITE)
-            surface.blit(st, st.get_rect(center=r.center))
-
-    def _draw_modifiers(self, surface):
-        pygame.draw.rect(surface, BLACK, self.modifiers_panel_rect); pygame.draw.rect(surface, WHITE, self.modifiers_panel_rect, 4)
-        title_txt = self.t("MATCH MODIFIERS", "MODIFICADORES DE LA PARTIDA")
-        # Auto-encogimiento agresivo para evitar chocar con el botón BACK (umbral 500px)
-        f_to_use = self.font
-        if f_to_use.size(title_txt)[0] > 500:
-            f_to_use = self.medium_font
-            if f_to_use.size(title_txt)[0] > 500:
-                f_to_use = self.small_font
-            
-        t = f_to_use.render(title_txt, True, WHITE)
-        surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, self.modifiers_panel_rect.y+30)))
-        pygame.draw.rect(surface, BLACK, self.back_btn_rect); pygame.draw.rect(surface, WHITE, self.back_btn_rect, 2)
-        pygame.draw.rect(surface, BLACK, self.back_btn_rect); pygame.draw.rect(surface, WHITE, self.back_btn_rect, 2)
-        back_txt = self.t("BACK", "VOLVER")
-        # Si el texto es muy ancho para los 80px del botón, usamos tiny_font
-        f_to_use = self.tiny_font if self.small_font.size(back_txt)[0] > self.back_btn_rect.width - 10 else self.small_font
-        bt = f_to_use.render(back_txt, True, WHITE)
-        surface.blit(bt, bt.get_rect(center=self.back_btn_rect.center))
-        
-        # Tabs
-        tab_y = self.modifiers_panel_rect.top - 44
-        self.tab_all_rect.topleft = (self.modifiers_panel_rect.left, tab_y)
-        self.tab_extras_rect.topleft = (self.tab_all_rect.right + 5, tab_y)
-        self.tab_skins_rect.topleft = (self.tab_extras_rect.right + 5, tab_y)
-        for r, txt, key in [(self.tab_all_rect, self.t("ALL", "TODO"), "ALL"), (self.tab_extras_rect, self.t("EXTRAS", "EXTRAS"), "EXTRAS"), (self.tab_skins_rect, self.t("SKINS", "ASPECTOS"), "SKINS")]:
-            bg = BLACK
-            if key == "ALL": bg = (40,40,40) if self.modifiers_tab=="ALL" else BLACK
-            elif key == "EXTRAS": bg = (0,80,0) if self.modifiers_tab=="EXTRAS" else (0,40,0)
-            elif key == "SKINS": bg = (80,0,80) if self.modifiers_tab=="SKINS" else (40,0,40)
-            pygame.draw.rect(surface, bg, r, border_top_left_radius=8, border_top_right_radius=8)
-            pygame.draw.rect(surface, WHITE, r, 2, border_top_left_radius=8, border_top_right_radius=8)
-            st = self.tiny_font.render(txt, True, WHITE); surface.blit(st, st.get_rect(center=r.center))
-            
-        old_clip = surface.get_clip(); clip = pygame.Rect(self.modifiers_panel_rect.x+10, self.modifiers_panel_rect.y+60, self.modifiers_panel_rect.width-40, self.modifiers_panel_rect.height-70)
-        surface.set_clip(clip)
-        self._draw_modifier_content(surface)
-        surface.set_clip(old_clip)
-        
-        # Sincronizar posición del thumb visual con el scroll_y lógico (con clamping de seguridad)
-        self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
-        if self.max_scroll > 0:
-            fraction = max(0, min(self.scroll_y / self.max_scroll, 1.0))
-            self.scrollbar_thumb_rect.y = self.scrollbar_rect.y + fraction * (self.scrollbar_rect.height - self.scrollbar_thumb_height)
-        else:
-            self.scrollbar_thumb_rect.y = self.scrollbar_rect.y
-
-        pygame.draw.rect(surface, (50,50,50), self.scrollbar_rect)
-        pygame.draw.rect(surface, WHITE, self.scrollbar_thumb_rect)
-        self._draw_tooltips(clip, surface)
-
-    def _draw_modifier_content(self, surface):
-        off, lm, ox = self.scroll_y, self.modifiers_panel_rect.x + 50, self.modifiers_panel_rect.centerx + 50
-        self.max_y_rendered = 0
-        
-        # Reset rects visibility
-        for r in [self.match_point_rect, self.golden_goal_anim_rect, self.reroll_rect, self.all_reroll_rect, self.equal_watches_rect, self.equal_powers_rect, self.watches_kept_rect, self.remove_watches_toggle_rect, self.remove_power_toggle_rect, self.experimental_toggle_rect]: r.y = -1000
-
-        if self.modifiers_tab == "ALL":
-            curr_y = 100
-            # Score
-            surface.blit(self.small_font.render(self.t("Score limit:", "Límite de puntos:"), True, WHITE), (lm, self.modifiers_panel_rect.y + curr_y - off))
-            self.score_btn_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 80, 40)
-            pygame.draw.rect(surface, BLACK, self.score_btn_rect); pygame.draw.rect(surface, WHITE, self.score_btn_rect, 2)
-            sv = self.small_font.render(str(self.max_score), True, WHITE); surface.blit(sv, sv.get_rect(center=self.score_btn_rect.center))
-            
-            inc_val = f"{self.ball_speed_multiplier_options[self.ball_speed_multiplier_idx]-1:g}"
-            curr_y += 80; self._draw_sub_selector(curr_y, self.t("Ball speed increase:", "Aumento de velocidad:"), self.ball_speed_multiplier_names[self.ball_speed_multiplier_idx], self.ball_speed_btn_rect, off, ox, lm, surface, sub_val=inc_val)
-            
-            curr_y += 80
-            self._draw_sub_selector(curr_y, self.t("Initial ball speed:", "Velocidad inicial:"), self.initial_ball_speed_names[self.initial_ball_speed_idx], self.initial_ball_speed_rect, off, ox, lm, surface, sub_val=f"x{self.initial_ball_speed_options[self.initial_ball_speed_idx]}")
-            
-            curr_y += 80
-            y_spd = f"{int(self.yellow_speed_up_options[self.yellow_speed_up_idx]*100)}%"
-            self._draw_sub_selector(curr_y, self.t("|YELLOW|Yellow |WHITE|Power Speed Up:", "Aumento de velocidad\ndel poder |YELLOW|AMARILLO"), self.yellow_speed_up_names[self.yellow_speed_up_idx], self.yellow_speed_up_rect, off, ox, lm, surface, sub_val=y_spd)
-            
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Numbers encapsulating powers", "Los números\nencapsulan poderes"), self.encapsulate_powers_enabled, self.encapsulate_powers_rect, self.encapsulate_powers_text_rect, active_color=CYAN, offset=off, surface=surface)
-            
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("MATCH POINT:", "PUNTO DE PARTIDA:"), self.match_point_enabled, self.match_point_rect, self.match_point_text_rect, offset=off, surface=surface)
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("|GOLD|GOLDEN |WHITE|Goal animation:", "|GOLD|Animación de GOL |WHITE|DE ORO:"), self.golden_goal_anim_enabled, self.golden_goal_anim_rect, self.golden_goal_anim_text_rect, offset=off, surface=surface)
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Re-rolls (|ORANGE|ORANGE|WHITE|/|YELLOW|YELLOW|WHITE|):", "Re-rolls (|ORANGE|NARANJA|WHITE|/|YELLOW|AMARILLO|WHITE|):"), self.reroll_enabled, self.reroll_rect, self.reroll_text_rect, offset=off, surface=surface)
-            if self.reroll_enabled: curr_y += 80; draw_remove_option(self, curr_y, self.t("All Re-roll (|RED|RED|WHITE|/|GREEN|GREEN|WHITE|):", "Todo Re-roll (|RED|ROJO|WHITE|/|GREEN|VERDE|WHITE|):"), self.all_reroll_enabled, self.all_reroll_rect, self.all_reroll_text_rect, offset=off, surface=surface)
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Equal watches (20%):", "Relojes iguales (20%):"), self.equal_watches_enabled, self.equal_watches_rect, self.equal_watches_text_rect, offset=off, surface=surface)
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Equal powers (25%):", "Poderes iguales (25%):"), self.equal_powers_enabled, self.equal_powers_rect, self.equal_powers_text_rect, offset=off, surface=surface)
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Watches kept:", "Relojes guardados:"), self.watches_kept_enabled, self.watches_kept_rect, self.watches_kept_text_rect, offset=off, surface=surface)
-            
-            curr_y += 80
-            surface.blit(self.small_font.render(self.t("Watch spawn hits:", "Golpes para spawn de reloj:"), True, WHITE), (lm, self.modifiers_panel_rect.y + curr_y - off))
-            self.watch_spawn_hits_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 80, 40)
-            pygame.draw.rect(surface, BLACK, self.watch_spawn_hits_rect); pygame.draw.rect(surface, WHITE, self.watch_spawn_hits_rect, 2)
-            surface.blit(self.small_font.render(str(self.watch_spawn_hits_options[self.watch_spawn_hits_idx]), True, WHITE), self.small_font.render(str(self.watch_spawn_hits_options[self.watch_spawn_hits_idx]), True, WHITE).get_rect(center=self.watch_spawn_hits_rect.center))
-
-            curr_y += 80; draw_rich_text(surface, self.t("Power auto grant hits:", "Toques para recibir\nun nuevo poder:"), (lm, self.modifiers_panel_rect.y + curr_y - off), self.small_font)
-            self.power_auto_grant_hits_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 80, 40)
-            pygame.draw.rect(surface, BLACK, self.power_auto_grant_hits_rect); pygame.draw.rect(surface, WHITE, self.power_auto_grant_hits_rect, 2)
-            surface.blit(self.small_font.render(str(self.power_auto_grant_hits_options[self.power_auto_grant_hits_idx]), True, WHITE), self.small_font.render(str(self.power_auto_grant_hits_options[self.power_auto_grant_hits_idx]), True, WHITE).get_rect(center=self.power_auto_grant_hits_rect.center))
-
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Start with power:", "Iniciar con poder:"), self.start_with_power_enabled, self.start_with_power_rect, self.start_with_power_text_rect, offset=off, surface=surface)
-            
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Remove a watch", "Eliminar un reloj"), self.remove_watches_expanded, self.remove_watches_toggle_rect, self.remove_watches_toggle_text_rect, is_checkbox=False, offset=off, surface=surface)
-            if self.remove_watches_expanded:
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |BLUE| BLUE |WHITE| watch", " - Eliminar reloj |BLUE| AZUL"), self.remove_blue, self.remove_blue_rect, self.remove_blue_text_rect, active_color=BLUE, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |RED| RED |WHITE| watch", " - Eliminar reloj |RED| ROJO"), self.remove_red, self.remove_red_rect, self.remove_red_text_rect, active_color=RED, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |PURPLE| PURPLE |WHITE| watch", " - Eliminar reloj |PURPLE| PÚRPURA"), self.remove_purple, self.remove_purple_rect, self.remove_purple_text_rect, active_color=PURPLE, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |WHITE| WHITE |WHITE| watch", " - Eliminar reloj |WHITE| BLANCO"), self.remove_white, self.remove_white_rect, self.remove_white_text_rect, active_color=WHITE, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |YELLOW| YELLOW |WHITE| watch", " - Eliminar reloj |YELLOW| AMARILLO"), self.remove_yellow, self.remove_yellow_rect, self.remove_yellow_text_rect, active_color=YELLOW, offset=off, surface=surface)
-            
-            curr_y += 80; draw_remove_option(self, curr_y, self.t("Remove a power", "Eliminar un poder"), self.remove_power_expanded, self.remove_power_toggle_rect, self.remove_power_toggle_text_rect, is_checkbox=False, offset=off, surface=surface)
-            if self.remove_power_expanded:
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |RED| RED |WHITE| power", " - Eliminar poder |RED| ROJO"), self.remove_power_red, self.remove_power_red_rect, self.remove_power_red_text_rect, active_color=RED, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |GREEN| GREEN |WHITE| power", " - Eliminar poder |GREEN| VERDE"), self.remove_power_green, self.remove_power_green_rect, self.remove_power_green_text_rect, active_color=GREEN, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |YELLOW| YELLOW |WHITE| power", " - Eliminar poder |YELLOW| AMARILLO"), self.remove_power_yellow, self.remove_power_yellow_rect, self.remove_power_yellow_text_rect, active_color=YELLOW, offset=off, surface=surface)
-                curr_y += 60; draw_remove_option(self, curr_y, self.t(" - Remove |ORANGE| ORANGE |WHITE| power", " - Eliminar poder |ORANGE| NARANJA"), self.remove_power_orange, self.remove_power_orange_rect, self.remove_power_orange_text_rect, active_color=ORANGE, offset=off, surface=surface)
-
-            self.max_y_rendered = curr_y
-
-        elif self.modifiers_tab == "EXTRAS":
-            self._draw_extras_content(100, off, lm, ox, surface)
-            # max_y_rendered se actualiza dentro de _draw_extras_content
-
-        elif self.modifiers_tab == "SKINS":
-            curr_y = 100
-            draw_rich_text(surface, self.t("Change |ORANGE| ORANGE |WHITE| power:", "Cambiar poder |ORANGE| NARANJA:"), (lm, self.modifiers_panel_rect.y + curr_y - off), self.small_font)
-            self.orange_skin_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 130, 40)
-            pygame.draw.rect(surface, BLACK, self.orange_skin_rect); pygame.draw.rect(surface, WHITE, self.orange_skin_rect, 2)
-            skin_name = self.orange_skin_options[self.orange_skin_idx]
-            # HADOUKEN no se traduce, Default -> Normal
-            display_name = self.t(skin_name, "Normal" if skin_name == "Default" else skin_name)
-            skin_color = WHITE if skin_name == "Default" else CYAN
-            st = self.small_font.render(display_name, True, skin_color)
-            surface.blit(st, st.get_rect(center=self.orange_skin_rect.center))
-            
-            curr_y += 80
-            draw_rich_text(surface, self.t("Change |YELLOW| YELLOW |WHITE| watch:", "Cambiar reloj |YELLOW| AMARILLO:"), (lm, self.modifiers_panel_rect.y + curr_y - off), self.small_font)
-            self.yellow_watch_skin_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 130, 40)
-            pygame.draw.rect(surface, BLACK, self.yellow_watch_skin_rect); pygame.draw.rect(surface, WHITE, self.yellow_watch_skin_rect, 2)
-            y_skin_name = self.yellow_watch_skin_options[self.yellow_watch_skin_idx]
-            # CROSS -> CRUZ, Default -> Normal
-            y_display_name = self.t(y_skin_name, "CRUZ" if y_skin_name == "CROSS" else ("Normal" if y_skin_name == "Default" else y_skin_name))
-            y_skin_color = WHITE if y_skin_name == "Default" else BROWN
-            st2 = self.small_font.render(y_display_name, True, y_skin_color)
-            surface.blit(st2, st2.get_rect(center=self.yellow_watch_skin_rect.center))
-
-            curr_y += 80
-            draw_rich_text(surface, self.t("Change BALL skin:", "Cambiar aspecto PELOTA:"), (lm, self.modifiers_panel_rect.y + curr_y - off), self.small_font)
-            self.ball_skin_rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 130, 40)
-            pygame.draw.rect(surface, BLACK, self.ball_skin_rect); pygame.draw.rect(surface, WHITE, self.ball_skin_rect, 2)
-            b_skin_name = self.ball_skin_options[self.ball_skin_idx]
-            b_map = {"Default": "Clásica", "Fireball": "Fuego", "Neon": "Neón", "CHEESE": "QUESO"}
-            b_display_name = self.t(b_skin_name, b_map.get(b_skin_name, b_skin_name))
-            b_skin_color = WHITE if b_skin_name == "Default" else (YELLOW if b_skin_name == "CHEESE" else GREEN)
-            st3 = self.small_font.render(b_display_name, True, b_skin_color)
-            surface.blit(st3, st3.get_rect(center=self.ball_skin_rect.center))
-            
-            self.max_y_rendered = curr_y + 40
-
-        # Update scroll limits
-        self.max_scroll = max(0, self.max_y_rendered + 60 - 330)
-        self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
-
-    def _draw_extras_content(self, start_y, off, lm, ox, surface):
-        cy = start_y
-        mpos = pygame.mouse.get_pos()
-        active_tooltip = None
-        
-        draw_remove_option(self, cy, self.t("Enable |ORANGE| ORANGE |WHITE| watch", "Activar reloj |ORANGE| NARANJA"), self.orange_watch_enabled, self.orange_watch_rect, self.orange_watch_text_rect, active_color=ORANGE, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self, cy, self.t("Enable |GOLD|X2 MULTIPLIER |WHITE|at start", "Activar |GOLD|MULTIPLICADOR X2 |WHITE|al inicio"), self.start_x2_enabled, self.start_x2_rect, self.start_x2_text_rect, active_color=GOLD, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self, cy, self.t("Enable |BLUE|MAG|RED|NET|WHITE| power", "Activar poder |BLUE|MAG|RED|NET"), self.magnet_power_enabled, self.magnet_power_rect, self.magnet_power_text_rect, active_color=GRAY, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self, cy, self.t("Enable |GHOST| GHOST |WHITE| power", "Activar poder |GHOST| FANTASMA"), self.ghost_power_enabled, self.ghost_power_rect, self.ghost_power_text_rect, active_color=GHOST_COLOR, offset=off, surface=surface)
-        if self.ghost_power_enabled:
-            cy += 60; draw_remove_option(self, cy, self.t(" - |CYAN|Identical |WHITE|ball", " - Pelota |CYAN|idéntica"), self.ghost_identical_enabled, self.ghost_identical_rect, self.ghost_identical_text_rect, active_color=CYAN, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self, cy, self.t("Enable |GUM_PINK|GUM|WHITE| power", "Activar poder de |GUM_PINK|CHICLE"), self.gum_power_enabled, self.gum_power_rect, self.gum_power_text_rect, active_color=GUM_PINK, offset=off, surface=surface)
-        if self.gum_power_rect.collidepoint(mpos) or self.gum_power_text_rect.collidepoint(mpos):
-            if self.language == "EN":
-                active_tooltip = ["Paddles turn pink. Balls stick automatically.", "Sticking consumes 1 charge per second.", "Press power key to shoot a giant gum ball."]
-            else:
-                active_tooltip = ["Las paletas se vuelven rosas. Las pelotas se pegan solas.", "Estar pegado consume 1 carga por segundo.", "Usa el botón de poder para tirar un chicle gigante."]
-        cy += 60; draw_remove_option(self, cy, self.t("|GOLD|GOLDEN |WHITE|GOAL rule", "|GOLD|GOL DE ORO |WHITE|(Regla)"), self.experimental_golden_goal, self.experimental_golden_goal_rect, self.experimental_golden_goal_text_rect, active_color=GOLD, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self, cy, self.t("Allow floating planets", "Activar planetas flotantes"), self.floating_planets_enabled, self.floating_planets_rect, self.floating_planets_text_rect, active_color=CYAN, offset=off, surface=surface)
-        if self.floating_planets_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.t("Gravity:", "Fuerza de gravedad:"), self.gravity_force_names[self.gravity_force_idx], self.gravity_force_rect, off, ox, lm, surface, sub_val=self.gravity_force_options[self.gravity_force_idx])
-            cy += 60; self._draw_sub_selector(cy, self.t("Gravity Radius:", "Radio de gravedad:"), self.gravity_radius_names[self.gravity_radius_idx], self.gravity_radius_rect, off, ox, lm, surface, sub_val=str(self.gravity_radius_options[self.gravity_radius_idx]))
-            cy += 60; draw_remove_option(self, cy, self.t("Destructible planets", "Planetas destructibles"), self.destructible_planets_enabled, self.destructible_planets_rect, self.destructible_planets_text_rect, active_color=RED, offset=off, surface=surface)
-            if self.destructible_planets_enabled:
-                cy += 60; self._draw_sub_selector(cy, self.t("Planet resistance:", "Resistencia:"), self.planet_resistance_names[self.planet_resistance_idx], self.planet_resistance_rect, off, ox, lm, surface, sub_val=str(self.planet_resistance_options[self.planet_resistance_idx]))
-        
-        cy += 60; draw_remove_option(self, cy, self.t("Dimensional |BLUE|POR|RED|TALS", "|BLUE|POR|RED|TALES |WHITE|Dimensionales"), self.portals_enabled, self.portals_rect, self.portals_text_rect, active_color=CYAN, offset=off, surface=surface)
-        if self.portals_text_rect.collidepoint(mpos):
-            active_tooltip = ["Teleport balls between Blue and Orange PORTALS."]
-
-        if self.portals_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.t("PORTAL size:", "Tamaño del PORTAL:"), self.portal_size_names[self.portal_size_idx], self.portal_size_rect, off, ox, lm, surface, sub_val=str(self.portal_size_options[self.portal_size_idx]), text_rect=self.portal_size_text_rect)
-            if self.portal_size_text_rect.collidepoint(mpos):
-                active_tooltip = ["Change the length of the PORTALS."]
-
-            cy += 60; draw_remove_option(self, cy, self.t("Vertical PORTALS", "PORTALES Verticales"), self.portals_vertical, self.portals_vertical_rect, self.portals_vertical_text_rect, active_color=BLUE, offset=off, surface=surface)
-            if self.portals_vertical_text_rect.collidepoint(mpos):
-                active_tooltip = ["Flip PORTALS to vertical orientation on the side walls."]
-            cy += 60; draw_remove_option(self, cy, self.t("2 more |RED|POR|GREEN|TALS", "2 |RED|POR|GREEN|TALES |WHITE|más"), self.more_portals_enabled, self.more_portals_rect, self.more_portals_text_rect, active_color=BLUE, offset=off, surface=surface)
-            if self.more_portals_text_rect.collidepoint(mpos):
-                active_tooltip = ["Add RED and GREEN PORTALS (Cross-connection)."]
-                
-        cy += 60; draw_remove_option(self, cy, self.t("Intrusive Mouse", "Ratón Intruso"), self.add_mouse_enabled, self.add_mouse_rect, self.add_mouse_text_rect, active_color=BROWN, offset=off, surface=surface)
-        if self.add_mouse_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.t("Mouse speed:", "Velocidad de ratón:"), self.mouse_speed_names[self.mouse_speed_idx], self.mouse_speed_rect, off, ox, lm, surface, sub_val=str(self.mouse_speed_options[self.mouse_speed_idx]))
-            cy += 60; self._draw_sub_selector(cy, self.t("Mouse appear time:", "Tiempo aparición:"), self.mouse_appear_names[self.mouse_appear_idx], self.mouse_appear_rect, off, ox, lm, surface, sub_val=f"{self.mouse_appear_options[self.mouse_appear_idx]}s")
-        
-        cy += 60; draw_remove_option(self, cy, self.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVOLVER"), self.revolver_enabled, self.revolver_rect, self.revolver_text_rect, active_color=GUN_METAL, offset=off, surface=surface)
-        if self.revolver_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.revolver_prob_names[self.revolver_prob_idx], self.revolver_prob_rect, off, ox, lm, surface)
-        
-        if self.revolver_rect.collidepoint(mpos) or self.revolver_text_rect.collidepoint(mpos):
-            if self.language == "EN":
-                active_tooltip = ["Orbital item. Grants a 6-shooter (3 shots for balance).", "Yellow bullets travel at 2x speed.", "Hits are LETHAL to the opponent.", "Bullets go through and disappear if they miss."]
-            else:
-                active_tooltip = ["Ítem orbital. Otorga un revólver de 3 tiros.", "Las balas amarillas van a velocidad x2.", "Los impactos son LETALES para el oponente.", "Las balas siguen de largo si fallas."]
-        
-        self.max_y_rendered = cy + 40
-        
-        # Dibujamos el tooltip al FINAL para que esté por encima de todo
-        if active_tooltip:
-            from ui_components import draw_tooltip
-            draw_tooltip(self, active_tooltip, surface)
-
-    def _draw_sub_selector(self, curr_y, label, val_name, rect, off, ox, lm, surface, sub_val=None, text_rect=None):
-        draw_rich_text(surface, label, (lm, self.modifiers_panel_rect.y + curr_y - off), self.small_font)
-        rect.update(ox, self.modifiers_panel_rect.y + curr_y - 5 - off, 130, 40)
-        pygame.draw.rect(surface, BLACK, rect); pygame.draw.rect(surface, WHITE, rect, 2)
-        
-        translations = {
-            "None": "Ninguno", "Low": "Bajo", "Medium": "Medio", "High": "Alto", "Extreme": "Extremo",
-            "Minion": "Minion", "Short": "Pequeño", "Default": "Normal", "Big": "Grande", "Giant": "Gigante",
-            "Slow": "Lento", "Normal": "Normal", "Fast": "Rápido", "Sonic": "Sónico",
-            "Moon": "Luna", "Planet": "Planeta", "Gas Giant": "Gigante Gaseoso", "Star": "Estrella",
-            "CHEESE": "QUESO", "EARTH": "TIERRA"
-        }
-        translated_name = translations.get(val_name, val_name) if self.language == "ES" else val_name
-        
-        color = WHITE
-        if val_name == "Moon": color = (180, 180, 180)
-        elif val_name == "Planet": color = BROWN
-        elif val_name == "Gas Giant": color = (100, 200, 255)
-        elif val_name == "Star": color = YELLOW
-        
-        # Auto-encogimiento para nombres largos
-        f_to_use = self.small_font
-        if f_to_use.size(translated_name)[0] > rect.width - 10:
-            f_to_use = self.tiny_font
-            
-        st = f_to_use.render(translated_name, True, color)
-        surface.blit(st, st.get_rect(center=rect.center))
-        if sub_val:
-            ss = self.tiny_font.render(str(sub_val), True, GRAY)
-            surface.blit(ss, (rect.right + 10, rect.centery - ss.get_height()//2))
-
-    def _draw_tooltips(self, clip, surface):
-        m = pygame.mouse.get_pos()
-        if not clip.collidepoint(m): return
-        
-    def _draw_tooltips(self, clip, surface):
-        m = pygame.mouse.get_pos()
-        if not clip.collidepoint(m): return
-        
-        # Construir la lista de áreas según la pestaña activa
-        areas = []
-        
-        if self.modifiers_tab == "ALL":
-            areas = [
-                (self.match_point_text_rect, "match_point"),
-                (self.golden_goal_anim_text_rect, "golden_goal_anim"),
-                (self.reroll_text_rect, "reroll"),
-                (self.equal_watches_text_rect, "equal_watches"),
-                (self.equal_powers_text_rect, "equal_powers"),
-                (self.watches_kept_text_rect, "watches_kept"),
-                (self.watch_spawn_hits_text_rect, "watch_spawn"),
-                (self.power_auto_grant_hits_text_rect, "power_spawn"),
-                (self.start_with_power_text_rect, "start_with_power"),
-                (self.encapsulate_powers_text_rect, "encapsulate_powers")
-            ]
-        elif self.modifiers_tab == "EXTRAS":
-            areas = [
-                (self.remove_watches_toggle_text_rect, "remove_power_menu"),
-                (self.orange_watch_text_rect, "orange_watch"),
-                (self.magnet_power_text_rect, "magnet_power"),
-                (self.ghost_power_text_rect, "ghost_power"),
-                (self.experimental_golden_goal_text_rect, "exp_golden_goal"),
-                (self.floating_planets_text_rect, "floating_planets"),
-                (self.gravity_force_rect, "gravity_force"),
-                (self.gravity_radius_rect, "gravity_radius"),
-                (self.destructible_planets_text_rect, "destructible_planets"),
-                (self.planet_resistance_rect, "planet_resistance"),
-                (self.portals_text_rect, "portals"),
-                (self.portal_size_rect, "portal_size"),
-                (self.portals_vertical_text_rect, "portals_vertical"),
-                (self.more_portals_text_rect, "more_portals"),
-                (self.add_mouse_text_rect, "add_mouse")
-            ]
-        
-        lines = []
-        for rect, key in areas:
-            if rect.collidepoint(m):
-                lang_dict = assets.TOOLTIPS.get(self.language, assets.TOOLTIPS["EN"])
-                lines = lang_dict.get(key, [])
-                break
-                
-        draw_tooltip(self, lines, surface=surface)
-
-    def _draw_game_over(self, surface):
-        # Fondo oscuro semi-transparente
-        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        ov.set_alpha(180)
-        ov.fill(BLACK)
-        surface.blit(ov, (0,0))
-        
-        lines = self.winner_text.split("\n")
-        for i, line in enumerate(lines):
-            if "|" in line:
-                # Calcular ancho real ignorando las etiquetas |TAG|
-                import re
-                clean_txt = re.sub(r'\|[^|]*\|', '', line)
-                tw = self.tiny_font.render(clean_txt, True, WHITE).get_width()
-                draw_rich_text(surface, line, (SCREEN_WIDTH//2 - tw//2, SCREEN_HEIGHT//3 + 60), self.tiny_font)
-            else:
-                f = self.large_font if i == 0 else self.font
-                color = GOLD if i == 0 else WHITE
-                txt = f.render(line, True, color)
-                surface.blit(txt, txt.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//3 + i*60)))
-
-        # Botones
-        self.btn_gameover_restart.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 40, 300, 50)
-        self.btn_gameover_menu.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 105, 300, 50)
-        
-        btn_labels = [
-            (self.btn_gameover_restart, self.t("Restart Game", "Reiniciar Juego")),
-            (self.btn_gameover_menu, self.t("Back to Menu", "Volver al Menú"))
-        ]
-        
-        mpos = pygame.mouse.get_pos()
-        for r, txt in btn_labels:
-            is_hover = r.collidepoint(mpos)
-            b_col = (40, 40, 40) if is_hover else BLACK
-            s_col = GOLD if is_hover else WHITE
-            pygame.draw.rect(surface, b_col, r)
-            pygame.draw.rect(surface, s_col, r, 3)
-            
-            # Lógica de auto-encogimiento para el menú principal
-            f_to_use = self.font
-            if f_to_use.size(txt)[0] > r.width - 20:
-                f_to_use = self.small_font
-                
-            st = f_to_use.render(txt, True, WHITE)
-            surface.blit(st, st.get_rect(center=r.center))
-
-    def _draw_settings(self, surface):
-        pygame.draw.rect(surface, BLACK, self.modifiers_panel_rect); pygame.draw.rect(surface, WHITE, self.modifiers_panel_rect, 4)
-        
-        # Título bilingüe
-        title = "SETTINGS" if self.language == "EN" else "AJUSTES"
-        t = self.font.render(title, True, WHITE)
-        surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, self.modifiers_panel_rect.y+40)))
-        
-        lm = self.modifiers_panel_rect.x + 100
-        ox = self.modifiers_panel_rect.centerx + 50
-        cy = self.modifiers_panel_rect.y + 120
-        
-        # 1. Idioma
-        label_lang = "Language / Idioma"
-        draw_rich_text(surface, label_lang, (lm, cy), self.small_font)
-        self.lang_rect.update(ox, cy - 5, 130, 40)
-        pygame.draw.rect(surface, BLACK, self.lang_rect); pygame.draw.rect(surface, WHITE, self.lang_rect, 2)
-        txt_lang = "ESPAÑOL" if self.language == "ES" else "ENGLISH"
-        st = self.small_font.render(txt_lang, True, YELLOW)
-        surface.blit(st, st.get_rect(center=self.lang_rect.center))
-        
-        # 2. VFX
-        cy += 80
-        label_vfx = "Visual Effects" if self.language == "EN" else "Efectos Visuales"
-        draw_rich_text(surface, f"{label_vfx}:", (lm, cy), self.small_font)
-        self.vfx_rect.update(ox + 50, cy - 5, 30, 30)
-        pygame.draw.rect(surface, BLACK, self.vfx_rect); pygame.draw.rect(surface, WHITE, self.vfx_rect, 2)
-        if self.vfx_enabled: pygame.draw.rect(surface, GREEN, self.vfx_rect.inflate(-10, -10))
-        
-        # 3. VOLUME
-        cy += 80
-        label_vol = "Volume" if self.language == "EN" else "Volumen"
-        draw_rich_text(surface, f"{label_vol}:", (lm, cy), self.small_font)
-        
-        # Dibujar barra
-        self.volume_bar_rect.update(ox, cy + 10, 200, 10)
-        pygame.draw.rect(surface, GRAY, self.volume_bar_rect)
-        pygame.draw.rect(surface, WHITE, self.volume_bar_rect, 1)
-        
-        # Dibujar handle (basado en self.sfx_volume)
-        handle_x = self.volume_bar_rect.x + (self.sfx_volume * self.volume_bar_rect.width)
-        self.volume_handle_rect.center = (handle_x, self.volume_bar_rect.centery)
-        pygame.draw.rect(surface, WHITE, self.volume_handle_rect)
-        
-        # Porcentaje
-        pct_txt = f"{int(self.sfx_volume * 100)}%"
-        pst = self.tiny_font.render(pct_txt, True, WHITE)
-        surface.blit(pst, (self.volume_bar_rect.right + 15, cy + 5))
-        
-        # 4. Shake
-        cy += 80
-        label_shake = "Screen Shake" if self.language == "EN" else "Temblor de Pantalla"
-        draw_rich_text(surface, f"{label_shake}:", (lm, cy), self.small_font)
-        self.shake_rect.update(ox + 50, cy - 5, 30, 30)
-        pygame.draw.rect(surface, BLACK, self.shake_rect); pygame.draw.rect(surface, WHITE, self.shake_rect, 2)
-        if self.shake_enabled: pygame.draw.rect(surface, GREEN, self.shake_rect.inflate(-10, -10))
-        
-        # 1. Botón BACK (Esquina superior derecha del panel)
-        self.settings_back_btn_rect.update(self.modifiers_panel_rect.right - 100, self.modifiers_panel_rect.y + 20, 80, 40)
-        pygame.draw.rect(surface, BLACK, self.settings_back_btn_rect); pygame.draw.rect(surface, WHITE, self.settings_back_btn_rect, 2)
-        back_txt = self.t("BACK", "VOLVER")
-        bt = self.tiny_font.render(back_txt, True, WHITE)
-        surface.blit(bt, bt.get_rect(center=self.settings_back_btn_rect.center))
-
-        # 2. Botón APPLY (Centro abajo del panel)
-        self.settings_apply_btn_rect.update(SCREEN_WIDTH//2 - 65, self.modifiers_panel_rect.bottom - 60, 130, 45)
-        pygame.draw.rect(surface, (0, 100, 0), self.settings_apply_btn_rect) # Verde oscuro para Aplicar
-        pygame.draw.rect(surface, WHITE, self.settings_apply_btn_rect, 2)
-        apply_txt = self.t("APPLY", "APLICAR")
-        at = self.small_font.render(apply_txt, True, WHITE)
-        surface.blit(at, at.get_rect(center=self.settings_apply_btn_rect.center))
+        sx, sy = SCREEN_WIDTH//2 - tw//2, SCREEN_HEIGHT//2 - t1.get_height()//2
+        surface.blit(t1, (sx, sy)); surface.blit(t2, (sx + t1.get_width(), sy))
 
     def run(self):
         try:

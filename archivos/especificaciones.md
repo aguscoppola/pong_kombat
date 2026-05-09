@@ -1,7 +1,7 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.5.1)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.5.1.1)
 
 ## 1. Visión General
-**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego está estructurado en una arquitectura modular de carpetas (`codigo_fuente/`, `codigo/`, `sounds/`, `archivos/`) para facilitar la escalabilidad.
+**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. El juego utiliza una arquitectura desacoplada donde la lógica de decisiones (AIController) y las leyes físicas (PhysicsEngine) están separadas del bucle principal de juego.
 
 ---
 
@@ -30,3 +30,4 @@
 *   **v0.4.0**: "The Solo & Settings Update" - Modo contra IA y panel de ajustes.
 *   **v0.5.0**: "The REVOLVER Update" - Combate letal, IA pistolera y poder de chicle.
 *   **v0.5.1**: "The Architect & Survival Update" - Arquitectura modular, IA con radar de esquiva y probabilidad de revólver.
+*   **v0.5.1.1**: "The Stability & UI Fix" - Motor de física centralizado, fixes de colisión y pulido de UI.

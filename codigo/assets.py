@@ -86,9 +86,13 @@ TOOLTIPS = {
         "ghost_power": ["GHOST: Shoot 1 spectral ball that the rival must catch.", "Ghost balls are 50% slower. If they leave the screen", "behind the opponent, you score a point!"],
         "add_mouse": ["Adds a mouse that tries to eat the ball (cheese).", "If it succeeds, the last hitter loses 1 point.", "The mouse enters after the second bounce."],
         "encapsulate_powers": ["Stores your current power in your score number", "when receiving a new one. It activates automatically", "once your paddle is free and effects are over."],
+        "portals": ["Adds dimensional PORTALS on floor and ceiling.", "The ball enters one and exits from the other."],
         "portal_size": ["Change the length of the PORTALS."],
         "portals_vertical": ["Flip PORTALS to vertical orientation on the side walls."],
-        "more_portals": ["Add RED and GREEN PORTALS (Cross-connection)."]
+        "more_portals": ["Add RED and GREEN PORTALS (Cross-connection)."],
+        "revolver": ["REVOLVER: Orbiting item at center.", "Allows shooting 3 BULLETS that destroy", "the enemy paddle temporarily."],
+        "gum_power": ["GUM: The ball sticks to your paddle!", "You have 3 seconds to aim and shoot.", "Consumes charges per second."],
+        "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."]
     },
     "ES": {
         "match_point": ["Si ambos jugadores están a un punto de ganar (5-5),", "la partida no terminará hasta que haya 2 puntos de ventaja."],
@@ -117,8 +121,12 @@ TOOLTIPS = {
         "ghost_power": ["FANTASMA: Lanza 1 bola espectral lenta.", "Si el rival no la atrapa y sale del campo,", "¡marcas un punto!"],
         "add_mouse": ["Añade un ratón que intenta comerse la bola.", "Si lo logra, el último en tocarla pierde 1 punto.", "Entra tras el segundo rebote."],
         "encapsulate_powers": ["Guarda tu poder actual en tu marcador al recibir", "uno nuevo. Se activa automáticamente al quedar libre."],
+        "portals": ["Añade PORTALES dimensionales en techo y suelo.", "La bola entra por uno y sale por el otro."],
         "portal_size": ["Cambia la longitud de los PORTALES."],
         "portals_vertical": ["Gira los PORTALES a las paredes laterales."],
-        "more_portals": ["Añade portales ROJOS y VERDES (Conexión cruzada)."]
+        "more_portals": ["Añade portales ROJOS y VERDES (Conexión cruzada)."],
+        "revolver": ["REVÓLVER: Ítem que orbita el centro.", "Permite disparar 3 BALAS que destruyen", "la paleta enemiga temporalmente."],
+        "gum_power": ["CHICLE: ¡La bola se queda pegada a tu paleta!", "Tienes 3 segundos para apuntar y disparar.", "Consume cargas por segundo."],
+        "start_x2": ["Multiplicador X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."]
     }
 }

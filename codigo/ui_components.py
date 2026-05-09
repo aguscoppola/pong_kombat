@@ -44,8 +44,8 @@ def draw_remove_option(game, y, label, is_active, rect, text_rect, active_color=
     # Ajuste de posición basado en el scroll
     draw_y = game.modifiers_panel_rect.y + y - offset
     
-    # Dibujar etiqueta
-    text_rect.update(lm, draw_y, 250, 25)
+    # Dibujar etiqueta (Aumentar ancho de detección a 400 para facilitar colisión)
+    text_rect.update(lm, draw_y, 400, 30)
     draw_rich_text(surface, label, (lm, draw_y), game.small_font)
     
     # Dibujar checkbox/toggle (Tamaño original 30x30)
