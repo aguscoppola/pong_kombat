@@ -2,9 +2,8 @@ import pygame
 import re
 from constants import *
 
-def draw_rich_text(surface, text, pos, font, default_color=WHITE):
-    """Dibuja texto con soporte para cambios de color y saltos de línea"""
-    lines = text.split('\n')
+def draw_rich_text(surface, text, pos, font, default_color=WHITE, max_width=None, align="left"):
+    """Dibuja texto con soporte para cambios de color y alineación"""
     start_x, start_y = pos
     color_keywords = {
         "BLUE": BLUE, "RED": RED, "PURPLE": PURPLE, "WHITE": WHITE,
@@ -14,8 +13,36 @@ def draw_rich_text(surface, text, pos, font, default_color=WHITE):
     }
     
     line_height = font.get_linesize()
+    
+    # Pre-procesamiento para wrap automático si max_width está definido
+    processed_text = text
+    if max_width:
+        words = text.split(' ')
+        new_text = ""
+        current_line = ""
+        for word in words:
+            # Limpiar tags para el cálculo del ancho
+            clean_word = re.sub(r'\|[A-Z_]+\|', '', word)
+            clean_line = re.sub(r'\|[A-Z_]+\|', '', current_line)
+            
+            if font.size(clean_line + clean_word)[0] < max_width:
+                current_line += (word + " ")
+            else:
+                new_text += current_line.strip() + "\n"
+                current_line = word + " "
+        new_text += current_line.strip()
+        processed_text = new_text
+
+    lines = processed_text.split('\n')
     for i, line in enumerate(lines):
-        curr_x = start_x
+        # Calcular posición X basada en alineación
+        if align == "center":
+            clean_line = re.sub(r'\|[A-Z_]+\|', '', line)
+            line_w = font.size(clean_line)[0]
+            curr_x = start_x + (max_width - line_w) // 2 if max_width else start_x - line_w // 2
+        else:
+            curr_x = start_x
+            
         curr_y = start_y + i * line_height
         parts = re.split(r'(\s+|\(|\)|/|\|)', line)
         is_tag = False
@@ -32,7 +59,13 @@ def draw_rich_text(surface, text, pos, font, default_color=WHITE):
                 continue
                 
             # Si no es un tag, renderizar la palabra
-            word_surf = font.render(part, True, curr_color)
+            # Auto-color de palabras clave (v0.6.0 Fix)
+            word_color = curr_color
+            clean_p = part.upper().strip("(),.¡!¿?")
+            if clean_p in ["CROWN", "CORONA"]: word_color = GOLD
+            elif clean_p == "ARCADE": word_color = RED
+
+            word_surf = font.render(part, True, word_color)
             surface.blit(word_surf, (curr_x, curr_y))
             curr_x += word_surf.get_width()
 
@@ -94,3 +127,37 @@ def draw_tooltip(game, lines, surface=None):
     
     for i, line in enumerate(lines):
         surface.blit(game.tiny_font.render(line, True, WHITE), (tx + padding, ty + padding + i*line_height))
+
+def draw_crown(surface, x, y, size=1.0):
+    """Dibuja una corona pixel-art detallada (v0.6.0 New Design)"""
+    b = max(1, int(5 * size)) # Escala del píxel
+    
+    # Matriz de la corona (15x10)
+    # 0: Transparente, 1: Negro, 2: Oro, 3: Oro Oscuro, 4: Blanco
+    grid = [
+        [0,0,0,0,1,0,0,0,0,0,1,0,0,0,0],
+        [0,0,0,1,1,1,0,0,0,1,1,1,0,0,0],
+        [0,1,0,1,3,1,0,1,0,1,3,1,0,1,0],
+        [1,2,1,3,3,3,1,2,1,3,3,3,1,2,1],
+        [1,2,2,1,3,1,2,2,2,1,3,1,2,2,1],
+        [1,2,2,2,2,2,4,4,2,2,2,2,2,2,1],
+        [1,2,4,2,2,2,2,4,2,2,2,2,2,2,1],
+        [1,2,4,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,2,4,4,4,2,2,2,2,2,2,2,2,2,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ]
+    
+    colors = {
+        1: (0, 0, 0),         # Negro
+        2: (255, 200, 0),     # Oro
+        3: (130, 100, 0),     # Oro Oscuro
+        4: (255, 255, 255)    # Blanco
+    }
+    
+    start_x = x - (len(grid[0]) * b) // 2
+    start_y = y - (len(grid) * b)
+    
+    for r, row in enumerate(grid):
+        for c, val in enumerate(row):
+            if val in colors:
+                pygame.draw.rect(surface, colors[val], (start_x + c*b, start_y + r*b, b, b))

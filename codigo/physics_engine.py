@@ -13,6 +13,27 @@ class PhysicsEngine:
             ball.update(dt, self.game._get_zone_multiplier(ball))
             # 1. Procesar físicas y colisiones
             self._process_ball_physics(ball, dt)
+        
+        # 3. Colisiones de Proyectiles de Sueño (v0.6.0)
+        self._check_sleep_projectile_collisions()
+
+    def _check_sleep_projectile_collisions(self):
+        for sp in self.game.sleep_projectiles[:]:
+            # Colisión con Paletas
+            if sp.rect.colliderect(self.game.paddle1.rect):
+                if sp.owner_ref == self.game.paddle1 and sp.owner_immunity > 0: continue
+                self.game.audio.play('sleep') # v0.6.0 Fix: Nuevo sonido
+                self.game.paddle1.sleep_hits_left = 2
+                self.game.paddle1.sleep_timer = 4.0 # Ajustado a 4 segundos (v0.6.0 Fix)
+                self.game.vfx.explosion(sp.rect.centerx, sp.rect.centery, SLEEP_PURPLE)
+                sp.active = False
+            elif sp.rect.colliderect(self.game.paddle2.rect):
+                if sp.owner_ref == self.game.paddle2 and sp.owner_immunity > 0: continue
+                self.game.audio.play('sleep') # v0.6.0 Fix: Nuevo sonido
+                self.game.paddle2.sleep_hits_left = 2
+                self.game.paddle2.sleep_timer = 4.0 # Ajustado a 4 segundos (v0.6.0 Fix)
+                self.game.vfx.explosion(sp.rect.centerx, sp.rect.centery, SLEEP_PURPLE)
+                sp.active = False
 
     def _process_ball_physics(self, ball, dt):
         # 1. Rebotes en Paredes (Superior/Inferior)

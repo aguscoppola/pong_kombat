@@ -1,3 +1,38 @@
+## [0.6.0] - 2026-05-11
+### The Arcade & Sleep Update (v0.6.0)
+Esta es la actualización más ambiciosa hasta la fecha, introduciendo un modo campaña, un nuevo sistema de combate no letal y una IA con instinto de supervivencia real.
+
+#### Agregado (Nuevas cosas)
+- **Modo ARCADE**:
+    - Sistema de 5 niveles con dificultad escalonada.
+    - IA nivel 5 con reflejos "Ultra-Instinto".
+    - Tutorial interactivo específico para el modo Arcade (Botón rojo "?").
+    - Sistema de persistencia de victoria.
+- **Nuevo Poder: SLEEP (SUEÑO)**:
+    - Proyectil de triple trayectoria (45 grados).
+    - Efecto de inmovilización por 4 segundos.
+    - Sonidos espaciales dedicados para disparo y estado "dormido".
+- **Tutoriales Interactivos**:
+    - **Tutorial General**: Guía paso a paso desde el menú principal para aprender modificadores y ajustes.
+    - **Tutorial Arcade**: Explicación de la progresión de niveles y recompensas (Botón rojo "?").
+    - **Mecánica Typewriter**: Texto palabra por palabra con efectos de sonido 'pop' sincronizados.
+- **Sistema de Recompensas**:
+    - **Accesorio de CORONA**: Desbloqueable permanentemente al ganar el modo Arcade.
+    - Selector de corona en la pestaña SKINS para ambos jugadores.
+- **IA: Evasión Táctica**:
+    - Radar de balas para esquivar disparos del Revólver y bolas Naranjas.
+    - Inteligencia de priorización: primero la vida, luego la pelota (a menos que el gol sea inminente).
+
+#### Mejorado (Audio y Visual)
+- **Audio Overhaul**: Nuevos sonidos de alta calidad para explosiones, victoria y poderes especiales.
+- **UI Refinement**: Menú de selección de submodo Solo (Clásico vs Arcade).
+- **Estética Retro**: Botones de ayuda pixelados uniformemente en todos los menús.
+
+#### Arreglado (Bugs)
+- **Física de Sueño**: Corregida la colisión instantánea al disparar el proyectil violeta.
+- **Sincronización de Tutorial**: Fix en el efecto 'typewriter' que se bloqueaba en ciertas resoluciones.
+- **Balance de Poderes**: Ajuste de velocidades de proyectiles para un gameplay más justo.
+
 ## [0.5.1.1] - 2026-05-09
 ### Physics Engine Stability & UI Polish (v0.5.1.1)
 Esta es una actualización de corrección de errores (Hotfix) para estabilizar la nueva arquitectura del motor de física y pulir la experiencia de usuario.

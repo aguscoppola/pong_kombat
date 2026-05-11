@@ -31,27 +31,35 @@ class AudioManager:
             "ghost": ("fantasma.wav", 0.8),
             "nom": ("nom.wav", 0.8),
             "squeak": ("squeak.wav", 0.4),
-            "pium": ("pium.wav", 0.6)
+            "pium": ("pium.wav", 0.6),
+            "reveal": ("reveal.wav", 0.6),
+            "victory_arcade": ("victory_arcade.wav", 0.8),
+            "sleep_shoot": ("sleep_shoot.wav", 0.7),
+            "sleep": ("sleep.wav", 0.7)
         }
 
         for name, (filename, vol) in sound_configs.items():
             path = os.path.join(self.sounds_dir, filename)
             if os.path.exists(path):
-                sound = pygame.mixer.Sound(path)
-                self.sounds[name] = sound
-                self.sound_base_volumes[name] = vol # Guardamos el volumen relativo
-                sound.set_volume(vol * self.master_volume)
+                try:
+                    sound = pygame.mixer.Sound(path)
+                    self.sounds[name] = sound
+                    self.sound_base_volumes[name] = vol
+                    sound.set_volume(vol * self.master_volume)
+                except Exception as e:
+                    print(f"Error cargando {name}: {e}")
             else:
                 print(f"Advertencia: No se encontró el sonido {path}")
 
     def play(self, name, loops=0, fadeout=0):
         if name in self.sounds:
-            # Actualizar volumen antes de reproducir por si cambió el master_volume
             self.sounds[name].set_volume(self.sound_base_volumes[name] * self.master_volume)
             if fadeout > 0:
                 self.sounds[name].fadeout(fadeout)
             else:
                 self.sounds[name].play(loops)
+        else:
+            print(f"DEBUG: No se encontró el sonido en el diccionario: {name}")
 
     def stop(self, name):
         if name in self.sounds:

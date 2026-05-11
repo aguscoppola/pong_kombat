@@ -1,13 +1,15 @@
 # Pong Kombat 🔥🚀
 
-¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal y una IA que no tiene piedad.
+¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con un **Modo Arcade** desafiante y una IA que aprende de tus movimientos.
 
-## 🔭 ¿Qué hay de nuevo en la v0.5.1.1?
-¡La **Stability & UI Update** ha llegado! 🛠️✨
-*   **Motor de Física Centralizado:** Sistema de colisiones y gravedad profesionalmente separado y optimizado.
-*   **Corrección de Bugs:** Solucionados los problemas de rebote "metralleta", teletransportes infinitos y colisiones fantasmas.
-*   **Pulido de UI:** Tooltips corregidos, colores en el menú de gravedad y visuales de victoria mejorados.
-*   **Mecánicas Restauradas:** Reloj Púrpura y Revólver vuelven a funcionar al 100%.
+## 🔭 ¿Qué hay de nuevo en la v0.6.0?
+¡La **Arcade & Sleep Update** ha llegado! 🛠️✨
+*   **Modo ARCADE:** Enfréntate a 5 niveles de dificultad progresiva. ¡Solo tienes una oportunidad para llegar al final!
+*   **Nuevo Poder: SLEEP (Sueño):** Inmoviliza a tu oponente con proyectiles triple-violetas.
+*   **IA de Supervivencia:** La computadora ahora esquiva balas del revólver y amenazas letales con precisión quirúrgica.
+*   **Nuevos Tutoriales:** Sistema de ayuda interactiva con botones "?" pixelados. Incluye un tutorial general y uno específico para el modo Arcade.
+*   **Recompensas Desbloqueables:** Vence el modo Arcade para obtener la **CORONA** y personalizar tu paleta.
+*   **Audio Overhaul:** Nuevos efectos de sonido inmersivos para una experiencia arcade total.
 
 ## 📂 Estructura del Proyecto
 *   **`main.py`**: El lanzador principal (ejecuta este archivo para jugar).

@@ -37,5 +37,14 @@ class VFXManager:
         for _ in range(count):
             self.particles.append(Particle(x, y, color, lifetime=lifetime))
 
+    def confetti_rain(self, count=500):
+        if not self.enabled: return
+        colors = [RED, GREEN, BLUE, YELLOW, PINK, ORANGE, PURPLE, WHITE]
+        for _ in range(count):
+            x = random.randint(0, SCREEN_WIDTH)
+            # Spawnear algunos dentro de la pantalla para efecto inmediato (v0.6.0 Fix)
+            y = random.randint(-300, 300)
+            self.particles.append(Particle(x, y, random.choice(colors), lifetime=6.0, is_confetti=True))
+
     def clear(self):
         self.particles.clear()

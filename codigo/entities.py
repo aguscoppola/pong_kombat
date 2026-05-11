@@ -4,15 +4,22 @@ import math
 from constants import *
 
 class Particle:
-    def __init__(self, x, y, color, lifetime=1.0):
+    def __init__(self, x, y, color, lifetime=1.0, is_confetti=False):
         self.x = x
         self.y = y
         self.color = color
         self.lifetime = lifetime
         self.max_lifetime = lifetime
-        self.vx = random.uniform(-4, 4)
-        self.vy = random.uniform(-4, 4)
-        self.size = random.randint(3, 7)
+        self.is_confetti = is_confetti
+        
+        if is_confetti:
+            self.vx = random.uniform(-2, 2)
+            self.vy = random.uniform(2, 5) # Caída constante
+            self.size = random.randint(4, 8)
+        else:
+            self.vx = random.uniform(-4, 4)
+            self.vy = random.uniform(-4, 4)
+            self.size = random.randint(3, 7)
 
     def update(self, dt):
         self.x += self.vx * dt * 60
@@ -45,6 +52,7 @@ class Paddle:
         self.has_extra_life = False
         self.white_zone_hits_left = 0
         self.white_activation_timer = 0.0
+        self.white_zone_shrink_timer = 0.0
         # Variables para GUM Power
         self.gum_charges = 0
         self.is_stuck = False
@@ -53,6 +61,9 @@ class Paddle:
         # Variables para REVOLVER
         self.revolver_shots_left = 0
         self.revolver_timer = 0.0
+        # Variables para SLEEP (v0.6.0)
+        self.sleep_hits_left = 0
+        self.sleep_timer = 0.0
 
     def reset(self):
         self.rect.height = PADDLE_HEIGHT
@@ -78,6 +89,10 @@ class Paddle:
         self.is_stuck = False
         self.stuck_ball = None
         self.gum_decay_timer = 0.0
+        self.revolver_shots_left = 0
+        self.revolver_timer = 0.0
+        self.sleep_hits_left = 0
+        self.sleep_timer = 0.0
 
     def grant_random_power(self, game):
         all_p = [
@@ -87,7 +102,8 @@ class Paddle:
             (POWER_ORANGE, ORANGE, 25 if game.equal_powers_enabled else 10, game.remove_power_orange),
             (POWER_MAGNET, GRAY, 25 if game.equal_powers_enabled else 15, not game.magnet_power_enabled),
             (POWER_GHOST, GHOST_COLOR, 25 if game.equal_powers_enabled else 15, not game.ghost_power_enabled),
-            (POWER_GUM, GUM_PINK, 25 if game.equal_powers_enabled else 15, not game.gum_power_enabled)
+            (POWER_GUM, GUM_PINK, 25 if game.equal_powers_enabled else 15, not game.gum_power_enabled),
+            (POWER_SLEEP, SLEEP_PURPLE, 25 if game.equal_powers_enabled else 10, not game.sleeping_power_enabled)
         ]
         available_powers = [p for p in all_p if not p[3]]
         if not available_powers: return
@@ -145,8 +161,11 @@ class Paddle:
                 self.revolver_shots_left = 3
                 self.revolver_timer = 10.0
                 self.color = GRAY
+            elif self.power_active == POWER_SLEEP:
+                self.color = SLEEP_PURPLE
 
     def move(self, direction, dt, paddle_speed):
+        if self.sleep_hits_left > 0: return # Bloqueo por Sueño (v0.6.0)
         self.y_float += direction * (paddle_speed * self.speed_multiplier) * dt
         self.rect.y = int(self.y_float)
         if self.rect.top < 0: 
@@ -201,6 +220,12 @@ class Paddle:
                     self.stuck_ball = None
                     self.power_active = POWER_NONE
                     self.color = WHITE
+        
+        # Recuperación por tiempo del sueño (v0.6.0 Fix)
+        if self.sleep_hits_left > 0:
+            self.sleep_timer -= dt
+            if self.sleep_timer <= 0:
+                self.sleep_hits_left = 0
 
     def draw(self, surface, game):
         if self.is_destroyed: return
@@ -229,11 +254,65 @@ class Paddle:
             # Bloque 1 (Arriba) - Rosa si tiene 3 cargas
             c1 = GUM_PINK if self.gum_charges >= 3 else WHITE
             pygame.draw.rect(surface, c1, (self.rect.x, self.rect.y, self.rect.width, bh))
+        elif self.sleep_hits_left > 0:
+            # Dibujar paleta inmovilizada (Gris Violeta)
+            pygame.draw.rect(surface, (120, 100, 150), self.rect)
+            pygame.draw.rect(surface, SLEEP_PURPLE, self.rect, 2)
+            # Dibujar ZZZ
+            fz = pygame.font.SysFont("Arial", 16, bold=True)
+            txt = fz.render("Zzz", True, WHITE)
+            surface.blit(txt, (self.rect.centerx - txt.get_width()//2, self.rect.y - 20))
         else:
             pygame.draw.rect(surface, self.color, self.rect)
         if self.power_active == POWER_MAGNET:
             pygame.draw.rect(surface, RED, (self.rect.x, self.rect.y, self.rect.width, 10))
             pygame.draw.rect(surface, BLUE, (self.rect.x, self.rect.bottom - 10, self.rect.width, 10))
+
+class SleepProjectile:
+    def __init__(self, x, y, vx, vy, is_child=False):
+        size = BALL_SIZE * 2 if not is_child else BALL_SIZE
+        self.rect = pygame.Rect(x - size//2, y - size//2, size, size)
+        self.x_float = float(self.rect.x)
+        self.y_float = float(self.rect.y)
+        self.vx = vx
+        self.vy = vy
+        self.active = True
+        self.is_child = is_child
+        self.split_done = False
+        self.owner_immunity = 0.0
+        self.owner_ref = None
+
+    def update(self, dt, game):
+        if self.owner_immunity > 0:
+            self.owner_immunity -= dt
+            
+        self.x_float += self.vx * dt
+        self.y_float += self.vy * dt
+        self.rect.x = int(self.x_float)
+        self.rect.y = int(self.y_float)
+        
+        if self.rect.right < 0 or self.rect.left > SCREEN_WIDTH or self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT:
+            self.active = False
+            return
+
+        if not self.is_child and not self.split_done:
+            # Cruzar la mitad del mapa
+            if (self.vx > 0 and self.rect.centerx > SCREEN_WIDTH // 2) or \
+               (self.vx < 0 and self.rect.centerx < SCREEN_WIDTH // 2):
+                self.split_done = True
+                self.active = False
+                # Crear 3 hijos (v0.6.0)
+                speed = math.hypot(self.vx, self.vy)
+                angle = math.atan2(self.vy, self.vx)
+                for offset in [-math.pi/4, 0, math.pi/4]:
+                    new_angle = angle + offset
+                    game.sleep_projectiles.append(SleepProjectile(self.rect.centerx, self.rect.centery, 
+                                                                 speed * math.cos(new_angle), 
+                                                                 speed * math.sin(new_angle), is_child=True))
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, SLEEP_PURPLE, self.rect)
+        pygame.draw.rect(surface, WHITE, self.rect, 2)
 
 class Ball:
     def __init__(self, x, y):
@@ -422,12 +501,13 @@ class Mouse:
             pygame.draw.rect(surface, tail_color, (tx + i*4, self.rect.centery + 4, 3, 3))
 
 class GumProjectile:
-    def __init__(self, x, y, direction):
+    def __init__(self, x, y, direction, owner):
         size = BALL_SIZE * 3
         self.rect = pygame.Rect(x, y - size//2, size, size)
         self.x_float = float(self.rect.x)
         self.vx = 500 * direction
         self.active = True
+        self.owner = owner
 
     def update(self, dt):
         self.x_float += self.vx * dt

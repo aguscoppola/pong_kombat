@@ -18,7 +18,120 @@ class MenuManager:
             is_hover = r.collidepoint(mpos); pygame.draw.rect(surface, (40, 40, 40) if is_hover else BLACK, r); pygame.draw.rect(surface, WHITE, r, 4)
             f_to_use = self.game.font
             if f_to_use.size(txt)[0] > r.width - 20: f_to_use = self.game.medium_font
+            if f_to_use.size(txt)[0] > r.width - 20: f_to_use = self.game.small_font
             st = f_to_use.render(txt, True, WHITE); surface.blit(st, st.get_rect(center=r.center))
+        
+        # Botón pixelado de "?" al lado de PLAY
+        r_help = self.game.btn_tutorial_help_rect
+        is_hover_help = r_help.collidepoint(mpos)
+        h_col = (40,40,40) if is_hover_help else BLACK
+        cx, cy = r_help.center
+        
+        # OCULTAR BOTÓN SI EL TUTORIAL ESTÁ ACTIVO (Evitar distracciones)
+        show_button = True
+        if self.game.tutorial_active:
+            if self.game.tutorial_step == 31:
+                if self.game.tutorial_end_menu_timer > 1.0: show_button = False
+            elif self.game.tutorial_step == 32:
+                show_button = True # Mostrar en el paso final
+            else:
+                show_button = False # Ocultar durante el resto del tutorial
+            
+        if show_button:
+            self._draw_pixel_help_button(surface, r_help, h_col, WHITE)
+
+        
+        if self.game.show_tutorial_prompt:
+            self._draw_tutorial_prompt(surface)
+        elif self.game.tutorial_active:
+            self._draw_tutorial_overlay(surface)
+
+    def draw_tutorial_only(self, surface):
+        # Ocultar UI en los pasos de gameplay
+        if self.game.tutorial_step in [135, 215, 285]: return
+        
+        # OCULTAR CAJA EN SECUENCIA FINAL HASTA LOS 2 SEGUNDOS (Solo paso 31)
+        if self.game.tutorial_active and self.game.tutorial_step == 31:
+            if self.game.tutorial_end_menu_timer > 0.5:
+                return
+            # Efecto de Foco (Spotlight) en el botón "?" mediante 4 rectángulos
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            color = (0, 0, 0, 180)
+            r = self.game.btn_tutorial_help_rect.inflate(40, 40)
+            pygame.draw.rect(overlay, color, (0, 0, SCREEN_WIDTH, r.top))
+            pygame.draw.rect(overlay, color, (0, r.bottom, SCREEN_WIDTH, SCREEN_HEIGHT - r.bottom))
+            pygame.draw.rect(overlay, color, (0, r.top, r.left, r.height))
+            pygame.draw.rect(overlay, color, (r.right, r.top, SCREEN_WIDTH - r.right, r.height))
+            surface.blit(overlay, (0,0))
+
+        # Manto muy sutil en la partida para que el texto destaque
+        if self.game.state in [STATE_PLAYING, STATE_SERVE, STATE_GAME_OVER]:
+            ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA); ov.fill((0,0,0,100)); surface.blit(ov, (0,0))
+        self._draw_tutorial_box(surface)
+
+    def _draw_tutorial_box(self, surface):
+        # Rectángulo inferior para explicaciones (Soporta 3 renglones)
+        box_h = 100
+        box = pygame.Rect(0, SCREEN_HEIGHT - box_h, SCREEN_WIDTH, box_h)
+        pygame.draw.rect(surface, (15, 15, 15), box)
+        pygame.draw.rect(surface, WHITE, box, 2)
+        # Texto dinámico empezando un poco más arriba (20px desde el borde superior)
+        draw_rich_text(surface, f"|WHITE|{self.game.tutorial_text_visible}", (50, SCREEN_HEIGHT - box_h + 20), self.game.small_font, max_width=SCREEN_WIDTH - 100)
+
+    def _draw_highlighted_button(self, surface, r, txt, font=None, border=4):
+        if font is None: font = self.game.font
+        mpos = pygame.mouse.get_pos()
+        is_hover = r.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if is_hover else BLACK, r)
+        pygame.draw.rect(surface, WHITE, r, border)
+        st = font.render(txt, True, WHITE); surface.blit(st, st.get_rect(center=r.center))
+
+    def _draw_tutorial_overlay(self, surface):
+        # Ocultar overlay en gameplay
+        if self.game.tutorial_step in [135, 215, 285]: return
+        # Manto negro semi-transparente que cubre TODO (800x600 o más)
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        ov.fill((0, 0, 0, 200))
+        surface.blit(ov, (0,0))
+        
+        # SI estamos en el paso 1 (Settings) o paso 3 (Modifiers), iluminamos el botón correspondiente
+        if self.game.tutorial_step == 1:
+            r = self.game.btn_settings_rect
+            txt = self.game.t("SETTINGS", "AJUSTES")
+            self._draw_highlighted_button(surface, r, txt)
+        elif self.game.tutorial_step == 3:
+            r = self.game.btn_modifiers_rect
+            txt = self.game.t("MODIFIERS", "MODIFICADORES")
+            self._draw_highlighted_button(surface, r, txt)
+        elif self.game.tutorial_step == 9:
+            r = self.game.btn_play_rect
+            txt = self.game.t("PLAY", "JUGAR")
+            self._draw_highlighted_button(surface, r, txt)
+
+        # Dibujar la caja de texto al final
+        self._draw_tutorial_box(surface)
+
+    def _draw_tutorial_prompt(self, surface):
+        # Overlay oscuro
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(180); ov.fill(BLACK); surface.blit(ov, (0,0))
+        
+        # Globo de texto (Ampliado a 500 de ancho)
+        panel = pygame.Rect(SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 100, 500, 200)
+        pygame.draw.rect(surface, (20, 20, 20), panel)
+        pygame.draw.rect(surface, WHITE, panel, 3)
+        
+        # Texto
+        msg = "Do you want to start the TUTORIAL?" if self.game.language == "EN" else "¿Quieres empezar el TUTORIAL?"
+        draw_rich_text(surface, f"|WHITE|{msg}", (panel.x + 55, panel.y + 40), self.game.small_font)
+        
+        # Botones
+        mpos = pygame.mouse.get_pos()
+        for r, txt, col in [(self.game.btn_tutorial_yes_rect, "YES", GREEN), (self.game.btn_tutorial_no_rect, "NO", RED)]:
+            hover = r.collidepoint(mpos)
+            pygame.draw.rect(surface, (40, 40, 40) if hover else BLACK, r)
+            pygame.draw.rect(surface, col if hover else WHITE, r, 2)
+            st = self.game.small_font.render(txt, True, WHITE)
+            surface.blit(st, st.get_rect(center=r.center))
 
     def draw_mode_selection(self, surface):
         surface.fill(BLACK)
@@ -34,27 +147,117 @@ class MenuManager:
                 monitor_rect = pygame.Rect(img_rect.right - 70, img_rect.centery - 35, 50, 70); pygame.draw.rect(surface, WHITE, monitor_rect, 2)
                 ai_txt = self.game.small_font.render("AI", True, WHITE); surface.blit(ai_txt, (monitor_rect.centerx - ai_txt.get_width()//2, monitor_rect.centery - ai_txt.get_height()//2))
         pygame.draw.rect(surface, BLACK, self.game.back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.back_btn_rect, 2)
-        bt = self.game.small_font.render(self.game.t("BACK", "VOLVER"), True, WHITE); surface.blit(bt, bt.get_rect(center=self.game.back_btn_rect.center))
+        bt = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE); surface.blit(bt, bt.get_rect(center=self.game.back_btn_rect.center))
+    
+    def draw_solo_submode_selection(self, surface):
+        surface.fill(BLACK)
+        title = self.game.large_font.render(self.game.t("SELECT SOLO MODE", "SELECCIONAR MODO SOLO"), True, WHITE)
+        surface.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 100))
+        
+        mpos = pygame.mouse.get_pos()
+        
+        # Classic Button
+        hover_c = self.game.btn_classic_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if hover_c else BLACK, self.game.btn_classic_rect)
+        pygame.draw.rect(surface, WHITE, self.game.btn_classic_rect, 3 if hover_c else 2)
+        txt_c = self.game.font.render(self.game.t("CLASSIC", "CLÁSICO"), True, WHITE)
+        surface.blit(txt_c, txt_c.get_rect(center=self.game.btn_classic_rect.center))
+        
+        # Arcade Button
+        hover_a = self.game.btn_arcade_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (60, 0, 0) if hover_a else (40, 0, 0), self.game.btn_arcade_rect)
+        pygame.draw.rect(surface, RED, self.game.btn_arcade_rect, 3 if hover_a else 2)
+        txt_a = self.game.font.render("ARCADE", True, RED)
+        surface.blit(txt_a, txt_a.get_rect(center=self.game.btn_arcade_rect.center))
+
+        # Help Button (Red "?" button v0.6.0)
+        r_h = self.game.btn_arcade_tutorial_help_rect
+        is_hover_h = r_h.collidepoint(mpos)
+        h_col = (100, 0, 0) if is_hover_h else (60, 0, 0)
+        self._draw_pixel_help_button(surface, r_h, h_col, RED)
+        
+        # Level Selector (Debug/Testing) - Solo si ya completó el Arcade (v0.6.0 Fix)
+        if self.game.arcade_completed:
+            hover_ls = self.game.btn_arcade_level_selector_rect.collidepoint(mpos)
+            pygame.draw.rect(surface, (30, 30, 30) if hover_ls else BLACK, self.game.btn_arcade_level_selector_rect)
+            pygame.draw.rect(surface, GRAY, self.game.btn_arcade_level_selector_rect, 1)
+            txt_ls = self.game.tiny_font.render(f"TEST LEVEL: {self.game.test_arcade_level}", True, GRAY)
+            surface.blit(txt_ls, txt_ls.get_rect(center=self.game.btn_arcade_level_selector_rect.center))
+        
+        # Back Button
+        hover_b = self.game.btn_solo_sub_back_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if hover_b else BLACK, self.game.btn_solo_sub_back_rect)
+        pygame.draw.rect(surface, WHITE, self.game.btn_solo_sub_back_rect, 2)
+        txt_b = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE)
+        surface.blit(txt_b, txt_b.get_rect(center=self.game.btn_solo_sub_back_rect.center))
 
     def draw_modifiers(self, surface):
-        pygame.draw.rect(surface, BLACK, self.game.modifiers_panel_rect); pygame.draw.rect(surface, WHITE, self.game.modifiers_panel_rect, 4)
+        panel_rect = self.game.modifiers_panel_rect
+        
+        pygame.draw.rect(surface, BLACK, panel_rect); pygame.draw.rect(surface, WHITE, panel_rect, 4)
         title_txt = self.game.t("MATCH MODIFIERS", "MODIFICADORES DE LA PARTIDA")
         f = self.game.font if self.game.font.size(title_txt)[0] < 500 else self.game.medium_font
-        t = f.render(title_txt, True, WHITE); surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, self.game.modifiers_panel_rect.y+30)))
+        t = f.render(title_txt, True, WHITE); surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, panel_rect.y+30)))
+        # Botón BACK (A la derecha) - Usar tiny_font para que quepa "VOLVER"
+        self.game.back_btn_rect.update(panel_rect.right - 100, panel_rect.y + 15, 80, 40)
         pygame.draw.rect(surface, BLACK, self.game.back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.back_btn_rect, 2)
-        bt = self.game.small_font.render(self.game.t("BACK", "VOLVER"), True, WHITE); surface.blit(bt, bt.get_rect(center=self.game.back_btn_rect.center))
-        tab_y = self.game.modifiers_panel_rect.top - 44
-        self.game.tab_all_rect.topleft, self.game.tab_extras_rect.topleft, self.game.tab_skins_rect.topleft = (self.game.modifiers_panel_rect.left, tab_y), (self.game.tab_all_rect.right + 5, tab_y), (self.game.tab_extras_rect.right + 5, tab_y)
+        bt = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE); surface.blit(bt, bt.get_rect(center=self.game.back_btn_rect.center))
+        
+        tab_y = panel_rect.top - 44
+        self.game.tab_all_rect.topleft = (panel_rect.left, tab_y)
+        self.game.tab_extras_rect.topleft = (self.game.tab_all_rect.right + 5, tab_y)
+        self.game.tab_skins_rect.topleft = (self.game.tab_extras_rect.right + 5, tab_y)
+        
         for r, txt, key in [(self.game.tab_all_rect, self.game.t("ALL", "TODO"), "ALL"), (self.game.tab_extras_rect, self.game.t("EXTRAS", "EXTRAS"), "EXTRAS"), (self.game.tab_skins_rect, self.game.t("SKINS", "ASPECTOS"), "SKINS")]:
             bg = (40,40,40) if self.game.modifiers_tab==key else BLACK
             pygame.draw.rect(surface, bg, r, border_top_left_radius=8, border_top_right_radius=8); pygame.draw.rect(surface, WHITE, r, 2, border_top_left_radius=8, border_top_right_radius=8)
             surface.blit(self.game.tiny_font.render(txt, True, WHITE), self.game.tiny_font.render(txt, True, WHITE).get_rect(center=r.center))
-        old_clip = surface.get_clip(); clip = pygame.Rect(self.game.modifiers_panel_rect.x+10, self.game.modifiers_panel_rect.y+60, self.game.modifiers_panel_rect.width-40, self.game.modifiers_panel_rect.height-70)
+            
+        old_clip = surface.get_clip(); clip = pygame.Rect(panel_rect.x+10, panel_rect.y+60, panel_rect.width-40, panel_rect.height-70)
         surface.set_clip(clip); self._draw_modifier_content(surface); surface.set_clip(old_clip)
+        
+        # Actualizar Barra de Scroll con el offset
+        self.game.scrollbar_rect.update(panel_rect.right - 30, panel_rect.y + 60, 20, panel_rect.height - 70)
         self.game.scroll_y = max(0, min(self.game.scroll_y, self.game.max_scroll))
-        if self.game.max_scroll > 0: self.game.scrollbar_thumb_rect.y = self.game.scrollbar_rect.y + (self.game.scroll_y / self.game.max_scroll) * (self.game.scrollbar_rect.height - self.game.scrollbar_thumb_height)
+        if self.game.max_scroll > 0: 
+            self.game.scrollbar_thumb_rect.update(self.game.scrollbar_rect.x, self.game.scrollbar_rect.y + (self.game.scroll_y / self.game.max_scroll) * (self.game.scrollbar_rect.height - self.game.scrollbar_thumb_height), 20, self.game.scrollbar_thumb_height)
+        else:
+            self.game.scrollbar_thumb_rect.update(self.game.scrollbar_rect.x, self.game.scrollbar_rect.y, 20, self.game.scrollbar_thumb_height)
+        
         pygame.draw.rect(surface, (50,50,50), self.game.scrollbar_rect); pygame.draw.rect(surface, WHITE, self.game.scrollbar_thumb_rect)
         self._draw_tooltips(clip, surface)
+
+        # --- CAPA DE TUTORIAL ---
+        if self.game.tutorial_active:
+            # Manto negro total que cubre TODOS los bordes
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            
+            if self.game.tutorial_step == 4:
+                pygame.draw.rect(overlay, (0,0,0,0), self.game.tab_all_rect, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(overlay, (0,0))
+                r = self.game.tab_all_rect
+                pygame.draw.rect(surface, (40,40,40), r, border_top_left_radius=8, border_top_right_radius=8); pygame.draw.rect(surface, WHITE, r, 2, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(self.game.tiny_font.render(self.game.t("ALL", "TODO"), True, WHITE), self.game.tiny_font.render(self.game.t("ALL", "TODO"), True, WHITE).get_rect(center=r.center))
+            elif self.game.tutorial_step == 5:
+                pygame.draw.rect(overlay, (0,0,0,0), self.game.tab_extras_rect, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(overlay, (0,0))
+                r = self.game.tab_extras_rect
+                pygame.draw.rect(surface, (40,40,40), r, border_top_left_radius=8, border_top_right_radius=8); pygame.draw.rect(surface, WHITE, r, 2, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(self.game.tiny_font.render(self.game.t("EXTRAS", "EXTRAS"), True, WHITE), self.game.tiny_font.render(self.game.t("EXTRAS", "EXTRAS"), True, WHITE).get_rect(center=r.center))
+            elif self.game.tutorial_step == 6:
+                pygame.draw.rect(overlay, (0,0,0,0), self.game.tab_skins_rect, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(overlay, (0,0))
+                r = self.game.tab_skins_rect
+                pygame.draw.rect(surface, (40,40,40), r, border_top_left_radius=8, border_top_right_radius=8); pygame.draw.rect(surface, WHITE, r, 2, border_top_left_radius=8, border_top_right_radius=8)
+                surface.blit(self.game.tiny_font.render(self.game.t("SKINS", "ASPECTOS"), True, WHITE), self.game.tiny_font.render(self.game.t("SKINS", "ASPECTOS"), True, WHITE).get_rect(center=r.center))
+            elif self.game.tutorial_step == 8:
+                surface.blit(overlay, (0,0))
+                self._draw_highlighted_button(surface, self.game.back_btn_rect, self.game.t("BACK", "VOLVER"), font=self.game.tiny_font, border=2)
+            else:
+                surface.blit(overlay, (0,0))
+
+            self._draw_tutorial_box(surface)
 
     def _draw_modifier_content(self, surface):
         off, lm, ox = self.game.scroll_y, self.game.modifiers_panel_rect.x + 50, self.game.modifiers_panel_rect.centerx + 50
@@ -101,7 +304,7 @@ class MenuManager:
     def _draw_extras_tab_full(self, surface, off, lm, ox):
         cy = 100
         draw_remove_option(self.game, cy, self.game.t("Enable |ORANGE| ORANGE |WHITE| watch", "Activar reloj |ORANGE| NARANJA"), self.game.orange_watch_enabled, self.game.orange_watch_rect, self.game.orange_watch_text_rect, active_color=ORANGE, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GOLD|X2 MULTIPLIER |WHITE|at start", "Activar |GOLD|MULTIPLICADOR X2 |WHITE|al inicio"), self.game.start_x2_enabled, self.game.start_x2_rect, self.game.start_x2_text_rect, active_color=GOLD, offset=off, surface=surface)
+        cy += 60; draw_remove_option(self.game, cy, self.game.t("|GOLD|Enable X2 multiplier", "|GOLD|Multiplicador de X2"), self.game.start_x2_enabled, self.game.start_x2_rect, self.game.start_x2_text_rect, active_color=GOLD, offset=off, surface=surface)
         cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |BLUE|MAG|RED|NET|WHITE| power", "Activar poder |BLUE|MAG|RED|NET"), self.game.magnet_power_enabled, self.game.magnet_power_rect, self.game.magnet_power_text_rect, active_color=GRAY, offset=off, surface=surface)
         cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GHOST| GHOST |WHITE| power", "Activar poder |GHOST| FANTASMA"), self.game.ghost_power_enabled, self.game.ghost_power_rect, self.game.ghost_power_text_rect, active_color=GHOST_COLOR, offset=off, surface=surface)
         if self.game.ghost_power_enabled: cy += 60; draw_remove_option(self.game, cy, " - |CYAN|Identical |WHITE|ball", self.game.ghost_identical_enabled, self.game.ghost_identical_rect, self.game.ghost_identical_text_rect, active_color=CYAN, offset=off, surface=surface)
@@ -122,8 +325,9 @@ class MenuManager:
         if self.game.add_mouse_enabled:
             cy += 60; self._draw_sub_selector(cy, self.game.t("Mouse speed:", "Velocidad de ratón:"), self.game.mouse_speed_names[self.game.mouse_speed_idx], self.game.mouse_speed_rect, off, ox, lm, surface, sub_val=str(self.game.mouse_speed_options[self.game.mouse_speed_idx]), text_rect=self.game.mouse_speed_text_rect)
             cy += 60; self._draw_sub_selector(cy, self.game.t("Mouse appear time:", "Tiempo aparición:"), self.game.mouse_appear_names[self.game.mouse_appear_idx], self.game.mouse_appear_rect, off, ox, lm, surface, sub_val=f"{self.game.mouse_appear_options[self.game.mouse_appear_idx]}s", text_rect=self.game.mouse_appear_text_rect)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVOLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
+        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
         if self.game.revolver_enabled: cy += 60; self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, text_rect=self.game.revolver_prob_text_rect)
+        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |PURPLE|SLEEPING|WHITE| power", "Activar poder de |PURPLE|SUEÑO"), self.game.sleeping_power_enabled, self.game.sleeping_power_rect, self.game.sleeping_power_text_rect, active_color=SLEEP_PURPLE, offset=off, surface=surface)
         self.game.max_y_rendered = cy
 
     def _draw_skins_tab_full(self, surface, off, lm, ox):
@@ -163,28 +367,88 @@ class MenuManager:
         elif b_name.upper() == "TENNIS": b_col = GREEN
         surface.blit(self.game.small_font.render(b_d_name, True, b_col), self.game.small_font.render(b_d_name, True, b_col).get_rect(center=self.game.ball_skin_rect.center))
         
+        # 4. Crown Hat (v0.6.0 Reward)
+        cy += 80
+        lbl4 = self.game.t("Enable CROWN hat:", "Activar GORRO de corona:")
+        draw_rich_text(surface, lbl4, (lm, self.game.modifiers_panel_rect.y + cy - off), self.game.small_font)
+        self.game.crown_hat_rect.update(ox, self.game.modifiers_panel_rect.y + cy - 5 - off, 130, 40)
+        
+        if self.game.arcade_completed:
+            pygame.draw.rect(surface, BLACK, self.game.crown_hat_rect); pygame.draw.rect(surface, WHITE, self.game.crown_hat_rect, 2)
+            c_name = self.game.crown_hat_options[self.game.crown_hat_idx]
+            c_map = {"None": "Ninguno", "Player 1": "Jugador 1", "Player 2": "Jugador 2", "Both": "Ambos"}
+            c_d_name = self.game.t(c_name, c_map.get(c_name, c_name))
+            surface.blit(self.game.small_font.render(c_d_name, True, GOLD), self.game.small_font.render(c_d_name, True, GOLD).get_rect(center=self.game.crown_hat_rect.center))
+        else:
+            pygame.draw.rect(surface, (20, 20, 20), self.game.crown_hat_rect); pygame.draw.rect(surface, GRAY, self.game.crown_hat_rect, 2)
+            lock_txt = self.game.t("LOCKED", "BLOQUEADO")
+            surface.blit(self.game.tiny_font.render(lock_txt, True, GRAY), self.game.tiny_font.render(lock_txt, True, GRAY).get_rect(center=self.game.crown_hat_rect.center))
+
         self.game.max_y_rendered = cy
 
     def draw_settings(self, surface):
-        pygame.draw.rect(surface, BLACK, self.game.modifiers_panel_rect); pygame.draw.rect(surface, WHITE, self.game.modifiers_panel_rect, 4)
-        t = self.game.font.render(self.game.t("SETTINGS", "AJUSTES"), True, WHITE); surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, self.game.modifiers_panel_rect.y+40)))
-        lm, ox, cy = self.game.modifiers_panel_rect.x + 100, self.game.modifiers_panel_rect.centerx + 50, self.game.modifiers_panel_rect.y + 120
+        panel_rect = self.game.modifiers_panel_rect
+        
+        pygame.draw.rect(surface, BLACK, panel_rect); pygame.draw.rect(surface, WHITE, panel_rect, 4)
+        t = self.game.font.render(self.game.t("SETTINGS", "AJUSTES"), True, WHITE); surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, panel_rect.y+40)))
+        lm, ox, cy_init = panel_rect.x + 100, panel_rect.centerx + 50, panel_rect.y + 120
+        cy = cy_init
+        
+        # 1. Language
         draw_rich_text(surface, "Language / Idioma", (lm, cy), self.game.small_font)
         self.game.lang_rect.update(ox, cy - 5, 130, 40); pygame.draw.rect(surface, BLACK, self.game.lang_rect); pygame.draw.rect(surface, WHITE, self.game.lang_rect, 2)
         surface.blit(self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW), self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW).get_rect(center=self.game.lang_rect.center))
+        
+        # 2. VFX
         cy += 80; draw_rich_text(surface, self.game.t("Visual Effects:", "Efectos Visuales:"), (lm, cy), self.game.small_font)
         self.game.vfx_rect.update(ox + 50, cy - 5, 30, 30); pygame.draw.rect(surface, BLACK, self.game.vfx_rect); pygame.draw.rect(surface, WHITE, self.game.vfx_rect, 2)
         if self.game.vfx_enabled: pygame.draw.rect(surface, GREEN, self.game.vfx_rect.inflate(-10, -10))
+        
+        # 3. Volume
         cy += 80; draw_rich_text(surface, self.game.t("Volume:", "Volumen:"), (lm, cy), self.game.small_font)
         self.game.volume_bar_rect.update(ox, cy + 10, 200, 10); pygame.draw.rect(surface, GRAY, self.game.volume_bar_rect); pygame.draw.rect(surface, WHITE, self.game.volume_bar_rect, 1)
         self.game.volume_handle_rect.center = (self.game.volume_bar_rect.x + (self.game.sfx_volume * self.game.volume_bar_rect.width), self.game.volume_bar_rect.centery); pygame.draw.rect(surface, WHITE, self.game.volume_handle_rect)
+        
+        # 4. Shake
         cy += 80; draw_rich_text(surface, self.game.t("Screen Shake:", "Temblor de Pantalla:"), (lm, cy), self.game.small_font)
         self.game.shake_rect.update(ox + 50, cy - 5, 30, 30); pygame.draw.rect(surface, BLACK, self.game.shake_rect); pygame.draw.rect(surface, WHITE, self.game.shake_rect, 2)
         if self.game.shake_enabled: pygame.draw.rect(surface, GREEN, self.game.shake_rect.inflate(-10, -10))
-        self.game.settings_back_btn_rect.update(self.game.modifiers_panel_rect.right - 100, self.game.modifiers_panel_rect.y + 20, 80, 40); pygame.draw.rect(surface, BLACK, self.game.settings_back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_back_btn_rect, 2)
+        
+        # 5. Buttons
+        self.game.settings_back_btn_rect.update(panel_rect.right - 100, panel_rect.y + 20, 80, 40); pygame.draw.rect(surface, BLACK, self.game.settings_back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_back_btn_rect, 2)
         surface.blit(self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE), self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE).get_rect(center=self.game.settings_back_btn_rect.center))
-        self.game.settings_apply_btn_rect.update(SCREEN_WIDTH//2 - 65, self.game.modifiers_panel_rect.bottom - 60, 130, 45); pygame.draw.rect(surface, (0, 100, 0), self.game.settings_apply_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_apply_btn_rect, 2)
+        
+        # Subir botón APPLY un poco más
+        self.game.settings_apply_btn_rect.update(SCREEN_WIDTH//2 - 65, panel_rect.bottom - 60, 130, 45)
+        pygame.draw.rect(surface, (0, 100, 0), self.game.settings_apply_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_apply_btn_rect, 2)
         surface.blit(self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE), self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE).get_rect(center=self.game.settings_apply_btn_rect.center))
+
+        # --- CAPA DE TUTORIAL ---
+        if self.game.tutorial_active and self.game.tutorial_step == 2:
+            # 1. Oscurecer el exterior del panel (Suave: 120 alpha)
+            ext_alpha = 120
+            pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (0, 0, SCREEN_WIDTH, panel_rect.top))
+            pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (0, panel_rect.bottom, SCREEN_WIDTH, SCREEN_HEIGHT - panel_rect.bottom))
+            pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (0, panel_rect.top, panel_rect.left, panel_rect.height))
+            pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (panel_rect.right, panel_rect.top, SCREEN_WIDTH - panel_rect.right, panel_rect.height))
+
+            # 2. Oscurecer TODO el interior del panel (Suave: 100 alpha)
+            inner_ov = pygame.Surface((panel_rect.width - 8, panel_rect.height - 8), pygame.SRCALPHA)
+            inner_ov.fill((0, 0, 0, 100))
+            surface.blit(inner_ov, (panel_rect.x + 4, panel_rect.y + 4))
+
+            # 3. ILUMINAR (REDIBUJAR ENCIMA DEL MANTO)
+            # Redibujamos Idioma
+            draw_rich_text(surface, "|WHITE|Language / Idioma", (lm, cy_init), self.game.small_font)
+            pygame.draw.rect(surface, BLACK, self.game.lang_rect); pygame.draw.rect(surface, WHITE, self.game.lang_rect, 2)
+            surface.blit(self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW), self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW).get_rect(center=self.game.lang_rect.center))
+            
+            # Redibujamos Apply
+            pygame.draw.rect(surface, (0, 120, 0), self.game.settings_apply_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_apply_btn_rect, 2)
+            surface.blit(self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE), self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE).get_rect(center=self.game.settings_apply_btn_rect.center))
+
+            # La caja de tutorial siempre al frente (SIN MANTO EXTRA)
+            self._draw_tutorial_box(surface)
 
     def draw_game_over(self, surface):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(180); ov.fill(BLACK); surface.blit(ov, (0,0))
@@ -201,9 +465,27 @@ class MenuManager:
             draw_rich_text(surface, line, pos, f, GOLD if i==0 else WHITE)
             
         self.game.btn_gameover_restart.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 40, 300, 50); self.game.btn_gameover_menu.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 105, 300, 50)
-        for r, txt in [(self.game.btn_gameover_restart, self.game.t("Restart Game", "Reiniciar Juego")), (self.game.btn_gameover_menu, self.game.t("Back to Menu", "Volver al Menú"))]:
-            is_hover = r.collidepoint(pygame.mouse.get_pos()); pygame.draw.rect(surface, (40, 40, 40) if is_hover else BLACK, r); pygame.draw.rect(surface, GOLD if is_hover else WHITE, r, 3)
-            surface.blit(self.game.font.render(txt, True, WHITE), self.game.font.render(txt, True, WHITE).get_rect(center=r.center))
+        
+        # Modo Arcade Nivel 5: Solo botón de recompensa (v0.6.0)
+        is_level_5_win = self.game.arcade_active and int(self.game.arcade_level) == 5 and self.game.score1 > self.game.score2
+        
+        if is_level_5_win:
+            r = self.game.btn_gameover_restart
+            txt = self.game.t("Receive Reward", "Recibir recompensa")
+            is_hover = r.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surface, (0, 60, 0) if is_hover else BLACK, r)
+            pygame.draw.rect(surface, GOLD if is_hover else WHITE, r, 3)
+            # Usar fuente pequeña si es español para que quepa (v0.6.0 Fix)
+            f = self.game.small_font if self.game.language == "ES" else self.game.font
+            surface.blit(f.render(txt, True, WHITE), f.render(txt, True, WHITE).get_rect(center=r.center))
+        else:
+            restart_text = self.game.t("Restart Game", "Reiniciar Juego")
+            if self.game.arcade_active and self.game.score1 > self.game.score2:
+                restart_text = self.game.t("Continue", "Continuar")
+                
+            for r, txt in [(self.game.btn_gameover_restart, restart_text), (self.game.btn_gameover_menu, self.game.t("Back to Menu", "Volver al Menú"))]:
+                is_hover = r.collidepoint(pygame.mouse.get_pos()); pygame.draw.rect(surface, (40, 40, 40) if is_hover else BLACK, r); pygame.draw.rect(surface, GOLD if is_hover else WHITE, r, 3)
+                surface.blit(self.game.font.render(txt, True, WHITE), self.game.font.render(txt, True, WHITE).get_rect(center=r.center))
 
     def _draw_sub_selector(self, curr_y, label, val_name, rect, off, ox, lm, surface, sub_val=None, text_rect=None):
         draw_y = self.game.modifiers_panel_rect.y + curr_y - off
@@ -251,8 +533,81 @@ class MenuManager:
                 (self.game.experimental_golden_goal_text_rect, "exp_golden_goal"), (self.game.floating_planets_text_rect, "floating_planets"), 
                 (self.game.destructible_planets_text_rect, "destructible_planets"), (self.game.portals_text_rect, "portals"), 
                 (self.game.portals_vertical_text_rect, "portals_vertical"), (self.game.more_portals_text_rect, "more_portals"),
-                (self.game.add_mouse_text_rect, "add_mouse"), (self.game.revolver_text_rect, "revolver")
+                (self.game.add_mouse_text_rect, "add_mouse"), (self.game.revolver_text_rect, "revolver"),
+                (self.game.sleeping_power_text_rect, "sleeping_power")
             ]
         
         for rect, key in areas:
             if rect.collidepoint(m): draw_tooltip(self.game, lang_dict.get(key, []), surface); break
+
+    def draw_arcade_reward(self, surface):
+        # Manto negro de fondo
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(180); ov.fill(BLACK); surface.blit(ov, (0,0))
+        
+        # Cuadro central de recompensa
+        panel_w, panel_h = 550, 320
+        panel = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2 - 50, panel_w, panel_h)
+        pygame.draw.rect(surface, (15, 15, 15), panel)
+        pygame.draw.rect(surface, WHITE, panel, 3)
+        
+        # --- CORONA PIXEL ART (Capa inferior al texto) ---
+        cx, cy = panel.centerx, panel.centery + 70
+        from ui_components import draw_crown
+        draw_crown(surface, cx, cy, size=2.5)
+
+        # Encabezado
+        reward_txt = self.game.t("Your reward is a CROWN,\nfor winning ARCADE mode.", "Tu recompensa es una CORONA,\npor ganar el modo ARCADE.")
+        draw_rich_text(surface, f"|WHITE|{reward_txt}", (panel.x + 40, panel.y + 40), self.game.small_font, max_width=panel.width - 80)
+
+        # --- CAJA DE TEXTO (Estilo Tutorial) ---
+        box_h = 110
+        box = pygame.Rect(0, SCREEN_HEIGHT - box_h, SCREEN_WIDTH, box_h)
+        pygame.draw.rect(surface, (20, 20, 20), box)
+        pygame.draw.rect(surface, WHITE, box, 2)
+        
+        msg = self.game.reward_text_visible
+        draw_rich_text(surface, f"|WHITE|{msg}", (50, SCREEN_HEIGHT - box_h + 30), self.game.small_font, max_width=SCREEN_WIDTH - 100)
+
+    def draw_arcade_tutorial(self, surface):
+        # Manto negro al fondo (v0.6.0)
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(200); ov.fill(BLACK); surface.blit(ov, (0,0))
+        # Caja de texto abajo
+        self._draw_tutorial_box(surface)
+
+    def _draw_pixel_help_button(self, surface, rect, bg_color, border_color):
+        cx, cy = rect.center
+        b_size = 4
+        # 1. Dibujar el "Círculo Minecraft" (Borde pixelado grueso)
+        circle_blocks = [
+            (-3,-5),( -2,-5),( -1,-5),( 0,-5),( 1,-5),( 2,-5), # Top
+            (-3, 4),( -2, 4),( -1, 4),( 0, 4),( 1, 4),( 2, 4), # Bottom
+            (-5,-3),( -5,-2),( -5,-1),( -5, 0),( -5, 1),( -5, 2), # Left
+            ( 4,-3),(  4,-2),(  4,-1),(  4, 0),(  4, 1),(  4, 2), # Right
+            (-4,-4),( 3,-4),( -4, 3),( 3, 3) # Corners
+        ]
+        # Rellenar fondo
+        pygame.draw.rect(surface, bg_color, (cx-5*b_size, cy-5*b_size, 10*b_size, 10*b_size))
+        # Dibujar borde
+        for bx, by in circle_blocks:
+            pygame.draw.rect(surface, border_color, (cx + bx*b_size, cy + by*b_size, b_size, b_size))
+
+        # 2. Dibujar "?" replicando la imagen EXACTA (píxel por píxel real)
+        p_size = 2
+        q_sprite = [
+            "  XXXXX  ",
+            " XX   XX ",
+            " XX   XX ",
+            "      XX ",
+            "     XX  ",
+            "    XX   ",
+            "    XX   ",
+            "         ",
+            "    XX   ",
+            "    XX   "
+        ]
+        start_x = cx - (9 * p_size) // 2
+        start_y = cy - (10 * p_size) // 2
+        for row_idx, row in enumerate(q_sprite):
+            for col_idx, char in enumerate(row):
+                if char == 'X':
+                    pygame.draw.rect(surface, WHITE, (start_x + col_idx * p_size, start_y + row_idx * p_size, p_size, p_size))

@@ -43,6 +43,10 @@ STATE_GAME_OVER = "game_over"
 STATE_PRESS_TO_START = "press_to_start"
 STATE_SETTINGS = "settings"
 STATE_MODE_SELECTION = "mode_selection"
+STATE_SOLO_SUBMODE_SELECTION = "solo_submode_selection"
+STATE_ARCADE_LEVEL_START = "arcade_level_start"
+STATE_ARCADE_REWARD = "arcade_reward"
+STATE_ARCADE_TUTORIAL = "arcade_tutorial"
 
 # --- Tipos de Poderes ---
 POWER_NONE = 0
@@ -54,7 +58,9 @@ POWER_ORANGE = 5
 POWER_GHOST = 6
 POWER_GUM = 7
 POWER_REVOLVER = 8
+POWER_SLEEP = 9
 
 GUM_PINK = (255, 105, 180) 
+SLEEP_PURPLE = (180, 0, 255)
 LIGHT_BROWN = (181, 101, 29)
 GUN_METAL = (128, 128, 128)

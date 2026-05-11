@@ -92,7 +92,8 @@ TOOLTIPS = {
         "more_portals": ["Add RED and GREEN PORTALS (Cross-connection)."],
         "revolver": ["REVOLVER: Orbiting item at center.", "Allows shooting 3 BULLETS that destroy", "the enemy paddle temporarily."],
         "gum_power": ["GUM: The ball sticks to your paddle!", "You have 3 seconds to aim and shoot.", "Consumes charges per second."],
-        "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."]
+        "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."],
+        "sleeping_power": ["SLEEP: Shoots a large violet projectile that", "splits into 3 at mid-map.", "Immobilizes opponent for 2 hits if caught."]
     },
     "ES": {
         "match_point": ["Si ambos jugadores están a un punto de ganar (5-5),", "la partida no terminará hasta que haya 2 puntos de ventaja."],
@@ -117,7 +118,7 @@ TOOLTIPS = {
         "orange_watch": ["Reloj Naranja: ¡Si la bola lo toca, activa", "la Bola de Demolición al instante!"],
         "magnet_power": ["IMÁN: La bola es atraída al centro de tu paleta", "como un planeta. Permite dirigir el tiro."],
         "exp_golden_goal": ["Gol de Oro aleatorio: 10% de probabilidad", "de muerte súbita. ¡El próximo gol gana!"],
-        "x2_multiplier": ["Multiplicador X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
+        "x2_multiplier": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
         "ghost_power": ["FANTASMA: Lanza 1 bola espectral lenta.", "Si el rival no la atrapa y sale del campo,", "¡marcas un punto!"],
         "add_mouse": ["Añade un ratón que intenta comerse la bola.", "Si lo logra, el último en tocarla pierde 1 punto.", "Entra tras el segundo rebote."],
         "encapsulate_powers": ["Guarda tu poder actual en tu marcador al recibir", "uno nuevo. Se activa automáticamente al quedar libre."],
@@ -127,6 +128,7 @@ TOOLTIPS = {
         "more_portals": ["Añade portales ROJOS y VERDES (Conexión cruzada)."],
         "revolver": ["REVÓLVER: Ítem que orbita el centro.", "Permite disparar 3 BALAS que destruyen", "la paleta enemiga temporalmente."],
         "gum_power": ["CHICLE: ¡La bola se queda pegada a tu paleta!", "Tienes 3 segundos para apuntar y disparar.", "Consume cargas por segundo."],
-        "start_x2": ["Multiplicador X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."]
+        "start_x2": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
+        "sleeping_power": ["SUEÑO: Lanza un gran proyectil violeta que", "se divide en 3 al cruzar la mitad.", "Inmoviliza al rival por 2 toques si lo atrapa."]
     }
 }
