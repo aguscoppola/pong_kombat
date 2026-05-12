@@ -113,6 +113,11 @@ class Paddle:
         for p_type, p_color, weight, removed in available_powers:
             acc += weight
             if r <= acc:
+                # REGLA v0.6.0: Si hay un poder activo, NO recibir uno nuevo (vía hits) 
+                # a menos que sea de contacto (ROJO o NARANJA)
+                if self.power_active != POWER_NONE and p_type not in [POWER_FIREBALL, POWER_ORANGE]:
+                    return # No recibimos nada
+                
                 if game.encapsulate_powers_enabled:
                     if self.power_stored != POWER_NONE:
                         # Caso normal: Mover guardado a cápsula, nuevo a slot
@@ -133,7 +138,7 @@ class Paddle:
                     self.power_stored = p_type
                     self.color = p_color
                 
-                # AUTO-ACTIVAR GUM POWER
+                # AUTO-ACTIVAR GUM POWER (v0.6.0: Si no hay otro activo ya)
                 if p_type == POWER_GUM:
                     self.power_active = POWER_GUM
                     self.gum_charges = 3
@@ -281,6 +286,7 @@ class SleepProjectile:
         self.split_done = False
         self.owner_immunity = 0.0
         self.owner_ref = None
+        self.is_sleep = True
 
     def update(self, dt, game):
         if self.owner_immunity > 0:
@@ -518,3 +524,37 @@ class GumProjectile:
     def draw(self, surface):
         pygame.draw.rect(surface, GUM_PINK, self.rect)
         pygame.draw.rect(surface, WHITE, self.rect, 2)
+class Cloud:
+    def __init__(self, x, y, direction, size_mult=1.0, speed_mult=1.0):
+        self.x = float(x)
+        self.y = float(y)
+        self.direction = direction
+        self.speed = random.uniform(80, 180) * speed_mult
+        self.active = True
+        
+        # Generar forma "pixel art" abstracta (unión de rectángulos)
+        self.rects = []
+        num_blocks = random.randint(3, 7)
+        base_w = int(random.randint(60, 120) * size_mult)
+        base_h = int(random.randint(40, 80) * size_mult)
+        
+        for _ in range(num_blocks):
+            w = random.randint(base_w // 2, base_w)
+            h = random.randint(base_h // 2, base_h)
+            ox = random.randint(-base_w // 2, base_w // 2)
+            oy = random.randint(-base_h // 3, base_h // 3)
+            self.rects.append(pygame.Rect(ox, oy, w, h))
+
+    def update(self, dt):
+        self.x += self.direction * self.speed * dt
+        if self.direction > 0 and self.x > SCREEN_WIDTH + 200: self.active = False
+        elif self.direction < 0 and self.x < -300: self.active = False
+
+    def draw(self, surface):
+        # Color Gris Sólido (Opacidad 100%)
+        color = (100, 100, 100) # Gris estándar
+        for r in self.rects:
+            draw_r = r.copy()
+            draw_r.x += int(self.x)
+            draw_r.y += int(self.y)
+            pygame.draw.rect(surface, color, draw_r)

@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import re
+import json
 from constants import *
 from entities import Ball, Paddle, Particle, Mouse
 from ui_components import draw_rich_text, draw_remove_option, draw_tooltip
@@ -64,6 +65,13 @@ class Game:
         self.init_entities()
         self.init_game_state()
         self.init_modifier_variables()
+        self.load_progress() # NUEVO v0.6.1: Cargar progreso al iniciar
+        
+        # Iniciar música del menú
+        if self.music_enabled:
+            self.audio.play_music('menu_music.wav', volume=self.music_volume)
+        else:
+            self.audio.stop_music()
 
     def init_fonts(self):
         self.font = pygame.font.SysFont("Arial", 36, bold=True)
@@ -130,6 +138,7 @@ class Game:
         self.btn_tutorial_help_rect = pygame.Rect(self.btn_play_rect.right + 20, self.btn_play_rect.centery - 20, 40, 40)
         self.btn_modifiers_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 15, 300, 70)
         self.btn_settings_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 70, 300, 70)
+        self.btn_credits_rect = pygame.Rect(SCREEN_WIDTH - 60, SCREEN_HEIGHT - 60, 40, 40)
         
         panel_w, panel_h = 700, 450
         self.modifiers_panel_rect = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2, panel_w, panel_h)
@@ -146,6 +155,13 @@ class Game:
         self.scrollbar_thumb_rect = pygame.Rect(self.scrollbar_rect.x, self.scrollbar_rect.y, 10, self.scrollbar_thumb_height)
         self.is_dragging_scrollbar = False
         self.scroll_offset_y = 0
+        
+        # Scroll para Settings
+        self.settings_scroll_y = 0
+        self.settings_max_scroll = 200
+        self.settings_scrollbar_rect = pygame.Rect(self.modifiers_panel_rect.right - 20, self.modifiers_panel_rect.y + 60, 10, self.modifiers_panel_rect.height - 70)
+        self.settings_scrollbar_thumb_rect = pygame.Rect(self.settings_scrollbar_rect.x, self.settings_scrollbar_rect.y, 10, 50)
+        self.is_dragging_settings_scrollbar = False
 
         # Pestañas
         self.modifiers_tab = "ALL"
@@ -181,6 +197,14 @@ class Game:
         self.vfx_enabled = True
         self.vfx_rect = pygame.Rect(0,0,30,30)
         self.sfx_volume = 0.5 # 50% por defecto
+        self.music_enabled = True
+        self.music_rect = pygame.Rect(0,0,30,30)
+        self.music_volume = 0.4
+        self.music_volume_bar_rect = pygame.Rect(0,0,200,10)
+        self.music_volume_handle_rect = pygame.Rect(0,0,15,30)
+        self.is_dragging_music_volume = False
+        self.music_in_match = False
+        self.music_in_match_rect = pygame.Rect(0,0,30,30)
         self.volume_bar_rect = pygame.Rect(0,0,200,10)
         self.volume_handle_rect = pygame.Rect(0,0,15,30)
         self.is_dragging_volume = False
@@ -271,6 +295,16 @@ class Game:
         self.gum_power_rect = pygame.Rect(0,0,30,30)
         self.gum_power_text_rect = pygame.Rect(0,0,0,0)
         self.gum_projectiles = []
+        self.cloudy_day_enabled = False
+        self.cloudy_day_rect = pygame.Rect(0,0,30,30)
+        self.cloudy_day_text_rect = pygame.Rect(0,0,0,0)
+        self.cloud_size_options = [0.5, 1.0, 1.5, 2.0]
+        self.cloud_size_names = ["Clear", "Cloudy", "Rainy", "TORRENCIAL"]
+        self.cloud_size_idx = 1
+        self.cloud_size_rect = pygame.Rect(0,0,130,40)
+        self.cloud_size_text_rect = pygame.Rect(0,0,0,0)
+        self.clouds = []
+        self.cloud_spawn_timer = 0
         self.experimental_golden_goal = False
         self.experimental_golden_goal_rect = pygame.Rect(0,0,30,30)
         self.experimental_golden_goal_text_rect = pygame.Rect(0,0,0,0)
@@ -468,6 +502,7 @@ class Game:
 
     def _reset_modifiers(self):
         """Restablece todos los modificadores a sus valores por defecto (v0.6.0 Fix)"""
+        self.max_score = 6
         self.match_point_enabled = False
         self.reroll_enabled = True
         self.all_reroll_enabled = False
@@ -499,7 +534,56 @@ class Game:
         self.destructible_planets_enabled = False
         self._update_portal_rects()
 
-    def reset_game(self):
+    def save_progress(self):
+        """Guarda el progreso del usuario en un archivo JSON (v0.6.1)"""
+        data = {
+            "first_time_playing": self.first_time_playing,
+            "arcade_completed": self.arcade_completed,
+            "crown_hat_idx": self.crown_hat_idx,
+            "language": self.language,
+            "music_enabled": self.music_enabled,
+            "music_in_match": self.music_in_match,
+            "sfx_volume": self.sfx_volume,
+            "music_volume": self.music_volume,
+            "vfx_enabled": self.vfx_enabled,
+            "shake_enabled": self.shake_enabled
+        }
+        try:
+            with open("save_data.json", "w") as f:
+                json.dump(data, f)
+        except Exception as e:
+            print(f"Error al guardar progreso: {e}")
+
+    def load_progress(self):
+        """Carga el progreso del usuario desde el archivo JSON (v0.6.1)"""
+        if os.path.exists("save_data.json"):
+            try:
+                with open("save_data.json", "r") as f:
+                    data = json.load(f)
+                    self.first_time_playing = data.get("first_time_playing", True)
+                    self.show_tutorial_prompt = self.first_time_playing
+                    self.arcade_completed = data.get("arcade_completed", False)
+                    self.crown_hat_idx = data.get("crown_hat_idx", 0)
+                    self.language = data.get("language", "EN")
+                    self.music_enabled = data.get("music_enabled", True)
+                    self.music_in_match = data.get("music_in_match", False)
+                    self.sfx_volume = data.get("sfx_volume", 0.5)
+                    self.music_volume = data.get("music_volume", 0.4)
+                    self.vfx_enabled = data.get("vfx_enabled", True)
+                    self.shake_enabled = data.get("shake_enabled", True)
+                    
+                    # Sincronizar volúmenes con AudioManager
+                    self.audio.master_volume = self.sfx_volume
+                    for s in self.audio.sounds.values():
+                        # Obtener nombre del sonido para buscar su volumen base
+                        for name, sound in self.audio.sounds.items():
+                            if sound == s:
+                                s.set_volume(self.audio.sound_base_volumes[name] * self.audio.master_volume)
+                                break
+            except Exception as e:
+                print(f"Error al cargar progreso: {e}")
+
+    def reset_game(self, skip_announcement=False):
         # self._reset_modifiers() # REMOVED (v0.6.0 Fix) - Wipes classic mode modifiers
         self.score1 = 0
         self.score2 = 0
@@ -536,7 +620,8 @@ class Game:
         self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
         self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
         
-        self._check_for_announcements()
+        if not skip_announcement:
+            self._check_for_announcements()
 
     def start_arcade_level(self, level):
         self._reset_modifiers() # Limpieza total antes de empezar (v0.6.0 Fix)
@@ -759,9 +844,23 @@ class Game:
                 if event.button == 1:
                     self.is_dragging_scrollbar = False
                     self.is_dragging_volume = False
+                    self.is_dragging_music_volume = False
+                    self.is_dragging_settings_scrollbar = False
                     
             if event.type == pygame.MOUSEMOTION:
                 self._handle_mouse_motion(event)
+                if self.is_dragging_volume:
+                    rel_x = max(0, min(event.pos[0] - self.volume_bar_rect.x, self.volume_bar_rect.width))
+                    self.sfx_volume = rel_x / self.volume_bar_rect.width
+                    self.audio.master_volume = self.sfx_volume
+                elif self.is_dragging_music_volume:
+                    rel_x = max(0, min(event.pos[0] - self.music_volume_bar_rect.x, self.music_volume_bar_rect.width))
+                    self.music_volume = rel_x / self.music_volume_bar_rect.width
+                    self.audio.set_music_volume(self.music_volume)
+                elif self.is_dragging_settings_scrollbar:
+                    self._handle_settings_scrollbar_drag(event)
+                elif self.is_dragging_scrollbar:
+                    self._handle_scrollbar_drag(event)
             
             if event.type == pygame.KEYDOWN:
                 if self.tutorial_active or self.state == STATE_ARCADE_TUTORIAL:
@@ -774,8 +873,11 @@ class Game:
                     self._handle_keydown(event)
                 
             if event.type == pygame.MOUSEWHEEL:
+                scroll_speed = 30
                 if self.state == STATE_MODIFIERS:
-                    self.scroll_y = max(0, min(self.scroll_y - event.y * 30, self.max_scroll))
+                    self.scroll_y = max(0, min(self.scroll_y - event.y * scroll_speed, self.max_scroll))
+                elif self.state == STATE_SETTINGS:
+                    self.settings_scroll_y = max(0, min(self.settings_scroll_y - event.y * scroll_speed, self.settings_max_scroll))
 
         self._handle_continuous_input(dt)
 
@@ -788,11 +890,13 @@ class Game:
                     self.audio.play('hit')
                     self.show_tutorial_prompt = False
                     self.first_time_playing = False
+                    self.save_progress() # Guardar que ya no es primera vez
                 elif self.btn_tutorial_yes_rect.collidepoint(event.pos):
                     self.audio.play('hit')
                     self.show_tutorial_prompt = False
                     self.tutorial_active = True
                     self.first_time_playing = False
+                    self.save_progress() # Guardar
                     self._start_tutorial_step(0)
                 return
 
@@ -818,6 +922,9 @@ class Game:
                 if self.tutorial_active and self.tutorial_step != 3: return # Bloqueado en tutorial
                 self.audio.play('hit')
                 self.state = STATE_MODIFIERS
+            elif self.btn_credits_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.state = STATE_CREDITS
                 self.modifiers_tab = "ALL"
                 self.scroll_y = 0
                 if self.tutorial_active: self._start_tutorial_step(4)
@@ -827,12 +934,16 @@ class Game:
                 
                 self.audio.play('hit')
                 self.state = STATE_SETTINGS
+                self.settings_scroll_y = 0
                 if self.tutorial_active: self._start_tutorial_step(2)
                 # Crear backup para poder cancelar cambios con BACK
                 self.settings_backup = {
                     "lang": self.language,
                     "vfx": self.vfx_enabled,
                     "vol": self.sfx_volume,
+                    "music": self.music_enabled,
+                    "mvol": self.music_volume,
+                    "m_match": self.music_in_match,
                     "shake": self.shake_enabled
                 }
             elif self.btn_tutorial_help_rect.collidepoint(event.pos):
@@ -921,9 +1032,12 @@ class Game:
                 self.audio.play('hit')
                 # Restaurar backup (Descartar cambios)
                 self.language = self.settings_backup["lang"]
-                self.vfx_enabled = self.settings_backup["vfx"]
-                self.sfx_volume = self.settings_backup["vol"]
-                self.audio.master_volume = self.sfx_volume
+                self.music_enabled = self.settings_backup["music"]
+                self.music_volume = self.settings_backup["mvol"]
+                self.music_in_match = self.settings_backup["m_match"]
+                self.audio.set_music_volume(self.music_volume)
+                if self.music_enabled: self.audio.play_music('menu_music.wav', volume=self.music_volume)
+                else: self.audio.stop_music()
                 self.shake_enabled = self.settings_backup["shake"]
                 self.state = STATE_MAIN_MENU
             elif self.lang_rect.collidepoint(event.pos):
@@ -942,6 +1056,17 @@ class Game:
                 rel_x = max(0, min(event.pos[0] - self.volume_bar_rect.x, self.volume_bar_rect.width))
                 self.sfx_volume = rel_x / self.volume_bar_rect.width
                 self.audio.master_volume = self.sfx_volume
+            elif self.music_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.music_enabled = not self.music_enabled
+                if self.music_enabled: self.audio.play_music('menu_music.wav', volume=self.music_volume)
+                else: self.audio.stop_music()
+            elif self.music_enabled and (self.music_volume_bar_rect.collidepoint(event.pos) or self.music_volume_handle_rect.collidepoint(event.pos)):
+                self.is_dragging_music_volume = True
+                rel_x = max(0, min(event.pos[0] - self.music_volume_bar_rect.x, self.music_volume_bar_rect.width))
+                self.music_volume = rel_x / self.music_volume_bar_rect.width
+                self.audio.set_music_volume(self.music_volume)
+            elif self.music_enabled and self.music_in_match_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.music_in_match = not self.music_in_match
             elif self.shake_rect.collidepoint(event.pos):
                 if self.tutorial_active: return # Bloqueado en tutorial
                 self.audio.play('hit'); self.shake_enabled = not self.shake_enabled
@@ -949,6 +1074,12 @@ class Game:
                 self.audio.play('hit'); self.state = STATE_MAIN_MENU
                 if self.tutorial_active and self.tutorial_step == 2:
                     self._start_tutorial_step(3)
+            elif self.settings_scrollbar_rect.collidepoint(event.pos) or self.settings_scrollbar_thumb_rect.collidepoint(event.pos):
+                self.is_dragging_settings_scrollbar = True
+                self._handle_settings_scrollbar_drag(event)
+        elif self.state == STATE_CREDITS:
+            if self.back_btn_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.state = STATE_MAIN_MENU
 
         elif self.state == STATE_GAME_OVER:
             if self.tutorial_active: return 
@@ -972,14 +1103,16 @@ class Game:
                         else:
                             self.start_arcade_level(1)
                     else:
-                        self.reset_game()
+                        self.score1 = self.score2 = 0
+                        self.state = STATE_PRESS_TO_START
                 elif self.btn_gameover_menu.collidepoint(event.pos):
                     self.audio.play('hit')
                     if self.arcade_active:
                         self._reset_modifiers()
-                    self.reset_game()
+                    self.reset_game(skip_announcement=True)
                     self.state = STATE_MAIN_MENU
                     self.arcade_active = False
+                    self.show_match_point_anim = self.show_golden_goal_anim = False
 
     def _handle_modifier_clicks(self, event):
         if self.modifiers_tab == "SKINS":
@@ -991,6 +1124,7 @@ class Game:
                 self.audio.play('hit'); self.ball_skin_idx = (self.ball_skin_idx + 1) % len(self.ball_skin_options)
             elif self.arcade_completed and self.crown_hat_rect.collidepoint(event.pos):
                 self.audio.play('hit'); self.crown_hat_idx = (self.crown_hat_idx + 1) % len(self.crown_hat_options)
+                self.save_progress() # Guardar selección cosmética
         
         elif self.modifiers_tab == "ALL":
             if self.score_btn_rect.collidepoint(event.pos):
@@ -1074,6 +1208,10 @@ class Game:
             self.audio.play('pop'); self.revolver_prob_idx = (self.revolver_prob_idx + 1) % len(self.revolver_prob_options)
         elif self.sleeping_power_rect.collidepoint(event.pos) or self.sleeping_power_text_rect.collidepoint(event.pos):
             self.audio.play('pop'); self.sleeping_power_enabled = not self.sleeping_power_enabled
+        elif self.cloudy_day_rect.collidepoint(event.pos) or self.cloudy_day_text_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.cloudy_day_enabled = not self.cloudy_day_enabled
+        elif self.cloudy_day_enabled and self.cloud_size_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.cloud_size_idx = (self.cloud_size_idx + 1) % len(self.cloud_size_options)
         
         if self.add_mouse_enabled:
             if self.mouse_speed_rect.collidepoint(event.pos):
@@ -1086,6 +1224,16 @@ class Game:
             elif self.gravity_radius_rect.collidepoint(event.pos): self.audio.play('pop'); self.gravity_radius_idx = (self.gravity_radius_idx + 1) % len(self.gravity_radius_options)
             elif self.destructible_planets_rect.collidepoint(event.pos) or self.destructible_planets_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.destructible_planets_enabled = not self.destructible_planets_enabled
             elif self.destructible_planets_enabled and self.planet_resistance_rect.collidepoint(event.pos): self.audio.play('pop'); self.planet_resistance_idx = (self.planet_resistance_idx + 1) % len(self.planet_resistance_options)
+            
+    def _handle_scrollbar_drag(self, event):
+        rel_y = max(0, min(event.pos[1] - self.scrollbar_rect.y, self.scrollbar_rect.height))
+        scroll_pct = rel_y / self.scrollbar_rect.height
+        self.scroll_y = scroll_pct * self.max_scroll
+
+    def _handle_settings_scrollbar_drag(self, event):
+        rel_y = max(0, min(event.pos[1] - self.settings_scrollbar_rect.y, self.settings_scrollbar_rect.height))
+        scroll_pct = rel_y / self.settings_scrollbar_rect.height
+        self.settings_scroll_y = scroll_pct * self.settings_max_scroll
 
     def _handle_mouse_motion(self, event):
         mpos = event.pos
@@ -1128,6 +1276,11 @@ class Game:
                 if random.random() < 0.1: # No saturar, solo de vez en cuando
                     self.audio.play('pop')
 
+    def _handle_mouse_wheel(self, event):
+        if self.state == STATE_MODIFIERS:
+            self.scroll_y -= event.y * 30
+            self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
+
     def _handle_keydown(self, event):
         if self.state == STATE_ARCADE_REWARD:
             if event.key == pygame.K_SPACE:
@@ -1142,8 +1295,10 @@ class Game:
                     else:
                         self.reset_game()
                         self.state = STATE_MAIN_MENU
+                        self.save_progress() # Guardar cambios en ajustes
                         self.arcade_active = False
                         self.arcade_completed = True # ¡DESBLOQUEADO!
+                        self.save_progress() # Guardar victoria arcade
             return
 
         if self.tutorial_active:
@@ -1162,6 +1317,10 @@ class Game:
         if self.state == STATE_PRESS_TO_START and event.key == pygame.K_SPACE:
             self.audio.play('hit')
             self.reset_game()
+        elif self.state == STATE_SERVE and event.key == pygame.K_SPACE:
+            # Mantener la funcionalidad de saltar el saque si se desea, pero el texto visual ya no estará aquí.
+            if not (self.tutorial_active and self.tutorial_step in [11, 12, 13]):
+                self.serve_timer = 0
         elif self.state == STATE_PLAYING:
             if event.key == pygame.K_d: self.activate_paddle_power(self.paddle1, 1)
             # Solo permitir activar poder si no es la IA (v0.6.0 Fix)
@@ -1262,10 +1421,9 @@ class Game:
             self.audio.play('explosion')
             self.vfx.burst(paddle.rect.centerx, paddle.rect.centery, YELLOW)
             self.trigger_shake(12, 0.5)
-            # Destruir paleta visualmente como el poder naranja
-            if self.orange_skin_idx == 1:
-                paddle.is_destroyed = True
-                self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, BROWN)
+            # Destruir paleta visualmente (v0.6.0 Fix: Letalidad absoluta)
+            paddle.is_destroyed = True
+            self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, YELLOW)
             
             # Quitar bala y dar punto
             if ball in self.balls: self.balls.remove(ball)
@@ -1284,11 +1442,15 @@ class Game:
                 return
                 
             ball.reset_orange(BALL_SIZE); self.audio.play('pop')
-            if self.orange_skin_idx == 1:
-                paddle.is_destroyed = True
-                self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, BROWN)
-                self.trigger_shake(15, 0.6) # Gran impacto
-            self.goal_scored(2 if paddle == self.paddle1 else 1); return
+            # Destruir paleta visualmente (v0.6.0 Fix: Letalidad absoluta)
+            paddle.is_destroyed = True
+            self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, BROWN)
+            self.trigger_shake(15, 0.6) # Gran impacto
+            
+            # Penalización: El oponente gana el punto
+            scoring_player = 2 if paddle == self.paddle1 else 1
+            self.goal_scored(scoring_player)
+            return
             
         self.audio.play('pop'); self.last_hitter = 1 if paddle == self.paddle1 else 2
         # Decrementar penalización de sueño si existe (v0.6.0)
@@ -1323,7 +1485,10 @@ class Game:
             is_purple = (current_z == 3)
             
             got_power = False
-            if is_purple:
+            # Bloqueo de Re-roll para SLEEP (No sobrescribir si ya lo tenemos)
+            if paddle.power_stored == POWER_SLEEP:
+                pass 
+            elif is_purple:
                 if paddle.hits >= 3:
                     paddle.grant_random_power(self)
                     paddle.hits = 0
@@ -1536,6 +1701,8 @@ class Game:
         
         # Reset global round variables (relojes, zonas, multiplicadores)
         self.global_hits = 0
+        self.clouds = []
+        self.cloud_spawn_timer = 0
         self.hourglass_rect = None
         self.is_x2_item_active = False
         self.pending_x2_spawn = False
@@ -1656,6 +1823,11 @@ class Game:
         self.reward_char_timer = 0
 
     def _check_for_announcements(self):
+        # Evitar anuncios si no estamos en una partida activa (v0.6.0 Fix)
+        if self.state not in [STATE_PLAYING, STATE_SERVE]:
+            self.show_match_point_anim = self.show_golden_goal_anim = False
+            return
+
         self.show_match_point_anim = self.show_golden_goal_anim = False
         self.serve_timer = 1.0
         
@@ -1679,9 +1851,9 @@ class Game:
                     self.audio.play('match_point')
                 return
         
-        # Prioridad 3: Golden Goal Experimental / Sudden Death Natural
+        # Prioridad 3: Golden Goal Experimental (v0.6.0 Fix: Respetar modificador de EXTRAS)
         is_at_final_point = (self.score1 == self.max_score-1 and self.score2 == self.max_score-1)
-        if is_at_final_point and (self.experimental_golden_goal or not self.match_point_enabled):
+        if is_at_final_point and self.experimental_golden_goal:
             if not self.show_golden_goal_anim:
                 self.is_golden_goal_round = True 
                 self.show_golden_goal_anim = True
@@ -1691,9 +1863,25 @@ class Game:
             return
 
     def update(self, dt):
-        # Sincronizar estado del VFXManager con el ajuste de Settings
         self.vfx.enabled = self.vfx_enabled
         self.vfx.update(dt)
+
+        # Gestión dinámica de la música según el estado y configuración
+        if self.music_enabled:
+            is_match_state = self.state in [STATE_PLAYING, STATE_SERVE, STATE_ARCADE_LEVEL_START]
+            should_play = True
+            if is_match_state and not self.music_in_match:
+                should_play = False
+            
+            # Si debería sonar pero no está sonando (mixer.music.get_busy() no es fiable al 100% con loops, 
+            # pero para detectar si está cargada y activa sirve)
+            if should_play and not pygame.mixer.music.get_busy():
+                self.audio.play_music('menu_music.wav', volume=self.music_volume)
+            elif not should_play and pygame.mixer.music.get_busy():
+                self.audio.stop_music(fadeout_ms=1500)
+        else:
+            if pygame.mixer.music.get_busy():
+                self.audio.stop_music(fadeout_ms=1500)
         
         # Secuencia final tutorial en menú
         if self.state == STATE_MAIN_MENU and self.tutorial_active and self.tutorial_step == 31:
@@ -1807,6 +1995,32 @@ class Game:
                 sp.update(dt, self)
                 if not sp.active:
                     self.sleep_projectiles.remove(sp)
+
+            # --- DÍA NUBLADO (CLOUDY DAY) ---
+            if self.cloudy_day_enabled:
+                self.cloud_spawn_timer += dt
+                if self.cloud_spawn_timer >= 1.0:
+                    self.cloud_spawn_timer = 0
+                    if random.random() < 0.5: # 50/50 Chance
+                        from entities import Cloud
+                        # Velocidad exponencial si > 30 toques
+                        speed_mult = 1.0
+                        if self.global_hits > 30:
+                            # 1.1^n donde n es cada golpe extra tras el 30
+                            speed_mult = min(5.0, 1.1 ** (self.global_hits - 30))
+                        
+                        size_mult = self.cloud_size_options[self.cloud_size_idx]
+                        
+                        # Aparecer por la izquierda (1) o derecha (-1)
+                        direction = 1 if random.random() < 0.5 else -1
+                        start_x = -300 if direction == 1 else SCREEN_WIDTH + 300
+                        start_y = random.randint(50, SCREEN_HEIGHT - 50)
+                        self.clouds.append(Cloud(start_x, start_y, direction, size_mult, speed_mult))
+                
+                for c in self.clouds[:]:
+                    c.update(dt)
+                    if not c.active:
+                        self.clouds.remove(c)
 
             # --- FÍSICAS CENTRALIZADAS ---
             self.physics.update(dt)
@@ -2149,8 +2363,22 @@ class Game:
                 for sp in self.sleep_projectiles:
                     sp.draw(temp_surf)
             
+            if self.cloudy_day_enabled:
+                for c in self.clouds:
+                    c.draw(temp_surf)
+
             if self.is_x2_item_active: self._draw_x2_icon(temp_surf)
             self._draw_score(temp_surf)
+            
+            # Indicador de inicio de partida (v0.6.0)
+            if self.state == STATE_PRESS_TO_START:
+                if int(pygame.time.get_ticks() / 500) % 2 == 0:
+                    txt = self.t("PRESS SPACE TO START", "PRESIONA ESPACIO PARA EMPEZAR")
+                    st = self.font.render(txt, True, WHITE)
+                    temp_surf.blit(st, st.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
+            
+            # Indicador de inicio de saque (Opcional, quitado de aquí por petición)
+            # if self.state == STATE_SERVE: ...
             
         if self.state == STATE_MAIN_MENU: self.menus.draw_main_menu(temp_surf)
         elif self.state == STATE_MODIFIERS: self.menus.draw_modifiers(temp_surf)
@@ -2158,8 +2386,9 @@ class Game:
         elif self.state == STATE_MODE_SELECTION: self.menus.draw_mode_selection(temp_surf)
         elif self.state == STATE_SOLO_SUBMODE_SELECTION: self.menus.draw_solo_submode_selection(temp_surf)
         elif self.state == STATE_ARCADE_TUTORIAL:
-            self.menus.draw_solo_submode_selection(temp_surf)
             self.menus.draw_arcade_tutorial(temp_surf)
+        elif self.state == STATE_CREDITS:
+            self.menus.draw_credits(temp_surf)
         elif self.state == STATE_ARCADE_LEVEL_START:
             # Fondo Rojo Oscuro para el Nivel Final (v0.6.0)
             bg_color = (60, 0, 0) if self.arcade_level == 5 else BLACK
@@ -2404,6 +2633,13 @@ class Game:
                         self._handle_keydown(event)
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         self._handle_mouse_click(event)
+                    elif event.type == pygame.MOUSEBUTTONUP:
+                        self.is_dragging_volume = False
+                        self.is_dragging_music_volume = False
+                        self.is_dragging_scrollbar = False
+                        self.is_dragging_settings_scrollbar = False
+                    elif event.type == pygame.MOUSEMOTION:
+                        self._handle_mouse_motion(event)
                     elif event.type == pygame.USEREVENT + 10:
                         if self.tutorial_active and self.tutorial_step == 11:
                             pygame.time.set_timer(pygame.USEREVENT + 10, 0)

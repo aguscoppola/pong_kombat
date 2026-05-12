@@ -93,7 +93,8 @@ TOOLTIPS = {
         "revolver": ["REVOLVER: Orbiting item at center.", "Allows shooting 3 BULLETS that destroy", "the enemy paddle temporarily."],
         "gum_power": ["GUM: The ball sticks to your paddle!", "You have 3 seconds to aim and shoot.", "Consumes charges per second."],
         "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."],
-        "sleeping_power": ["SLEEP: Shoots a large violet projectile that", "splits into 3 at mid-map.", "Immobilizes opponent for 2 hits if caught."]
+        "sleeping_power": ["SLEEP: Shoots a large violet projectile that", "splits into 3 at mid-map.", "Immobilizes opponent for 2 hits if caught."],
+        "cloudy_day": ["CLOUDY DAY: Random clouds will cross the field.", "They are 100% opaque, covering ball and paddles.", "They speed up exponentially after 30 hits!"]
     },
     "ES": {
         "match_point": ["Si ambos jugadores están a un punto de ganar (5-5),", "la partida no terminará hasta que haya 2 puntos de ventaja."],
@@ -129,6 +130,7 @@ TOOLTIPS = {
         "revolver": ["REVÓLVER: Ítem que orbita el centro.", "Permite disparar 3 BALAS que destruyen", "la paleta enemiga temporalmente."],
         "gum_power": ["CHICLE: ¡La bola se queda pegada a tu paleta!", "Tienes 3 segundos para apuntar y disparar.", "Consume cargas por segundo."],
         "start_x2": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
-        "sleeping_power": ["SUEÑO: Lanza un gran proyectil violeta que", "se divide en 3 al cruzar la mitad.", "Inmoviliza al rival por 2 toques si lo atrapa."]
+        "sleeping_power": ["SUEÑO: Lanza un gran proyectil violeta que", "se divide en 3 al cruzar la mitad.", "Inmoviliza al rival por 2 toques si lo atrapa."],
+        "cloudy_day": ["DÍA NUBLADO: Nubes aleatorias cruzan el campo.", "Son 100% opacas, tapando pelota y paletas.", "¡Se aceleran exponencialmente tras 30 golpes!"]
     }
 }

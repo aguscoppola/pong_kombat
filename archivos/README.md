@@ -2,14 +2,12 @@
 
 ¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con un **Modo Arcade** desafiante y una IA que aprende de tus movimientos.
 
-## 🔭 ¿Qué hay de nuevo en la v0.6.0?
-¡La **Arcade & Sleep Update** ha llegado! 🛠️✨
-*   **Modo ARCADE:** Enfréntate a 5 niveles de dificultad progresiva. ¡Solo tienes una oportunidad para llegar al final!
-*   **Nuevo Poder: SLEEP (Sueño):** Inmoviliza a tu oponente con proyectiles triple-violetas.
-*   **IA de Supervivencia:** La computadora ahora esquiva balas del revólver y amenazas letales con precisión quirúrgica.
-*   **Nuevos Tutoriales:** Sistema de ayuda interactiva con botones "?" pixelados. Incluye un tutorial general y uno específico para el modo Arcade.
-*   **Recompensas Desbloqueables:** Vence el modo Arcade para obtener la **CORONA** y personalizar tu paleta.
-*   **Audio Overhaul:** Nuevos efectos de sonido inmersivos para una experiencia arcade total.
+## 🔭 ¿Qué hay de nuevo en la v0.6.1?
+¡La **Persistence & Credits Update** ha llegado! 💾✨
+*   **Sistema de Guardado:** ¡Tu progreso ya no se borra! El juego guarda automáticamente tu victoria en el modo Arcade, la corona desbloqueada, el estado del tutorial y tus ajustes de volumen/idioma. 💾
+*   **Panel de Créditos:** Descubre quién está detrás del juego haciendo clic en el nuevo botón "+" del menú principal. 🎖️
+*   **Balance de Combate:** Sistema de restricción de poderes activos para evitar ventajas injustas. ⚖️
+*   **IA Mejorada:** Ahora la IA detecta y defiende las pelotas fantasmales, además de tener una letalidad absoluta con proyectiles críticos. 🤖
 
 ## 📂 Estructura del Proyecto
 *   **`main.py`**: El lanzador principal (ejecuta este archivo para jugar).

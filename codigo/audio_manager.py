@@ -68,3 +68,19 @@ class AudioManager:
     def fadeout(self, name, time):
         if name in self.sounds:
             self.sounds[name].fadeout(time)
+
+    def play_music(self, filename, volume=0.5, fade_ms=1500):
+        path = os.path.join(self.sounds_dir, filename)
+        if os.path.exists(path):
+            try:
+                pygame.mixer.music.load(path)
+                pygame.mixer.music.set_volume(volume * self.master_volume)
+                pygame.mixer.music.play(-1, fade_ms=fade_ms) # Loop eterno con FadeIn
+            except Exception as e:
+                print(f"Error cargando música {filename}: {e}")
+
+    def stop_music(self, fadeout_ms=1500):
+        pygame.mixer.music.fadeout(fadeout_ms)
+
+    def set_music_volume(self, volume):
+        pygame.mixer.music.set_volume(volume * self.master_volume)

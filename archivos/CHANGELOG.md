@@ -1,3 +1,36 @@
+## [0.6.1] - 2026-05-12
+### The Persistence & Credits Update (v0.6.1)
+Esta actualización introduce la memoria permanente al juego, un panel de agradecimientos y ajustes críticos en el equilibrio de los combates.
+
+#### Agregado (Nuevas cosas)
+- **Sistema de Persistencia (Guardado/Carga)**:
+    - Se guarda automáticamente el estado del tutorial (no aparece más de una vez).
+    - Se guarda el progreso del modo ARCADE y la corona desbloqueada.
+    - Se guardan los ajustes de volumen, idioma y efectos visuales.
+    - Archivo de guardado: `save_data.json`.
+- **Panel de CRÉDITOS**:
+    - Acceso mediante botón "+" pixelado en la esquina del menú principal.
+    - Información del autor: Agustin Martinez Coppola.
+    - Soporte bilingüe completo (Español/Inglés).
+- **Ajustes de MÚSICA (Settings)**:
+    - Control de volumen independiente para la música.
+    - Opción de activar/desactivar la música globalmente.
+    - Nuevo interruptor para activar la música específicamente durante la partida.
+
+#### Mejorado (Balance y Audio)
+- **Restricción de Poderes Activos**:
+    - Si tienes un poder activo (Imán, Chicle, Sueño, etc.), no recibirás uno nuevo por toques para evitar el "overpowering".
+    - **Excepción**: Los poderes de contacto (ROJO y NARANJA) se siguen recibiendo normalmente.
+- **Transiciones de Audio**:
+    - FadeIn y FadeOut cinemáticos de 1500ms para la música en todas las transiciones del motor.
+- **Lógica de GOL DE ORO**:
+    - La animación y el sonido característico ahora solo se activan si el modificador está habilitado en EXTRAS.
+
+#### Arreglado (Bugs)
+- **IA: Defensa Espectral**: Corregido el bug donde la IA ignoraba las pelotas fantasmales del rival si había una real en juego.
+- **IA: Letalidad**: Unificada la destrucción instantánea al contacto con proyectiles críticos (Naranja/Balas).
+- **Limpieza de Estado**: Reset forzado de `max_score` al salir del modo Arcade para no contaminar partidas clásicas.
+
 ## [0.6.0] - 2026-05-11
 ### The Arcade & Sleep Update (v0.6.0)
 Esta es la actualización más ambiciosa hasta la fecha, introduciendo un modo campaña, un nuevo sistema de combate no letal y una IA con instinto de supervivencia real.

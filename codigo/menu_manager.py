@@ -39,8 +39,15 @@ class MenuManager:
             
         if show_button:
             self._draw_pixel_help_button(surface, r_help, h_col, WHITE)
-
         
+        # Botón "+" de créditos (v0.6.0)
+        r_credits = self.game.btn_credits_rect
+        is_hover_credits = r_credits.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if is_hover_credits else BLACK, r_credits)
+        pygame.draw.rect(surface, WHITE, r_credits, 2)
+        txt_plus = self.game.font.render("+", True, WHITE)
+        surface.blit(txt_plus, txt_plus.get_rect(center=r_credits.center))
+
         if self.game.show_tutorial_prompt:
             self._draw_tutorial_prompt(surface)
         elif self.game.tutorial_active:
@@ -328,6 +335,9 @@ class MenuManager:
         cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
         if self.game.revolver_enabled: cy += 60; self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, text_rect=self.game.revolver_prob_text_rect)
         cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |PURPLE|SLEEPING|WHITE| power", "Activar poder de |PURPLE|SUEÑO"), self.game.sleeping_power_enabled, self.game.sleeping_power_rect, self.game.sleeping_power_text_rect, active_color=SLEEP_PURPLE, offset=off, surface=surface)
+        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|CLOUDY |WHITE|day", "Activar día |GRAY|NUBLADO"), self.game.cloudy_day_enabled, self.game.cloudy_day_rect, self.game.cloudy_day_text_rect, active_color=GRAY, offset=off, surface=surface)
+        if self.game.cloudy_day_enabled:
+            cy += 60; self._draw_sub_selector(cy, self.game.t(" - Cloud intensity:", " - Intensidad de nubes:"), self.game.cloud_size_names[self.game.cloud_size_idx], self.game.cloud_size_rect, off, ox, lm, surface, text_rect=self.game.cloud_size_text_rect)
         self.game.max_y_rendered = cy
 
     def _draw_skins_tab_full(self, surface, off, lm, ox):
@@ -388,38 +398,83 @@ class MenuManager:
 
     def draw_settings(self, surface):
         panel_rect = self.game.modifiers_panel_rect
-        
         pygame.draw.rect(surface, BLACK, panel_rect); pygame.draw.rect(surface, WHITE, panel_rect, 4)
         t = self.game.font.render(self.game.t("SETTINGS", "AJUSTES"), True, WHITE); surface.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, panel_rect.y+40)))
-        lm, ox, cy_init = panel_rect.x + 100, panel_rect.centerx + 50, panel_rect.y + 120
-        cy = cy_init
+        
+        # Área de recorte para el contenido scrolleable
+        clip_rect = pygame.Rect(panel_rect.x + 5, panel_rect.y + 60, panel_rect.width - 25, panel_rect.height - 120)
+        temp_surf = pygame.Surface((clip_rect.width, 1000), pygame.SRCALPHA)
+        
+        lm, ox, cy = 95, panel_rect.centerx - panel_rect.x + 45, 20 - self.game.settings_scroll_y
         
         # 1. Language
-        draw_rich_text(surface, "Language / Idioma", (lm, cy), self.game.small_font)
-        self.game.lang_rect.update(ox, cy - 5, 130, 40); pygame.draw.rect(surface, BLACK, self.game.lang_rect); pygame.draw.rect(surface, WHITE, self.game.lang_rect, 2)
-        surface.blit(self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW), self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW).get_rect(center=self.game.lang_rect.center))
+        draw_rich_text(temp_surf, "Language / Idioma", (lm, cy), self.game.small_font)
+        self.game.lang_rect.update(clip_rect.x + ox, clip_rect.y + cy - 5, 130, 40)
+        pygame.draw.rect(temp_surf, BLACK, (ox, cy - 5, 130, 40)); pygame.draw.rect(temp_surf, WHITE, (ox, cy - 5, 130, 40), 2)
+        txt = "ESPAÑOL" if self.game.language=="ES" else "ENGLISH"
+        st = self.game.small_font.render(txt, True, YELLOW)
+        temp_surf.blit(st, st.get_rect(center=(ox + 65, cy + 15)))
         
         # 2. VFX
-        cy += 80; draw_rich_text(surface, self.game.t("Visual Effects:", "Efectos Visuales:"), (lm, cy), self.game.small_font)
-        self.game.vfx_rect.update(ox + 50, cy - 5, 30, 30); pygame.draw.rect(surface, BLACK, self.game.vfx_rect); pygame.draw.rect(surface, WHITE, self.game.vfx_rect, 2)
-        if self.game.vfx_enabled: pygame.draw.rect(surface, GREEN, self.game.vfx_rect.inflate(-10, -10))
+        cy += 70; draw_rich_text(temp_surf, self.game.t("Visual Effects:", "Efectos Visuales:"), (lm, cy), self.game.small_font)
+        self.game.vfx_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
+        pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
+        if self.game.vfx_enabled: pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
         
         # 3. Volume
-        cy += 80; draw_rich_text(surface, self.game.t("Volume:", "Volumen:"), (lm, cy), self.game.small_font)
-        self.game.volume_bar_rect.update(ox, cy + 10, 200, 10); pygame.draw.rect(surface, GRAY, self.game.volume_bar_rect); pygame.draw.rect(surface, WHITE, self.game.volume_bar_rect, 1)
-        self.game.volume_handle_rect.center = (self.game.volume_bar_rect.x + (self.game.sfx_volume * self.game.volume_bar_rect.width), self.game.volume_bar_rect.centery); pygame.draw.rect(surface, WHITE, self.game.volume_handle_rect)
+        cy += 70; draw_rich_text(temp_surf, self.game.t("SFX Volume:", "Volumen SFX:"), (lm, cy), self.game.small_font)
+        self.game.volume_bar_rect.update(clip_rect.x + ox, clip_rect.y + cy + 10, 200, 10)
+        pygame.draw.rect(temp_surf, GRAY, (ox, cy + 10, 200, 10)); pygame.draw.rect(temp_surf, WHITE, (ox, cy + 10, 200, 10), 1)
+        self.game.volume_handle_rect.center = (self.game.volume_bar_rect.x + (self.game.sfx_volume * self.game.volume_bar_rect.width), self.game.volume_bar_rect.centery)
+        pygame.draw.rect(temp_surf, WHITE, (ox + (self.game.sfx_volume * 200) - 7, cy + 5, 15, 20))
         
-        # 4. Shake
-        cy += 80; draw_rich_text(surface, self.game.t("Screen Shake:", "Temblor de Pantalla:"), (lm, cy), self.game.small_font)
-        self.game.shake_rect.update(ox + 50, cy - 5, 30, 30); pygame.draw.rect(surface, BLACK, self.game.shake_rect); pygame.draw.rect(surface, WHITE, self.game.shake_rect, 2)
-        if self.game.shake_enabled: pygame.draw.rect(surface, GREEN, self.game.shake_rect.inflate(-10, -10))
+        # 4. Music Settings
+        cy += 70; draw_rich_text(temp_surf, self.game.t("Active Music:", "Activar Música:"), (lm, cy), self.game.small_font)
+        self.game.music_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
+        pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
+        if self.game.music_enabled:
+            pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
+            # Sub-opciones
+            cy += 50; draw_rich_text(temp_surf, self.game.t("Music Volume:", "Volumen Música:"), (lm + 40, cy), self.game.tiny_font)
+            self.game.music_volume_bar_rect.update(clip_rect.x + ox + 40, clip_rect.y + cy + 5, 160, 8)
+            pygame.draw.rect(temp_surf, GRAY, (ox + 40, cy + 5, 160, 8)); pygame.draw.rect(temp_surf, WHITE, (ox + 40, cy + 5, 160, 8), 1)
+            self.game.music_volume_handle_rect.center = (self.game.music_volume_bar_rect.x + (self.game.music_volume * self.game.music_volume_bar_rect.width), self.game.music_volume_bar_rect.centery)
+            pygame.draw.rect(temp_surf, WHITE, (ox + 40 + (self.game.music_volume * 160) - 5, cy + 2, 10, 15))
+            
+            cy += 50; draw_rich_text(temp_surf, self.game.t("Music in the Match:", "Música en Partida:"), (lm + 40, cy), self.game.tiny_font)
+            self.game.music_in_match_rect.update(clip_rect.x + ox + 40, clip_rect.y + cy - 5, 25, 25)
+            pygame.draw.rect(temp_surf, BLACK, (ox + 40, cy - 5, 25, 25)); pygame.draw.rect(temp_surf, WHITE, (ox + 40, cy - 5, 25, 25), 2)
+            if self.game.music_in_match: pygame.draw.rect(temp_surf, GREEN, (ox + 45, cy, 15, 15))
         
-        # 5. Buttons
-        self.game.settings_back_btn_rect.update(panel_rect.right - 100, panel_rect.y + 20, 80, 40); pygame.draw.rect(surface, BLACK, self.game.settings_back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_back_btn_rect, 2)
+        # 5. Shake
+        cy += 70; draw_rich_text(temp_surf, self.game.t("Screen Shake:", "Temblor de Pantalla:"), (lm, cy), self.game.small_font)
+        self.game.shake_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
+        pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
+        if self.game.shake_enabled: pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
+        
+        # Finalizar renderizado scrolleable
+        total_content_h = cy + self.game.settings_scroll_y - 20
+        self.game.settings_max_scroll = max(0, total_content_h - clip_rect.height + 40)
+        
+        # Clamp scroll if content shrunk
+        if self.game.settings_scroll_y > self.game.settings_max_scroll:
+            self.game.settings_scroll_y = self.game.settings_max_scroll
+
+        surface.blit(temp_surf, clip_rect, (0, 0, clip_rect.width, clip_rect.height))
+        
+        # 6. Scrollbar (Solo si es necesario)
+        if self.game.settings_max_scroll > 0:
+            pygame.draw.rect(surface, (30, 30, 30), self.game.settings_scrollbar_rect)
+            scroll_pct = self.game.settings_scroll_y / self.game.settings_max_scroll
+            self.game.settings_scrollbar_thumb_rect.y = self.game.settings_scrollbar_rect.y + scroll_pct * (self.game.settings_scrollbar_rect.height - self.game.settings_scrollbar_thumb_rect.height)
+            pygame.draw.rect(surface, WHITE, self.game.settings_scrollbar_thumb_rect)
+
+        # 7. Buttons (Fuera del scroll)
+        self.game.settings_back_btn_rect.update(panel_rect.right - 100, panel_rect.y + 20, 80, 40)
+        pygame.draw.rect(surface, BLACK, self.game.settings_back_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_back_btn_rect, 2)
         surface.blit(self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE), self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE).get_rect(center=self.game.settings_back_btn_rect.center))
         
-        # Subir botón APPLY un poco más
-        self.game.settings_apply_btn_rect.update(SCREEN_WIDTH//2 - 65, panel_rect.bottom - 60, 130, 45)
+        self.game.settings_apply_btn_rect.update(SCREEN_WIDTH//2 - 65, panel_rect.bottom - 50, 130, 40)
         pygame.draw.rect(surface, (0, 100, 0), self.game.settings_apply_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_apply_btn_rect, 2)
         surface.blit(self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE), self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE).get_rect(center=self.game.settings_apply_btn_rect.center))
 
@@ -438,8 +493,13 @@ class MenuManager:
             surface.blit(inner_ov, (panel_rect.x + 4, panel_rect.y + 4))
 
             # 3. ILUMINAR (REDIBUJAR ENCIMA DEL MANTO)
+            # Alineamos con el inicio del clip_rect (60) + offset inicial (20)
+            cy_tut = panel_rect.y + 80
+            lm_tut = panel_rect.x + 100
             # Redibujamos Idioma
-            draw_rich_text(surface, "|WHITE|Language / Idioma", (lm, cy_init), self.game.small_font)
+            draw_rich_text(surface, "|WHITE|Language / Idioma", (lm_tut, cy_tut), self.game.small_font)
+            # Actualizamos posición del rect para que coincida perfectamente
+            self.game.lang_rect.update(panel_rect.centerx + 45, cy_tut - 5, 130, 40)
             pygame.draw.rect(surface, BLACK, self.game.lang_rect); pygame.draw.rect(surface, WHITE, self.game.lang_rect, 2)
             surface.blit(self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW), self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW).get_rect(center=self.game.lang_rect.center))
             
@@ -493,7 +553,13 @@ class MenuManager:
         if text_rect: text_rect.update(lm, draw_y, 400, 30)
         
         rect.update(ox, draw_y - 5, 130, 40); pygame.draw.rect(surface, BLACK, rect); pygame.draw.rect(surface, WHITE, rect, 2)
-        translations = {"None": "Ninguno", "Low": "Bajo", "Medium": "Medio", "High": "Alto", "Extreme": "Extremo", "Default": "Normal", "Slow": "Lento", "Fast": "Rápido", "Sonic": "Sónico", "Moon": "Luna", "Planet": "Planeta", "Gas Giant": "Gigante", "Star": "Estrella"}
+        translations = {
+            "None": "Ninguno", "Low": "Bajo", "Medium": "Medio", "High": "Alto", "Extreme": "Extremo", 
+            "Default": "Normal", "Slow": "Lento", "Fast": "Rápido", "Sonic": "Sónico", 
+            "Moon": "Luna", "Planet": "Planeta", "Gas Giant": "Gigante", "Star": "Estrella",
+            "Low (10%)": "Baja (10%)", "Default (25%)": "Normal (25%)", "Quite (50%)": "Mucha (50%)", "Always (100%)": "Siempre (100%)",
+            "Clear": "Despejado", "Cloudy": "Nublado", "Rainy": "Lluvioso", "TORRENCIAL": "TORRENCIAL"
+        }
         
         # Colores especiales para planetas
         col = WHITE
@@ -503,7 +569,9 @@ class MenuManager:
         elif "GAS GIANT" in v_upper: col = (230, 180, 140)
         elif "STAR" in v_upper: col = YELLOW
         
-        st = self.game.small_font.render(translations.get(val_name, val_name) if self.game.language=="ES" else val_name, True, col)
+        # Usar fuente pequeña si es TORRENCIAL o si es una opción de probabilidad con paréntesis
+        st_font = self.game.tiny_font if (val_name == "TORRENCIAL" or "(" in val_name) else self.game.small_font
+        st = st_font.render(translations.get(val_name, val_name) if self.game.language=="ES" else val_name, True, col)
         surface.blit(st, st.get_rect(center=rect.center))
         if sub_val: surface.blit(self.game.tiny_font.render(str(sub_val), True, GRAY), (rect.right + 10, rect.centery - self.game.tiny_font.get_height()//2))
 
@@ -534,7 +602,7 @@ class MenuManager:
                 (self.game.destructible_planets_text_rect, "destructible_planets"), (self.game.portals_text_rect, "portals"), 
                 (self.game.portals_vertical_text_rect, "portals_vertical"), (self.game.more_portals_text_rect, "more_portals"),
                 (self.game.add_mouse_text_rect, "add_mouse"), (self.game.revolver_text_rect, "revolver"),
-                (self.game.sleeping_power_text_rect, "sleeping_power")
+                (self.game.sleeping_power_text_rect, "sleeping_power"), (self.game.cloudy_day_text_rect, "cloudy_day")
             ]
         
         for rect, key in areas:
@@ -611,3 +679,32 @@ class MenuManager:
             for col_idx, char in enumerate(row):
                 if char == 'X':
                     pygame.draw.rect(surface, WHITE, (start_x + col_idx * p_size, start_y + row_idx * p_size, p_size, p_size))
+
+    def draw_credits(self, surface):
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(220); ov.fill(BLACK); surface.blit(ov, (0,0))
+        panel_w, panel_h = 650, 400
+        panel = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2, panel_w, panel_h)
+        pygame.draw.rect(surface, (20, 20, 20), panel)
+        pygame.draw.rect(surface, WHITE, panel, 3)
+        
+        # Botón BACK en la esquina superior
+        mpos = pygame.mouse.get_pos()
+        self.game.back_btn_rect.update(panel.right - 100, panel.y + 20, 80, 40)
+        hover_b = self.game.back_btn_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if hover_b else BLACK, self.game.back_btn_rect)
+        pygame.draw.rect(surface, WHITE, self.game.back_btn_rect, 2)
+        txt_b = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE)
+        surface.blit(txt_b, txt_b.get_rect(center=self.game.back_btn_rect.center))
+        
+        # Título: PONG KOMBAT
+        t1, t2 = self.game.large_font.render("PONG ", True, WHITE), self.game.large_font.render("KOMBAT", True, RED)
+        tw = t1.get_width() + t2.get_width()
+        sx, ty = SCREEN_WIDTH//2 - tw//2, panel.y + 60
+        surface.blit(t1, (sx, ty)); surface.blit(t2, (sx+t1.get_width(), ty))
+        
+        # Créditos
+        cy = ty + 120
+        made_by_label = self.game.t("Made by:", "Creado por:")
+        draw_rich_text(surface, f"|WHITE|{made_by_label} |GOLD|Agustin Martinez Coppola", (panel.x + 50, cy), self.game.small_font)
+        cy += 80
+        draw_rich_text(surface, f"|WHITE|Gmail: |CYAN|agustinmartinezcoppola@Gmail.com", (panel.x + 50, cy), self.game.small_font)
