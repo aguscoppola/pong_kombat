@@ -77,6 +77,7 @@ class MenuManager:
         self._draw_tutorial_box(surface)
 
     def _draw_tutorial_box(self, surface):
+        if not self.game.tutorial_active: return
         # Rectángulo inferior para explicaciones (Soporta 3 renglones)
         box_h = 100
         box = pygame.Rect(0, SCREEN_HEIGHT - box_h, SCREEN_WIDTH, box_h)
@@ -403,7 +404,8 @@ class MenuManager:
         
         # Área de recorte para el contenido scrolleable
         clip_rect = pygame.Rect(panel_rect.x + 5, panel_rect.y + 60, panel_rect.width - 25, panel_rect.height - 120)
-        temp_surf = pygame.Surface((clip_rect.width, 1000), pygame.SRCALPHA)
+        temp_surf = pygame.Surface((clip_rect.width, 1000))
+        temp_surf.fill(BLACK)
         
         lm, ox, cy = 95, panel_rect.centerx - panel_rect.x + 45, 20 - self.game.settings_scroll_y
         
@@ -451,6 +453,25 @@ class MenuManager:
         self.game.shake_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
         pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
         if self.game.shake_enabled: pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
+
+        # 6. Fullscreen (v0.7.0)
+        cy += 70; draw_rich_text(temp_surf, self.game.t("Fullscreen:", "Pantalla Completa:"), (lm, cy), self.game.small_font)
+        self.game.fullscreen_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
+        pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
+        if self.game.fullscreen_enabled: pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
+
+        # 7. Mobile Controls (v0.7.0)
+        cy += 70; draw_rich_text(temp_surf, self.game.t("Mobile Controls:", "Controles Móviles:"), (lm, cy), self.game.small_font)
+        self.game.mobile_controls_toggle_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 30, 30)
+        pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 30, 30)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 30, 30), 2)
+        if self.game.mobile_mode:
+            pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 20, 20))
+            
+            # Sub-opción: Geográficos (v0.7.0)
+            cy += 45; draw_rich_text(temp_surf, self.game.t("  > Geographic Mode", "  > Modo Geográfico"), (lm, cy), self.game.tiny_font)
+            self.game.geo_controls_rect.update(clip_rect.x + ox + 50, clip_rect.y + cy - 5, 25, 25)
+            pygame.draw.rect(temp_surf, BLACK, (ox + 50, cy - 5, 25, 25)); pygame.draw.rect(temp_surf, WHITE, (ox + 50, cy - 5, 25, 25), 2)
+            if self.game.geographic_controls: pygame.draw.rect(temp_surf, GREEN, (ox + 55, cy, 15, 15))
         
         # Finalizar renderizado scrolleable
         total_content_h = cy + self.game.settings_scroll_y - 20
@@ -487,28 +508,30 @@ class MenuManager:
             pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (0, panel_rect.top, panel_rect.left, panel_rect.height))
             pygame.draw.rect(surface, (0, 0, 0, ext_alpha), (panel_rect.right, panel_rect.top, SCREEN_WIDTH - panel_rect.right, panel_rect.height))
 
-            # 2. Oscurecer TODO el interior del panel (Suave: 100 alpha)
-            inner_ov = pygame.Surface((panel_rect.width - 8, panel_rect.height - 8), pygame.SRCALPHA)
-            inner_ov.fill((0, 0, 0, 100))
-            surface.blit(inner_ov, (panel_rect.x + 4, panel_rect.y + 4))
-
-            # 3. ILUMINAR (REDIBUJAR ENCIMA DEL MANTO)
-            # Alineamos con el inicio del clip_rect (60) + offset inicial (20)
-            cy_tut = panel_rect.y + 80
-            lm_tut = panel_rect.x + 100
-            # Redibujamos Idioma
-            draw_rich_text(surface, "|WHITE|Language / Idioma", (lm_tut, cy_tut), self.game.small_font)
-            # Actualizamos posición del rect para que coincida perfectamente
-            self.game.lang_rect.update(panel_rect.centerx + 45, cy_tut - 5, 130, 40)
-            pygame.draw.rect(surface, BLACK, self.game.lang_rect); pygame.draw.rect(surface, WHITE, self.game.lang_rect, 2)
-            surface.blit(self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW), self.game.small_font.render("ESPAÑOL" if self.game.language=="ES" else "ENGLISH", True, YELLOW).get_rect(center=self.game.lang_rect.center))
+            # 2. Capa de recorte (Agujeros en el manto)
+            mantle = pygame.Surface((panel_rect.width - 8, panel_rect.height - 8), pygame.SRCALPHA)
+            mantle.fill((0, 0, 0, 150)) # Manto negro semi-transparente
             
-            # Redibujamos Apply
-            pygame.draw.rect(surface, (0, 120, 0), self.game.settings_apply_btn_rect); pygame.draw.rect(surface, WHITE, self.game.settings_apply_btn_rect, 2)
-            surface.blit(self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE), self.game.small_font.render(self.game.t("APPLY", "APLICAR"), True, WHITE).get_rect(center=self.game.settings_apply_btn_rect.center))
+            # Recortamos hueco para Idioma (solo si es visible)
+            if clip_rect.colliderect(self.game.lang_rect):
+                local_x = self.game.lang_rect.x - (panel_rect.x + 4)
+                local_y = self.game.lang_rect.y - (panel_rect.y + 4)
+                pygame.draw.rect(mantle, (0, 0, 0, 0), (local_x - 220, local_y - 5, 400, 50))
+            
+            # Recortamos hueco para el botón APPLY
+            apply_x = self.game.settings_apply_btn_rect.x - (panel_rect.x + 4)
+            apply_y = self.game.settings_apply_btn_rect.y - (panel_rect.y + 4)
+            pygame.draw.rect(mantle, (0, 0, 0, 0), (apply_x - 5, apply_y - 5, self.game.settings_apply_btn_rect.width + 10, self.game.settings_apply_btn_rect.height + 10))
+            
+            surface.blit(mantle, (panel_rect.x + 4, panel_rect.y + 4))
+            
+            # 3. Bordes de resaltado
+            if clip_rect.colliderect(self.game.lang_rect):
+                pygame.draw.rect(surface, YELLOW, self.game.lang_rect, 2)
+            pygame.draw.rect(surface, YELLOW, self.game.settings_apply_btn_rect, 2)
 
-            # La caja de tutorial siempre al frente (SIN MANTO EXTRA)
-            self._draw_tutorial_box(surface)
+        # La caja de tutorial siempre al frente
+        self._draw_tutorial_box(surface)
 
     def draw_game_over(self, surface):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.set_alpha(180); ov.fill(BLACK); surface.blit(ov, (0,0))

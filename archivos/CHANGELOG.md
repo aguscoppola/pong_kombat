@@ -1,3 +1,31 @@
+## [0.7.0] - 2026-05-13
+### The Mobile & Web Update (v0.7.0)
+Esta actualización prepara el terreno para la expansión multiplataforma, introduciendo soporte táctil completo, un nuevo modo de juego intuitivo y compatibilidad con navegadores web.
+
+#### Agregado (Soporte Móvil)
+- **Controles Táctiles (Mobile Controls)**:
+    - Botones virtuales temáticos (**ʌ**, **v**, **POW**) con diseño estilo cristal y feedback visual.
+    - Soporte **Multitouch**: Permite mover ambas paletas y usar poderes simultáneamente.
+    - **Botones Dinámicos**: El botón de poder se tiñe automáticamente del color de tu habilidad actual con contraste de texto inteligente.
+- **Nuevo Modo: CONTROLES GEOGRÁFICOS**:
+    - Sub-opción en Settings que permite desplazarse tocando directamente cualquier punto de la pantalla.
+    - División de zonas: Mitad izquierda para el Jugador 1 y mitad derecha para el Jugador 2.
+    - El poder se activa mediante un único botón centralizado, dejando el resto de la pantalla para el movimiento directo.
+- **Despliegue Web (Web-Ready & PWA)**:
+    - Compatibilidad completa con **pygbag** mediante la refactorización asíncrona del motor.
+    - Soporte **PWA (Progressive Web App)**: Instalable en móviles con soporte offline.
+    - **Iconografía Premium**: Nuevo icono pixel art de 512px para la pantalla de inicio.
+- **Escalado Dinámico Inteligente**:
+    - Implementación de `pygame.SCALED` que permite jugar en cualquier resolución manteniendo la lógica de colisiones perfecta.
+- **Pulido Táctil (Touch Polish)**:
+    - Botones aumentados (120x85) para mayor confort.
+    - Estética **Glassmorphism** y feedback háptico (vibración) sincronizado con el gameplay.
+
+#### Mejorado (UX y Estabilidad)
+- **Unificación de Entrada**: El ratón ahora simula un "dedo virtual", permitiendo probar la experiencia móvil al 100% desde PC sin fallos de "hover" o clics fantasma.
+- **Consolidación de Eventos**: Eliminación de bucles redundantes para evitar la pérdida de inputs críticos (como soltar el botón).
+- **Persistencia Móvil**: El estado de los controles móviles y el modo geográfico se guardan en el perfil del jugador.
+
 ## [0.6.1] - 2026-05-12
 ### The Persistence & Credits Update (v0.6.1)
 Esta actualización introduce la memoria permanente al juego, un panel de agradecimientos y ajustes críticos en el equilibrio de los combates.

@@ -1,12 +1,16 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.6.1)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.7.0)
 
 ## 1. Visión General
-**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. La v0.6.1 introduce el **Sistema de Persistencia**, asegurando que los logros y configuraciones del jugador se mantengan entre sesiones.
+**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. La v0.7.0 introduce la **Infraestructura Móvil y Web**, permitiendo el despliegue del juego en navegadores y dispositivos táctiles.
 
 ---
 
 ## 2. Sistema de Controles (Input Mapping)
-... (Igual que v0.6.0) ...
+### Entrada Táctil y Móvil (v0.7.0)
+*   **Gestión de Dedos (Multitouch)**: El motor rastrea múltiples IDs de contacto de forma simultánea. Permite el movimiento independiente de ambas paletas y el uso de poderes sin bloqueos de entrada.
+*   **Modo Clásico (Botones Virtuales)**: Botones temáticos de dirección (ʌ, v) y activación de poder (POW). El botón POW cambia de color dinámicamente según el poder cargado.
+*   **Modo Geográfico (Position-Based)**: El usuario toca directamente la posición de destino. El campo se divide verticalmente en dos zonas de control (Mitad Izquierda: P1, Mitad Derecha: P2).
+*   **Unificación de Entrada (Virtual Finger)**: El ratón en PC simula el comportamiento de un dedo, permitiendo pruebas de UX móvil en entornos de escritorio sin discrepancias de lógica.
 
 ### Modo SOLO (IA de Supervivencia Avanzada)
 *   **Radar de Amenazas Letales**: La IA detecta balas del **REVÓLVER** y bolas **NARANJAS** en trayectoria de colisión. Prioriza la esquiva absoluta (moviéndose 70px fuera de la trayectoria) a menos que la pelota esté a menos de 80px de su fondo.
@@ -53,3 +57,13 @@
 *   **v0.5.1**: "The Architect & Survival Update" - Arquitectura modular, IA con radar de esquiva.
 *   **v0.6.0**: "The Arcade & Sleep Update" - Modo campaña, poder de sueño, recompensas desbloqueables e IA táctica.
 *   **v0.6.1**: "The Persistence & Credits Update" - Sistema de guardado JSON, panel de créditos y balance de combate.
+*   **v0.7.0**: "The Mobile & Web Update" - Soporte táctil, Modo Geográfico, Escalado Dinámico Inteligente e infraestructura PWA para funcionamiento offline.
+
+---
+
+## 9. Arquitectura Móvil y Web (v0.7.0)
+*   **Escalado Dinámico (SCALED)**: El motor utiliza `pygame.SCALED` para desacoplar la lógica de 800x600 de la resolución física. Esto permite que el juego se adapte a cualquier relación de aspecto (21:9, 4:3, etc.) sin deformar las colisiones.
+*   **Infraestructura PWA**: 
+    *   **Offline Mode**: Mediante Service Workers, el juego es jugable sin internet.
+    *   **Standalone Experience**: El `manifest.json` permite la instalación como app nativa, forzando la orientación horizontal y eliminando la interfaz del navegador.
+    *   **Haptic Feedback**: Integración de la API `vibrate()` del navegador para sincronizar impactos visuales con vibración física en móviles.

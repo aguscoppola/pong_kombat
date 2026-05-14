@@ -20,8 +20,11 @@ class Game:
         pygame.mixer.pre_init(44100, -16, 2, 2048)
         pygame.init()
         pygame.mixer.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Pong Kombat v0.6.0")
+        # --- v0.7.0: ESCALADO DINÁMICO (Móviles/Web) ---
+        # SCALED permite que Pygame gestione automáticamente el escalado de 800x600 
+        # a cualquier tamaño de ventana o pantalla, manteniendo las coordenadas lógicas.
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+        pygame.display.set_caption("Pong Kombat v0.7.0 - Mobile & Web Edition")
         # Icono de ventana (v0.6.0)
         try:
             import os
@@ -111,12 +114,18 @@ class Game:
         self.sfx_enabled = True
         self.last_hovered_rect = None # Para sonidos de hover
         
+        # MODO MÓVIL (v0.7.0)
+        self.mobile_mode = False
+        self.geographic_controls = False
+        self.fingers = {} # finger_id -> (x, y)
+        
         # Screen Shake
         self.shake_amount = 0
         self.shake_timer = 0
         
         # Secuencia final tutorial
         self.tutorial_end_menu_timer = 0
+        self.tutorial_cooldown_timer = 0 # Cooldown para evitar saltos accidentales (v0.7.0)
         
         # Secuencia de Recompensa (v0.6.0)
         self.reward_step = 0
@@ -140,6 +149,18 @@ class Game:
         self.btn_settings_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 70, 300, 70)
         self.btn_credits_rect = pygame.Rect(SCREEN_WIDTH - 60, SCREEN_HEIGHT - 60, 40, 40)
         
+        # Botones Móviles (v0.7.0)
+        bw, bh = 100, 70
+        self.btn_p1_up = pygame.Rect(10, SCREEN_HEIGHT - bh*2 - 20, bw, bh)
+        self.btn_p1_down = pygame.Rect(10, SCREEN_HEIGHT - bh - 10, bw, bh)
+        self.btn_p1_power = pygame.Rect(10, SCREEN_HEIGHT // 2 - bh // 2, bw, bh)
+
+        self.btn_p2_up = pygame.Rect(SCREEN_WIDTH - bw - 10, SCREEN_HEIGHT - bh*2 - 20, bw, bh)
+        self.btn_p2_down = pygame.Rect(SCREEN_WIDTH - bw - 10, SCREEN_HEIGHT - bh - 10, bw, bh)
+        self.btn_p2_power = pygame.Rect(SCREEN_WIDTH - bw - 10, SCREEN_HEIGHT // 2 - bh // 2, bw, bh)
+        self.mobile_controls_toggle_rect = pygame.Rect(0,0,30,30)
+        self.geo_controls_rect = pygame.Rect(0,0,25,25)
+
         panel_w, panel_h = 700, 450
         self.modifiers_panel_rect = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2, panel_w, panel_h)
         self.back_btn_rect = pygame.Rect(self.modifiers_panel_rect.right - 90, self.modifiers_panel_rect.y + 10, 80, 40)
@@ -162,6 +183,12 @@ class Game:
         self.settings_scrollbar_rect = pygame.Rect(self.modifiers_panel_rect.right - 20, self.modifiers_panel_rect.y + 60, 10, self.modifiers_panel_rect.height - 70)
         self.settings_scrollbar_thumb_rect = pygame.Rect(self.settings_scrollbar_rect.x, self.settings_scrollbar_rect.y, 10, 50)
         self.is_dragging_settings_scrollbar = False
+        
+        # --- v0.7.0: MÓVILES ---
+        self.mobile_mode = False
+        self.mobile_controls_toggle_rect = pygame.Rect(0,0,30,30)
+        self.geographic_controls = False
+        self.geo_controls_rect = pygame.Rect(0,0,30,30)
 
         # Pestañas
         self.modifiers_tab = "ALL"
@@ -210,6 +237,8 @@ class Game:
         self.is_dragging_volume = False
         self.shake_enabled = True
         self.shake_rect = pygame.Rect(0,0,30,30)
+        self.fullscreen_enabled = False
+        self.fullscreen_rect = pygame.Rect(0,0,30,30)
         self.settings_back_btn_rect = pygame.Rect(0,0,80,40)
         self.settings_apply_btn_rect = pygame.Rect(0,0,130,45)
         self.golden_goal_anim_timer = 0
@@ -546,7 +575,9 @@ class Game:
             "sfx_volume": self.sfx_volume,
             "music_volume": self.music_volume,
             "vfx_enabled": self.vfx_enabled,
-            "shake_enabled": self.shake_enabled
+            "shake_enabled": self.shake_enabled,
+            "mobile_mode": self.mobile_mode,
+            "geographic_controls": self.geographic_controls
         }
         try:
             with open("save_data.json", "w") as f:
@@ -571,6 +602,8 @@ class Game:
                     self.music_volume = data.get("music_volume", 0.4)
                     self.vfx_enabled = data.get("vfx_enabled", True)
                     self.shake_enabled = data.get("shake_enabled", True)
+                    self.mobile_mode = data.get("mobile_mode", False)
+                    self.geographic_controls = data.get("geographic_controls", False)
                     
                     # Sincronizar volúmenes con AudioManager
                     self.audio.master_volume = self.sfx_volume
@@ -831,23 +864,43 @@ class Game:
             self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
             self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
 
-    def handle_input(self, dt):
-        for event in pygame.event.get():
+    def handle_input(self, events, dt):
+        for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             
             if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.fingers[0] = event.pos # Simular dedo con el ratón
                 self._handle_mouse_click(event)
+            
+            if event.type == pygame.FINGERDOWN:
+                tx, ty = event.x * SCREEN_WIDTH, event.y * SCREEN_HEIGHT
+                self.fingers[event.finger_id] = (tx, ty)
+                # Simular clic para menús
+                pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"pos": (int(tx), int(ty)), "button": 1}))
+
+            if event.type == pygame.FINGERMOTION:
+                tx, ty = event.x * SCREEN_WIDTH, event.y * SCREEN_HEIGHT
+                self.fingers[event.finger_id] = (tx, ty)
+
+            if event.type == pygame.FINGERUP:
+                if event.finger_id in self.fingers:
+                    tx, ty = self.fingers[event.finger_id]
+                    del self.fingers[event.finger_id]
+                    pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": (int(tx), int(ty)), "button": 1}))
             
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
+                    if 0 in self.fingers: del self.fingers[0]
                     self.is_dragging_scrollbar = False
                     self.is_dragging_volume = False
                     self.is_dragging_music_volume = False
                     self.is_dragging_settings_scrollbar = False
                     
             if event.type == pygame.MOUSEMOTION:
+                if 0 in self.fingers: self.fingers[0] = event.pos
                 self._handle_mouse_motion(event)
                 if self.is_dragging_volume:
                     rel_x = max(0, min(event.pos[0] - self.volume_bar_rect.x, self.volume_bar_rect.width))
@@ -861,17 +914,8 @@ class Game:
                     self._handle_settings_scrollbar_drag(event)
                 elif self.is_dragging_scrollbar:
                     self._handle_scrollbar_drag(event)
-            
-            if event.type == pygame.KEYDOWN:
-                if self.tutorial_active or self.state == STATE_ARCADE_TUTORIAL:
-                    if event.key == pygame.K_SPACE:
-                        if self.state == STATE_ARCADE_TUTORIAL:
-                            self._next_arcade_tutorial_step()
-                        else:
-                            self._next_tutorial_step()
-                else:
-                    self._handle_keydown(event)
-                
+
+            # --- SCROLL CON RUEDA ---
             if event.type == pygame.MOUSEWHEEL:
                 scroll_speed = 30
                 if self.state == STATE_MODIFIERS:
@@ -879,11 +923,54 @@ class Game:
                 elif self.state == STATE_SETTINGS:
                     self.settings_scroll_y = max(0, min(self.settings_scroll_y - event.y * scroll_speed, self.settings_max_scroll))
 
+            if event.type == pygame.KEYDOWN:
+                # REGLA ESTRICTA (v0.7.0 Fix): El tutorial SOLO avanza si el juego está 'frenado' (No en PLAYING)
+                if self.tutorial_active and self.state != STATE_PLAYING:
+                    if event.key == pygame.K_SPACE or self.tutorial_step == 4:
+                        self._next_tutorial_step()
+                else:
+                    self._handle_keydown(event)
+
         self._handle_continuous_input(dt)
 
     def _handle_mouse_click(self, event):
         if event.button != 1: return
         
+        # --- AVANCE DE TUTORIAL POR CLIC (v0.7.0 Fix) ---
+        # El tutorial avanza si no estamos jugando, O si estamos en las fases de explicación congeladas (14-28)
+        is_frozen_gameplay = self.state == STATE_PLAYING and (14 <= self.tutorial_step <= 28)
+        if self.tutorial_active and (self.state != STATE_PLAYING or is_frozen_gameplay):
+            # BLOQUEO: Si el paso requiere un botón específico, solo avanzamos si pulsan ese botón
+            btn_steps = {
+                1: self.btn_settings_rect,
+                2: self.settings_apply_btn_rect,
+                3: self.btn_modifiers_rect,
+                5: self.tab_extras_rect,
+                6: self.tab_skins_rect,
+                8: self.settings_back_btn_rect,
+                9: self.btn_play_rect,
+                10: self.btn_solo_rect
+            }
+            
+            if self.tutorial_step in btn_steps:
+                # Si el clic es sobre el botón que el tutorial pide, NO interceptar para dejar que el botón funcione
+                if btn_steps[self.tutorial_step].collidepoint(event.pos):
+                    pass # Dejar que el botón maneje su clic y llame a _next_tutorial_step() si corresponde
+                else:
+                    # En pasos de botón, si tocan la caja de texto abajo, permitimos avanzar el TEXTO (pero no el paso)
+                    if event.pos[1] > SCREEN_HEIGHT - 100:
+                        if self.tutorial_text_visible != self.tutorial_text_full:
+                            self.tutorial_text_visible = self.tutorial_text_full
+                            return
+            else:
+                # Pasos informativos: Cualquier clic/toque en la pantalla avanza
+                # (A menos que sea el botón de volver en los menús que no es el paso actual)
+                self._next_tutorial_step()
+                return
+        if self.mobile_mode and self.state in [STATE_PLAYING, STATE_SERVE]:
+            if self.btn_p1_power.collidepoint(event.pos): self.activate_paddle_power(self.paddle1, 1)
+            if not self.is_ai_mode and self.btn_p2_power.collidepoint(event.pos): self.activate_paddle_power(self.paddle2, 2)
+
         if self.state == STATE_MAIN_MENU:
             if self.show_tutorial_prompt:
                 if self.btn_tutorial_no_rect.collidepoint(event.pos):
@@ -922,12 +1009,12 @@ class Game:
                 if self.tutorial_active and self.tutorial_step != 3: return # Bloqueado en tutorial
                 self.audio.play('hit')
                 self.state = STATE_MODIFIERS
+                if self.tutorial_active and self.tutorial_step == 3: self._start_tutorial_step(5)
             elif self.btn_credits_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.state = STATE_CREDITS
                 self.modifiers_tab = "ALL"
                 self.scroll_y = 0
-                if self.tutorial_active: self._start_tutorial_step(4)
             elif self.btn_settings_rect.collidepoint(event.pos):
                 # EXCEPCIÓN: Permitido en el paso 1 del tutorial
                 if self.tutorial_active and self.tutorial_step != 1: return 
@@ -944,7 +1031,8 @@ class Game:
                     "music": self.music_enabled,
                     "mvol": self.music_volume,
                     "m_match": self.music_in_match,
-                    "shake": self.shake_enabled
+                    "shake": self.shake_enabled,
+                    "fullscreen": self.fullscreen_enabled # v0.7.0 Fix
                 }
             elif self.btn_tutorial_help_rect.collidepoint(event.pos):
                 if not self.tutorial_active:
@@ -1039,6 +1127,7 @@ class Game:
                 if self.music_enabled: self.audio.play_music('menu_music.wav', volume=self.music_volume)
                 else: self.audio.stop_music()
                 self.shake_enabled = self.settings_backup["shake"]
+                self.fullscreen_enabled = self.settings_backup["fullscreen"] # v0.7.0 Fix
                 self.state = STATE_MAIN_MENU
             elif self.lang_rect.collidepoint(event.pos):
                 self.audio.play('hit'); self.language = "EN" if self.language == "ES" else "ES"
@@ -1070,8 +1159,22 @@ class Game:
             elif self.shake_rect.collidepoint(event.pos):
                 if self.tutorial_active: return # Bloqueado en tutorial
                 self.audio.play('hit'); self.shake_enabled = not self.shake_enabled
+            elif self.fullscreen_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.fullscreen_enabled = not self.fullscreen_enabled
+            elif self.mobile_controls_toggle_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.mobile_mode = not self.mobile_mode
+            elif self.mobile_mode and self.geo_controls_rect.collidepoint(event.pos):
+                self.audio.play('hit'); self.geographic_controls = not self.geographic_controls
             elif self.settings_apply_btn_rect.collidepoint(event.pos):
-                self.audio.play('hit'); self.state = STATE_MAIN_MENU
+                self.audio.play('hit')
+                
+                # --- APLICAR PANTALLA COMPLETA (v0.7.0 Fix) ---
+                # Solo aplicar si ha cambiado respecto al estado real actual de la ventana
+                is_currently_fs = (pygame.display.get_surface().get_flags() & pygame.FULLSCREEN) != 0
+                if self.fullscreen_enabled != is_currently_fs and sys.platform != "emscripten":
+                    pygame.display.toggle_fullscreen()
+                
+                self.state = STATE_MAIN_MENU
                 if self.tutorial_active and self.tutorial_step == 2:
                     self._start_tutorial_step(3)
             elif self.settings_scrollbar_rect.collidepoint(event.pos) or self.settings_scrollbar_thumb_rect.collidepoint(event.pos):
@@ -1337,6 +1440,41 @@ class Game:
             if keys[pygame.K_w]: self.paddle1.move(-1, dt, p_speed)
             if keys[pygame.K_s]: self.paddle1.move(1, dt, p_speed)
             
+            # --- MOVIMIENTO MÓVIL (v0.7.0) ---
+            if self.mobile_mode:
+                for fx, fy in self.fingers.values():
+                    if self.geographic_controls:
+                        # Control Geográfico: Mover hacia el punto tocado
+                        if fx < SCREEN_WIDTH // 2: # Lado Jugador 1
+                            # Evitar mover si estamos tocando el botón de poder
+                            if not self.btn_p1_power.collidepoint(fx, fy):
+                                target_y = fy
+                                dy = target_y - self.paddle1.rect.centery
+                                if abs(dy) > 5:
+                                    move_step = p_speed * dt
+                                    if abs(dy) < move_step:
+                                        self.paddle1.rect.centery = target_y
+                                    else:
+                                        self.paddle1.move(1 if dy > 0 else -1, dt, p_speed)
+                        else: # Lado Jugador 2
+                            if not self.is_ai_mode and not self.btn_p2_power.collidepoint(fx, fy):
+                                target_y = fy
+                                dy = target_y - self.paddle2.rect.centery
+                                if abs(dy) > 5:
+                                    move_step = p_speed * dt
+                                    if abs(dy) < move_step:
+                                        self.paddle2.rect.centery = target_y
+                                    else:
+                                        self.paddle2.move(1 if dy > 0 else -1, dt, p_speed)
+                    else:
+                        # Control Clásico (Botones)
+                        if self.btn_p1_up.collidepoint(fx, fy): self.paddle1.move(-1, dt, p_speed)
+                        if self.btn_p1_down.collidepoint(fx, fy): self.paddle1.move(1, dt, p_speed)
+                        # Jugador 2
+                        if not self.is_ai_mode:
+                            if self.btn_p2_up.collidepoint(fx, fy): self.paddle2.move(-1, dt, p_speed)
+                            if self.btn_p2_down.collidepoint(fx, fy): self.paddle2.move(1, dt, p_speed)
+
             # Bloqueo de controles manuales para la IA (v0.6.0 Fix)
             if not self.is_ai_mode:
                 if keys[pygame.K_UP]: self.paddle2.move(-1, dt, p_speed)
@@ -1725,6 +1863,8 @@ class Game:
         self.mouse_hits_counter = 0
 
     def goal_scored(self, player):
+        self.audio.play('goal')
+        self.vibrate(150) # Vibración al anotar gol (v0.7.0 Polish)
         self._reset_round_state()
         if self.is_golden_goal_round:
             self.is_golden_goal_round = False
@@ -2104,6 +2244,9 @@ class Game:
         if not self.tutorial_active and self.state != STATE_ARCADE_TUTORIAL: return
         
         # Efecto Typewriter (Palabra por palabra)
+        if self.tutorial_cooldown_timer > 0:
+            self.tutorial_cooldown_timer -= dt
+
         if self.tutorial_text_visible != self.tutorial_text_full:
             self.tutorial_text_timer += dt
             if self.tutorial_text_timer >= self.tutorial_word_delay:
@@ -2118,6 +2261,7 @@ class Game:
         self.tutorial_step = step
         self.tutorial_text_index = 0
         self.tutorial_text_visible = ""
+        self.tutorial_cooldown_timer = 1.0 # 1 segundo de cooldown al iniciar cada paso (v0.7.0)
         
         if step == 0:
             self.tutorial_text_full = self.t("Welcome to the tutorial! (Press Space bar to continue...)", "¡Bienvenido al tutorial! (Pulsa Espacio para continuar...)")
@@ -2130,13 +2274,17 @@ class Game:
         elif step == 4:
             self.tutorial_text_full = self.t("Here are the MODIFIERS. In the 'ALL' tab, you can change the game rules (Press space bar to continue...)", "Aquí están los MODIFICADORES. En la pestaña 'TODO', puedes cambiar las reglas del juego (Pulsa espacio para continuar...)")
         elif step == 5:
-            self.tutorial_text_full = self.t("You can switch tabs to see other types of modifiers. For example: EXTRAS", "Puedes cambiar de pestaña para ver otros tipos de modificadores. Por ejemplo: EXTRAS")
+            self.tutorial_text_full = self.t("You can switch tabs to see other modifiers. Click on the EXTRAS tab to continue", "Puedes cambiar de pestaña para ver otros modificadores. Haz clic en la pestaña EXTRAS para continuar")
         elif step == 6:
             self.tutorial_text_full = self.t("You can also change the appearance of some powers in the SKIN tab", "También puedes cambiar la apariencia de algunos poderes en la pestaña ASPECTOS")
         elif step == 7:
             self.tutorial_text_full = self.t("Here you can see the available skins (Press space bar to continue...)", "Aquí puedes ver los aspectos disponibles (Pulsa espacio para continuar...)")
         elif step == 8:
             self.tutorial_text_full = self.t("Okay, you now understand how modifiers work. Now let's go back to the menu", "Bien, ahora ya entiendes cómo funcionan los modificadores. Volvamos al menú")
+        elif step == 9:
+            self.tutorial_text_full = self.t("Now let's start a game. Click on PLAY", "Ahora empecemos una partida. Haz clic en JUGAR")
+        elif step == 10:
+            self.tutorial_text_full = self.t("You can play against the AI or a friend. For this tutorial, we will choose SOLO mode", "Puedes jugar contra la IA o un amigo. Para este tutorial, elegiremos el modo SOLO")
         elif step == 11:
             self.tutorial_text_full = self.t("Player 1 Controls: Up: 'W', Down: 'S', and Power: 'D'", "Controles Jugador 1: Arriba: 'W', Abajo: 'S' y Poder: 'D'")
         elif step == 12:
@@ -2184,58 +2332,52 @@ class Game:
             self.tutorial_text_full = self.t("That's the end of the tutorial. You can now modify whatever you want. To finish, press the space bar.", "Ese es el final del tutorial. Ahora puedes modificar lo que quieras. Para finalizar, presiona la barra espaciadora.")
 
     def _next_tutorial_step(self):
-        # Si el texto aún se está escribiendo, lo completamos de golpe
+        # PROTECCIÓN (v0.7.0 Fix): No avanzar si estamos en cooldown (evita doble click accidental)
+        if self.tutorial_cooldown_timer > 0:
+            return
+
+        # No avanzar si estamos en una fase de juego activa (bloqueo total hasta cumplir condición)
+        if self.tutorial_step in [135, 215, 285]:
+            return
+
+        # 1. Completar texto si está escribiéndose
         if self.tutorial_text_visible != self.tutorial_text_full:
             self.tutorial_text_visible = self.tutorial_text_full
             return
         
-        # EXCEPCIÓN: Pasos que requieren interacción obligatoria en UI no avanzan con Espacio
-        # (1: AJUSTES, 2: APLICAR, 3: MODIFICADORES, 5: EXTRAS, 6: ASPECTOS, 8: VOLVER, 9: JUGAR)
-        if self.tutorial_step in [1, 2, 3, 5, 6, 8, 9]:
+        # 2. Bloqueo de pasos que requieren interacción obligatoria con la UI
+        # (1:Ajustes, 2:Aplicar, 3:Modificadores, 5:Extras, 6:Aspectos, 8:Volver, 9:Jugar, 10:Solo)
+        blocked_steps = [1, 2, 3, 5, 6, 8, 9, 10]
+        if self.tutorial_step in blocked_steps:
             return
 
-        # --- LÓGICA DE TRANSICIONES DEL PARTIDO TUTORIAL ---
-        if self.tutorial_step == 13:
-            self.tutorial_step = 135 # Estado oculto de Gameplay 1
+        # 3. Incrementar paso
+        self.tutorial_step += 1
+        
+        # 4. Transiciones especiales de Gameplay / Menú Final
+        if self.tutorial_step == 14: # Tras el mensaje de "Empecemos" (13)
+            self.tutorial_step = 135 # Fase Gameplay 1 (Relojes)
             self.state = STATE_PLAYING
-            self.global_hits = 0 # Seguro adicional
+            self.global_hits = 0
             return
-        elif self.tutorial_step == 135:
-            # Bloquear avance por espacio mientras se juega (hasta que aparezca el reloj)
-            return
-        elif self.tutorial_step == 21:
-            self.tutorial_step = 215 # Gameplay 2
-            self.state = STATE_PLAYING
-            return
-        elif self.tutorial_step == 215:
-            # Bloquear avance por espacio mientras se juega
-            return
-        elif self.tutorial_step == 28:
-            self.tutorial_step = 285 # Gameplay 3
+        elif self.tutorial_step == 22: # Tras el mensaje de Probabilidades (21)
+            self.tutorial_step = 215 # Fase Gameplay 2 (Poderes)
             self.state = STATE_PLAYING
             return
-        elif self.tutorial_step == 285:
-            # Bloquear avance por espacio en la fase final
-            return
-        elif self.tutorial_step == 29:
-            self._start_tutorial_step(30)
-            return
-        elif self.tutorial_step == 30:
-            self.tutorial_step = 31
-            self.state = STATE_MAIN_MENU
-            self.tutorial_end_menu_timer = 2.5
-            self.audio.play('reveal') # Sonido de partículas/revelación
-            self._start_tutorial_step(31)
+        elif self.tutorial_step == 29: # Tras el mensaje final (28)
+            self.tutorial_step = 285 # Fase Gameplay 3 (Libre)
+            self.state = STATE_PLAYING
             return
         elif self.tutorial_step == 31:
-            self._start_tutorial_step(32)
-            return
-        elif self.tutorial_step == 32:
+            # Fin de la pantalla de Game Over, regreso animado al menú
+            self.state = STATE_MAIN_MENU
+            self.tutorial_end_menu_timer = 2.5
+            self.audio.play('reveal')
+        elif self.tutorial_step == 33:
             self.tutorial_active = False
-            self.tutorial_end_menu_timer = 0
             return
 
-        self.tutorial_step += 1
+        # 5. Iniciar el nuevo paso
         self._start_tutorial_step(self.tutorial_step)
 
     def _next_arcade_tutorial_step(self):
@@ -2315,6 +2457,15 @@ class Game:
         if not self.shake_enabled: return
         self.shake_amount = amount
         self.shake_timer = duration
+        if amount > 5: self.vibrate(int(duration * 1000)) # Vibrar si el impacto es fuerte (v0.7.0)
+
+    def vibrate(self, duration_ms):
+        """Retroalimentación háptica para móviles (v0.7.0)"""
+        if sys.platform == "emscripten" and self.mobile_mode:
+            try:
+                import platform
+                platform.window.navigator.vibrate(duration_ms)
+            except: pass
 
     def draw(self):
         # Calculamos el desplazamiento del shake
@@ -2379,6 +2530,10 @@ class Game:
             
             # Indicador de inicio de saque (Opcional, quitado de aquí por petición)
             # if self.state == STATE_SERVE: ...
+            
+            # --- CAPA DE CONTROLES MÓVILES (v0.7.0) ---
+            if self.mobile_mode:
+                self._draw_mobile_controls(temp_surf)
             
         if self.state == STATE_MAIN_MENU: self.menus.draw_main_menu(temp_surf)
         elif self.state == STATE_MODIFIERS: self.menus.draw_modifiers(temp_surf)
@@ -2589,6 +2744,57 @@ class Game:
                 if mx[r][c]: pygame.draw.rect(surface, GOLD, (cx-25+c*px, cy-10+r*px, px, px))
                 if m2[r][c]: pygame.draw.rect(surface, GOLD, (cx+5+c*px, cy-10+r*px, px, px))
 
+    def _draw_mobile_controls(self, surface):
+        """Dibuja botones virtuales temáticos (v0.7.0)"""
+        # P1 Buttons
+        p1_color = self.paddle1.color
+        p1_btns = [(self.btn_p1_up, "ʌ"), (self.btn_p1_down, "v"), (self.btn_p1_power, "POW")]
+        if self.geographic_controls: p1_btns = [(self.btn_p1_power, "POW")]
+
+        for r, lbl in p1_btns:
+            # Detectar si se está pulsando este botón específico
+            is_active = any(r.collidepoint(pos) for pos in self.fingers.values())
+            alpha = 200 if is_active else 120 # Más opaco al pulsar
+            
+            # Color temático y estilo Premium (Bordes redondeados + Brillo)
+            base_color = p1_color if lbl == "POW" else (220, 220, 220)
+            if is_active:
+                # Efecto de pulsación (oscurecer un poco)
+                base_color = tuple(max(0, c - 50) for c in base_color)
+
+            s = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
+            pygame.draw.rect(s, (*base_color, alpha), (0, 0, r.width, r.height), border_radius=15)
+            # Borde blanco más nítido
+            pygame.draw.rect(s, (255, 255, 255, 220), (0, 0, r.width, r.height), 3, border_radius=15)
+            surface.blit(s, r.topleft)
+            
+            luminance = (0.299*base_color[0] + 0.587*base_color[1] + 0.114*base_color[2])
+            txt_color = BLACK if luminance > 160 and alpha > 150 else WHITE
+            # P2 Buttons (Solo si no es IA)
+        if not self.is_ai_mode:
+            p2_color = self.paddle2.color
+            p2_btns = [(self.btn_p2_up, "ʌ"), (self.btn_p2_down, "v"), (self.btn_p2_power, "POW")]
+            if self.geographic_controls: p2_btns = [(self.btn_p2_power, "POW")]
+
+            for r, lbl in p2_btns:
+                is_active = any(r.collidepoint(pos) for pos in self.fingers.values())
+                alpha = 200 if is_active else 120
+                
+                base_color = p2_color if lbl == "POW" else (220, 220, 220)
+                if is_active: base_color = tuple(max(0, c - 50) for c in base_color)
+
+                s = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
+                pygame.draw.rect(s, (*base_color, alpha), (0, 0, r.width, r.height), border_radius=15)
+                pygame.draw.rect(s, (255, 255, 255, 220), (0, 0, r.width, r.height), 3, border_radius=15)
+                surface.blit(s, r.topleft)
+                
+                luminance = (0.299*base_color[0] + 0.587*base_color[1] + 0.114*base_color[2])
+                txt_color = BLACK if luminance > 160 and alpha > 150 else WHITE
+                
+                font_to_use = self.large_font if lbl != "POW" else self.small_font
+                st = font_to_use.render(lbl, True, txt_color)
+                surface.blit(st, st.get_rect(center=r.center))
+
     def _draw_score(self, surface):
         c1 = self.paddle1.encapsulated_color if (self.encapsulate_powers_enabled and self.paddle1.power_encapsulated != POWER_NONE) else (BLACK if (self.zone_type == 4 and self.slow_zone_owner == 1) else WHITE)
         c2 = self.paddle2.encapsulated_color if (self.encapsulate_powers_enabled and self.paddle2.power_encapsulated != POWER_NONE) else (BLACK if (self.zone_type == 4 and self.slow_zone_owner == 2) else WHITE)
@@ -2619,42 +2825,39 @@ class Game:
         surface.blit(t1, (sx, sy)); surface.blit(t2, (sx + t1.get_width(), sy))
 
     def run(self):
+        """Versión síncrona clásica (PC)"""
         try:
             while True:
                 events = pygame.event.get()
                 for event in events:
                     if event.type == pygame.QUIT: pygame.quit(); sys.exit()
-                    if event.type == pygame.KEYDOWN:
-                        if self.tutorial_active:
-                            if self.tutorial_step == 11 and event.key in [pygame.K_w, pygame.K_s, pygame.K_d]:
-                                pygame.time.set_timer(pygame.USEREVENT + 10, 2000)
-                            elif self.tutorial_step == 12 and event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT]:
-                                pygame.time.set_timer(pygame.USEREVENT + 11, 2000)
-                        self._handle_keydown(event)
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        self._handle_mouse_click(event)
-                    elif event.type == pygame.MOUSEBUTTONUP:
-                        self.is_dragging_volume = False
-                        self.is_dragging_music_volume = False
-                        self.is_dragging_scrollbar = False
-                        self.is_dragging_settings_scrollbar = False
-                    elif event.type == pygame.MOUSEMOTION:
-                        self._handle_mouse_motion(event)
-                    elif event.type == pygame.USEREVENT + 10:
-                        if self.tutorial_active and self.tutorial_step == 11:
-                            pygame.time.set_timer(pygame.USEREVENT + 10, 0)
-                            self._start_tutorial_step(12)
-                    elif event.type == pygame.USEREVENT + 11:
-                        if self.tutorial_active and self.tutorial_step == 12:
-                            pygame.time.set_timer(pygame.USEREVENT + 11, 0)
-                            self._start_tutorial_step(13)
-
+                
                 dt = self.clock.tick(FPS) / 1000.0
-                self.handle_input(dt)
+                self.handle_input(events, dt)
                 self.update(dt)
                 self.draw()
         except Exception as e:
             import traceback
             print(f"CRASH DETECTADO: {e}")
+            traceback.print_exc()
+            pygame.quit()
+
+    async def run_async(self):
+        """Versión asíncrona para Web/Pygbag (Móviles)"""
+        try:
+            while True:
+                events = pygame.event.get()
+                for event in events:
+                    if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+                
+                dt = self.clock.tick(FPS) / 1000.0
+                self.handle_input(events, dt)
+                self.update(dt)
+                self.draw()
+                
+                await asyncio.sleep(0) # Liberar control al navegador
+        except Exception as e:
+            import traceback
+            print(f"CRASH ASYNC DETECTADO: {e}")
             traceback.print_exc()
             pygame.quit()
