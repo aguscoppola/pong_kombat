@@ -39,7 +39,14 @@ class AudioManager:
         }
 
         for name, (filename, vol) in sound_configs.items():
-            path = os.path.join(self.sounds_dir, filename)
+            # v0.7.0 Smart Loader: Priorizar .ogg para Web, fallback a .wav
+            base_name = os.path.splitext(filename)[0]
+            ogg_path = os.path.join(self.sounds_dir, f"{base_name}.ogg")
+            wav_path = os.path.join(self.sounds_dir, f"{base_name}.wav")
+            
+            # Elegir la mejor ruta disponible
+            path = ogg_path if os.path.exists(ogg_path) else wav_path
+            
             if os.path.exists(path):
                 try:
                     sound = pygame.mixer.Sound(path)
@@ -47,9 +54,9 @@ class AudioManager:
                     self.sound_base_volumes[name] = vol
                     sound.set_volume(vol * self.master_volume)
                 except Exception as e:
-                    print(f"Error cargando {name}: {e}")
+                    print(f"Error cargando {name} desde {path}: {e}")
             else:
-                print(f"Advertencia: No se encontró el sonido {path}")
+                print(f"Advertencia: No se encontró el sonido {base_name} (.ogg o .wav)")
 
     def play(self, name, loops=0, fadeout=0):
         if name in self.sounds:
@@ -59,7 +66,8 @@ class AudioManager:
             else:
                 self.sounds[name].play(loops)
         else:
-            print(f"DEBUG: No se encontró el sonido en el diccionario: {name}")
+            # Silenciamos el log en producción para no saturar la consola del navegador
+            pass
 
     def stop(self, name):
         if name in self.sounds:
@@ -70,14 +78,20 @@ class AudioManager:
             self.sounds[name].fadeout(time)
 
     def play_music(self, filename, volume=0.5, fade_ms=1500):
-        path = os.path.join(self.sounds_dir, filename)
+        # v0.7.0 Smart Loader para Música
+        base_name = os.path.splitext(filename)[0]
+        ogg_path = os.path.join(self.sounds_dir, f"{base_name}.ogg")
+        wav_path = os.path.join(self.sounds_dir, f"{base_name}.wav")
+        
+        path = ogg_path if os.path.exists(ogg_path) else wav_path
+        
         if os.path.exists(path):
             try:
                 pygame.mixer.music.load(path)
                 pygame.mixer.music.set_volume(volume * self.master_volume)
                 pygame.mixer.music.play(-1, fade_ms=fade_ms) # Loop eterno con FadeIn
             except Exception as e:
-                print(f"Error cargando música {filename}: {e}")
+                print(f"Error cargando música {path}: {e}")
 
     def stop_music(self, fadeout_ms=1500):
         pygame.mixer.music.fadeout(fadeout_ms)
