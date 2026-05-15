@@ -290,6 +290,16 @@ function show_infobox() {
 </head>
 
 <body>
+    <button id="infobox" 
+            style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); 
+                   z-index:1000000; width:300px; height:150px; background-color:red; 
+                   color:white; font-size:30px; font-weight:bold; border:5px solid white; 
+                   border-radius:20px; cursor:pointer; pointer-events:all !important; 
+                   display:block !important;" 
+            onclick="this.style.display='none'; console.log('FORCE_START');">
+        INICIAR JUEGO
+    </button>
+    
 
     <div id="transfer" align=center>
 <!--        <div class="spinner" id='spinner'></div> -->
@@ -313,7 +323,7 @@ height="720px"
     oncontextmenu="event.preventDefault()" tabindex=1 hidden>
     </canvas>
 
-    <div id="infobox" style="background:red; color:white; padding:50px; font-size:30px; font-weight:bold; cursor:pointer; z-index:999999; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); border:10px solid white; text-align:center;" onclick="this.style.display='none';">¡TOCA AQUÍ PARA EMPEZAR!</div>
+    
 
     <div id=html></div>
 
