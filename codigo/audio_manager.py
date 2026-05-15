@@ -1,5 +1,6 @@
 import pygame
 import os
+import sys
 
 class AudioManager:
     def __init__(self):
@@ -9,8 +10,13 @@ class AudioManager:
         self.sounds_dir = os.path.join(base_dir, "sounds")
         self.master_volume = 0.5  # Volumen maestro (0.0 a 1.0)
         self.sound_base_volumes = {} # Guardamos los volúmenes base originales
-        self.load_all_sounds()
-        pygame.mixer.set_num_channels(32)
+        
+        # v0.7.0: Desactivar carga de audio en Web para evitar errores de formato .wav
+        self.is_web = sys.platform == "emscripten"
+        
+        if not self.is_web:
+            self.load_all_sounds()
+            pygame.mixer.set_num_channels(32)
 
     def load_all_sounds(self):
         sound_configs = {
@@ -59,6 +65,7 @@ class AudioManager:
                 print(f"Advertencia: No se encontró el sonido {base_name} (.ogg o .wav)")
 
     def play(self, name, loops=0, fadeout=0):
+        if self.is_web: return # v0.7.0 Silencio en Web
         if name in self.sounds:
             self.sounds[name].set_volume(self.sound_base_volumes[name] * self.master_volume)
             if fadeout > 0:
@@ -78,6 +85,7 @@ class AudioManager:
             self.sounds[name].fadeout(time)
 
     def play_music(self, filename, volume=0.5, fade_ms=1500):
+        if self.is_web: return # v0.7.0 Silencio en Web
         # v0.7.0 Smart Loader para Música
         base_name = os.path.splitext(filename)[0]
         ogg_path = os.path.join(self.sounds_dir, f"{base_name}.ogg")

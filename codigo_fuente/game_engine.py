@@ -494,11 +494,13 @@ class Game:
         self.mouse_speed_names = ["Slow", "Normal", "Default", "Fast"]
         self.mouse_speed_idx = 2
         self.mouse_speed_rect = pygame.Rect(0,0,130,40)
+        self.mouse_speed_text_rect = pygame.Rect(0,0,0,0)
         
         self.mouse_appear_options = [1, 2, 3, 5]
         self.mouse_appear_names = ["1st hit", "2nd hit", "3rd hit", "5th hit"]
         self.mouse_appear_idx = 1
         self.mouse_appear_rect = pygame.Rect(0,0,180,40)
+        self.mouse_appear_text_rect = pygame.Rect(0,0,0,0)
         
         self.p1_zone_type = 0
         self.p2_zone_type = 0
