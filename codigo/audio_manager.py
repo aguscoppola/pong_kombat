@@ -5,21 +5,20 @@ import sys
 class AudioManager:
     def __init__(self):
         self.sounds = {}
-        # Ruta absoluta para evitar problemas con la estructura de carpetas
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.sounds_dir = os.path.join(base_dir, "sounds")
+        # v0.7.0 Fix: Usar rutas relativas para Web (Pygbag VFS)
+        if os.name == "nt" and not os.environ.get("PYGBAG"): # Si no estamos en Pygbag/Web
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.sounds_dir = os.path.join(base_dir, "sounds")
+        else:
+            self.sounds_dir = "sounds"
         self.master_volume = 0.5  # Volumen maestro (0.0 a 1.0)
         self.sound_base_volumes = {} # Guardamos los volúmenes base originales
         
         # v0.7.0: Desactivar carga de audio en Web para evitar errores de formato .wav
         self.is_web = sys.platform == "emscripten"
         
-        if not self.is_web:
-            self.load_all_sounds()
-            pygame.mixer.set_num_channels(32)
-
-    def load_all_sounds(self):
-        sound_configs = {
+        # v0.7.0 Fix: Carga diferida (Lazy Loading) para evitar bloqueos en móvil
+        self.sound_configs = {
             "hit": ("hit.wav", 0.7),
             "pop": ("pop.wav", 0.7),
             "item_get": ("item_get.wav", 0.4),
@@ -41,37 +40,45 @@ class AudioManager:
             "reveal": ("reveal.wav", 0.6),
             "victory_arcade": ("victory_arcade.wav", 0.8),
             "sleep_shoot": ("sleep_shoot.wav", 0.7),
-            "sleep": ("sleep.wav", 0.7)
+            "sleep": ("sleep.wav", 0.7),
+            "rainy": ("rainy.wav", 0.03),
+            "thunder": ("thunder.wav", 0.8)
         }
+        
+        pygame.mixer.set_num_channels(32)
 
-        for name, (filename, vol) in sound_configs.items():
-            # v0.7.0 Smart Loader: Priorizar .ogg para Web, fallback a .wav
-            base_name = os.path.splitext(filename)[0]
-            ogg_path = os.path.join(self.sounds_dir, f"{base_name}.ogg")
-            wav_path = os.path.join(self.sounds_dir, f"{base_name}.wav")
-            
-            # Elegir la mejor ruta disponible
-            path = ogg_path if os.path.exists(ogg_path) else wav_path
-            
+    def _load_single_sound(self, name):
+        """Carga un sonido individual de forma segura (Lazy Loading)"""
+        if self.is_web: return False # v0.7.0 Silencio en Web
+        if name in self.sound_configs:
+            filename, vol = self.sound_configs[name]
+            path = os.path.join(self.sounds_dir, filename)
             if os.path.exists(path):
                 try:
                     sound = pygame.mixer.Sound(path)
                     self.sounds[name] = sound
                     self.sound_base_volumes[name] = vol
                     sound.set_volume(vol * self.master_volume)
+                    return True
                 except Exception as e:
                     print(f"Error cargando {name} desde {path}: {e}")
             else:
-                print(f"Advertencia: No se encontró el sonido {base_name} (.ogg o .wav)")
+                print(f"Advertencia: No se encontró el sonido {path}")
+        return False
 
-    def play(self, name, loops=0, fadeout=0):
+    def play(self, name, loops=0, fadeout=0, fade_ms=0):
         if self.is_web: return # v0.7.0 Silencio en Web
+        # Si el sonido no está cargado, intentamos cargarlo ahora (Lazy Loading)
+        if name not in self.sounds:
+            if not self._load_single_sound(name):
+                return # No se pudo cargar, ignoramos para no romper el juego
+
         if name in self.sounds:
             self.sounds[name].set_volume(self.sound_base_volumes[name] * self.master_volume)
             if fadeout > 0:
                 self.sounds[name].fadeout(fadeout)
             else:
-                self.sounds[name].play(loops)
+                self.sounds[name].play(loops, fade_ms=fade_ms)
         else:
             # Silenciamos el log en producción para no saturar la consola del navegador
             pass

@@ -1,3 +1,27 @@
+## [0.7.1] - 2026-05-18
+### The Rainy Kombat & Local Network Update (v0.7.1)
+Esta actualización consolida la versión web y móvil del juego, solucionando todos los bloqueos de red local, agregando la espectacular ambientación y el sonido generativo de lluvia, y garantizando la compatibilidad perfecta tanto en PC de escritorio como en celulares.
+
+#### Agregado (Clima y Sonido Generativo)
+- **Sonido de Lluvia Generativo (`rainy.wav`)**:
+    - Nuevo sonido ambiental de lluvia pura creado mediante algoritmos matemáticos en `crear_lluvia.py`.
+    - Combinación de tres filtros de paso bajo (grave, medio y agudo) que simulan lluvia lejana, salpicaduras y brisa húmeda.
+    - Aplicación de un cross-fade de 0.3 segundos para lograr un bucle (loop) 100% continuo y libre de clics.
+    - Volumen balanceado en el `AudioManager` para actuar como fondo inmersivo.
+- **Ambiente "RAINY DAY"**:
+    - Efecto visual de lluvia torrencial sincronizado con el nuevo audio ambiental para una inmersión atmosférica total.
+
+#### Arreglado (Compatibilidad y Red Local)
+- **Interceptor de Fetch Global (Fetch Monkeypatching)**:
+    - Solución definitiva al error de carga infinita ("Loading, please wait") en dispositivos móviles de red local.
+    - Desvío al vuelo del archivo Pygame WASM wheel de la CDN oficial al servidor de la PC local, mientras que los índices JSON remotos continúan cargando normalmente de internet.
+- **Desbloqueo Dinámico del Firewall**:
+    - Comando de PowerShell automatizado con elevación de Administrador para abrir el Firewall de Windows en el puerto `8000`.
+- **Corrección de Clics en PC de Escritorio**:
+    - El estilo de bloqueo de pantalla y orientación vertical de 90 grados ahora se inyecta dinámicamente mediante JavaScript solo en dispositivos móviles. La PC mantiene el diseño original de Pygbag permitiendo clics perfectos en el botón "Ready to start".
+- **Alineación de Puerto Pygbag**:
+    - Restablecimiento del puerto del servidor a `8000` en `servidor_final.py` para sincronizar con los interceptores del motor.
+
 ## [0.7.0] - 2026-05-13
 ### The Mobile & Web Update (v0.7.0)
 Esta actualización prepara el terreno para la expansión multiplataforma, introduciendo soporte táctil completo, un nuevo modo de juego intuitivo y compatibilidad con navegadores web.

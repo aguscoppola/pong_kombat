@@ -94,7 +94,9 @@ TOOLTIPS = {
         "gum_power": ["GUM: The ball sticks to your paddle!", "You have 3 seconds to aim and shoot.", "Consumes charges per second."],
         "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."],
         "sleeping_power": ["SLEEP: Shoots a large violet projectile that", "splits into 3 at mid-map.", "Immobilizes opponent for 2 hits if caught."],
-        "cloudy_day": ["CLOUDY DAY: Random clouds will cross the field.", "They are 100% opaque, covering ball and paddles.", "They speed up exponentially after 30 hits!"]
+        "cloudy_day": ["CLOUDY DAY: Random clouds will cross the field.", "They are 100% opaque, covering ball and paddles.", "They speed up exponentially after 30 hits!"],
+        "rainy_day": ["RAINY DAY: Falls small raindrops across the court.", "They are in the same layer as clouds,", "so they cover paddles, ball, and powers!"],
+        "lightning": ["LIGHTNING: 5% chance per second of a full-screen flash.", "Blinds the screen, fading back to normal over 0.5s.", "Accompanied by a realistic thunder sound effect!"]
     },
     "ES": {
         "match_point": ["Si ambos jugadores están a un punto de ganar (5-5),", "la partida no terminará hasta que haya 2 puntos de ventaja."],
@@ -131,6 +133,8 @@ TOOLTIPS = {
         "gum_power": ["CHICLE: ¡La bola se queda pegada a tu paleta!", "Tienes 3 segundos para apuntar y disparar.", "Consume cargas por segundo."],
         "start_x2": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
         "sleeping_power": ["SUEÑO: Lanza un gran proyectil violeta que", "se divide en 3 al cruzar la mitad.", "Inmoviliza al rival por 2 toques si lo atrapa."],
-        "cloudy_day": ["DÍA NUBLADO: Nubes aleatorias cruzan el campo.", "Son 100% opacas, tapando pelota y paletas.", "¡Se aceleran exponencialmente tras 30 golpes!"]
+        "cloudy_day": ["DÍA NUBLADO: Nubes aleatorias cruzan el campo.", "Son 100% opacas, tapando pelota y paletas.", "¡Se aceleran exponencialmente tras 30 golpes!"],
+        "rainy_day": ["DÍA LLUVIOSO: Caen pequeñas gotas de lluvia en el campo.", "Están en la misma capa que las nubes,", "¡por lo que tapan paletas, pelota y poderes!"],
+        "lightning": ["RELÁMPAGO: 5% de probabilidad por segundo de un destello.", "Ciega la pantalla, volviendo a la normalidad en 0.5s.", "¡Acompañado por el estruendo de un trueno!"]
     }
 }

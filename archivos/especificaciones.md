@@ -1,7 +1,7 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.7.0)
+# Pong Kombat - Documento de Especificaciones Técnicas (v0.7.1)
 
 ## 1. Visión General
-**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. La v0.7.0 introduce la **Infraestructura Móvil y Web**, permitiendo el despliegue del juego en navegadores y dispositivos táctiles.
+**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. La v0.7.1 consolida la **Infraestructura Móvil y Web**, introduciendo soporte para redes locales, sonido ambiental generativo y estabilidad absoluta de carga.
 
 ---
 
@@ -58,12 +58,22 @@
 *   **v0.6.0**: "The Arcade & Sleep Update" - Modo campaña, poder de sueño, recompensas desbloqueables e IA táctica.
 *   **v0.6.1**: "The Persistence & Credits Update" - Sistema de guardado JSON, panel de créditos y balance de combate.
 *   **v0.7.0**: "The Mobile & Web Update" - Soporte táctil, Modo Geográfico, Escalado Dinámico Inteligente e infraestructura PWA para funcionamiento offline.
+*   **v0.7.1**: "The Rainy Combat & Local Network Update" - Sonido generativo de lluvia pura, Interceptor de Fetch Global (Fetch Monkeypatching) para móviles por Wi-Fi, apertura de Firewall automatizada e inyección dinámica de CSS móvil.
 
 ---
 
-## 9. Arquitectura Móvil y Web (v0.7.0)
+## 9. Arquitectura Móvil y Web (v0.7.1)
 *   **Escalado Dinámico (SCALED)**: El motor utiliza `pygame.SCALED` para desacoplar la lógica de 800x600 de la resolución física. Esto permite que el juego se adapte a cualquier relación de aspecto (21:9, 4:3, etc.) sin deformar las colisiones.
 *   **Infraestructura PWA**: 
     *   **Offline Mode**: Mediante Service Workers, el juego es jugable sin internet.
     *   **Standalone Experience**: El `manifest.json` permite la instalación como app nativa, forzando la orientación horizontal y eliminando la interfaz del navegador.
     *   **Haptic Feedback**: Integración de la API `vibrate()` del navegador para sincronizar impactos visuales con vibración física en móviles.
+*   **Interceptor de Peticiones Global (Fetch Monkeypatching)**:
+    *   Para evitar fallos de CORS y 404s silenciosos en redes Wi-Fi locales al descargar la rueda de Pygame (`pygame_ce`), se inyectó una función interceptora que monitorea el objeto `window.fetch`. 
+    *   Si detecta una solicitud de descarga dirigida al CDN oficial de Pygame-web para el `.whl` del motor, reescribe de forma transparente el destino apuntando a `window.location.origin` (nuestro servidor local). Esto permite que los archivos de configuración JSON genéricos se carguen de internet y la biblioteca pesada se transmita de forma local e instantánea.
+*   **Inyección Dinámica de CSS Móvil**:
+    *   Se eliminaron las restricciones estáticas de visualización en la cabecera que rompían los clics del puntero en PC. 
+    *   El motor ahora detecta dinámicamente si el navegador del cliente es móvil (`/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i`). Si es afirmativo, inyecta mediante JS en tiempo de ejecución las reglas de transformación física a 90° (Landscape) y el bloqueo absoluto de zoom. En caso contrario (Desktop PC), se omiten al 100%, restaurando la interacción del ratón original.
+    *   **Clima y Sonido Generativo Ambiental**:
+        *   **Sonido de Lluvia (`rainy.wav`)**: Generado mediante un script matemático (`crear_lluvia.py`) combinando tres capas de ruido con filtros de paso bajo para graves, medios y agudos, y un cross-fade lineal de 0.3 segundos para lograr un loop ininterrumpido sin clicks de fase.
+        *   **Clima Lluvioso**: El modificador visual "RAINY DAY" dibuja partículas de gotas de lluvia cayendo en diagonal, sincronizadas con el nuevo canal inmersivo de audio tridimensional.

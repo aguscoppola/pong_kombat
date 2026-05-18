@@ -1,4 +1,5 @@
 import pygame
+import asyncio
 import random
 import math
 import os
@@ -17,7 +18,8 @@ import assets
 
 class Game:
     def __init__(self):
-        pygame.mixer.pre_init(44100, -16, 2, 2048)
+        # Aumentar el buffer a 4096 para evitar crujidos en móviles (WebAssembly AudioContext)
+        pygame.mixer.pre_init(44100, -16, 2, 4096)
         pygame.init()
         pygame.mixer.init()
         # --- v0.7.0: ESCALADO DINÁMICO (Móviles/Web) ---
@@ -27,8 +29,7 @@ class Game:
         pygame.display.set_caption("Pong Kombat v0.7.0 - Mobile & Web Edition")
         # Icono de ventana (v0.6.0)
         try:
-            import os
-            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "archivos", "pong_kombat_cover.png")
+            icon_path = os.path.join("archivos", "pong_kombat_cover.png")
             if os.path.exists(icon_path):
                 icon = pygame.image.load(icon_path)
                 pygame.display.set_icon(icon)
@@ -132,6 +133,7 @@ class Game:
         self.reward_text_full = ""
         self.reward_text_visible = ""
         self.reward_char_timer = 0
+        self.input_cooldown = 0.0
 
         # MODO ARCADE (v0.6.0)
         self.arcade_active = False
@@ -160,6 +162,14 @@ class Game:
         self.btn_p2_power = pygame.Rect(SCREEN_WIDTH - bw - 10, SCREEN_HEIGHT // 2 - bh // 2, bw, bh)
         self.mobile_controls_toggle_rect = pygame.Rect(0,0,30,30)
         self.geo_controls_rect = pygame.Rect(0,0,25,25)
+        
+        # Pre-allocate surfaces for mobile buttons to achieve beautiful semi-transparency without per-frame overhead
+        self.mobile_btn_surf_normal = pygame.Surface((bw, bh), pygame.SRCALPHA)
+        self.mobile_btn_surf_active = pygame.Surface((bw, bh), pygame.SRCALPHA)
+        pygame.draw.rect(self.mobile_btn_surf_normal, (20, 20, 20, 100), (0, 0, bw, bh), border_radius=15)
+        pygame.draw.rect(self.mobile_btn_surf_normal, (255, 255, 255, 120), (0, 0, bw, bh), 2, border_radius=15)
+        pygame.draw.rect(self.mobile_btn_surf_active, (50, 50, 50, 160), (0, 0, bw, bh), border_radius=15)
+        pygame.draw.rect(self.mobile_btn_surf_active, (255, 255, 255, 220), (0, 0, bw, bh), 3, border_radius=15)
 
         panel_w, panel_h = 700, 450
         self.modifiers_panel_rect = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2, panel_w, panel_h)
@@ -186,6 +196,15 @@ class Game:
         
         # --- v0.7.0: MÓVILES ---
         self.mobile_mode = False
+        if sys.platform == "emscripten":
+            try:
+                import platform
+                ua = platform.window.navigator.userAgent.lower()
+                if any(m in ua for m in ["android", "iphone", "ipad", "ipod"]):
+                    self.mobile_mode = True
+            except Exception as e:
+                print(f"Error detectando móvil: {e}")
+
         self.mobile_controls_toggle_rect = pygame.Rect(0,0,30,30)
         self.geographic_controls = False
         self.geo_controls_rect = pygame.Rect(0,0,30,30)
@@ -334,6 +353,34 @@ class Game:
         self.cloud_size_text_rect = pygame.Rect(0,0,0,0)
         self.clouds = []
         self.cloud_spawn_timer = 0
+        
+        self.rainy_day_enabled = False
+        self.rainy_day_rect = pygame.Rect(0,0,30,30)
+        self.rainy_day_text_rect = pygame.Rect(0,0,0,0)
+        self.rain_drops = []
+        self.rain_timer = 0.0
+        self.rain_sound_playing = False
+        
+        # Sub-modificadores de lluvia (Drop Size y Precipitation)
+        self.rain_drop_size_options = [0.5, 1.0, 2.0, 3.0, 5.0]
+        self.rain_drop_size_names = ["thin", "Default", "mid", "big", "TORRENCIAL"]
+        self.rain_drop_size_idx = 1  # Default (x1)
+        self.rain_drop_size_rect = pygame.Rect(0,0,130,40)
+        self.rain_drop_size_text_rect = pygame.Rect(0,0,0,0)
+        
+        self.rain_precipitation_options = [0.5, 1.0, 2.0, 3.0]
+        self.rain_precipitation_names = ["2 mm", "10 mm", "30 mm", "50 mm"]
+        self.rain_precipitation_idx = 1  # 10 mm (x1)
+        self.rain_precipitation_rect = pygame.Rect(0,0,130,40)
+        self.rain_precipitation_text_rect = pygame.Rect(0,0,0,0)
+        
+        # Sub-modificador LIGHTNING
+        self.lightning_enabled = False
+        self.lightning_rect = pygame.Rect(0,0,30,30)
+        self.lightning_text_rect = pygame.Rect(0,0,0,0)
+        self.lightning_active = False
+        self.lightning_flash_timer = 0.0
+        self.lightning_timer = 0.0
         self.experimental_golden_goal = False
         self.experimental_golden_goal_rect = pygame.Rect(0,0,30,30)
         self.experimental_golden_goal_text_rect = pygame.Rect(0,0,0,0)
@@ -359,7 +406,7 @@ class Game:
         self.revolver_rect = pygame.Rect(0,0,30,30)
         self.revolver_text_rect = pygame.Rect(0,0,0,0)
         self.revolver_prob_options = [0.1, 0.25, 0.5, 1.0]
-        self.revolver_prob_names = ["Low (10%)", "Default (25%)", "Quite (50%)", "Always (100%)"]
+        self.revolver_prob_names = ["Low Prob", "Default", "Quite", "Always"]
         self.revolver_prob_idx = 1
         self.revolver_prob_rect = pygame.Rect(0,0,220,40)
         self.revolver_prob_text_rect = pygame.Rect(0,0,0,0)
@@ -578,7 +625,6 @@ class Game:
             "music_volume": self.music_volume,
             "vfx_enabled": self.vfx_enabled,
             "shake_enabled": self.shake_enabled,
-            "mobile_mode": self.mobile_mode,
             "geographic_controls": self.geographic_controls
         }
         try:
@@ -604,7 +650,6 @@ class Game:
                     self.music_volume = data.get("music_volume", 0.4)
                     self.vfx_enabled = data.get("vfx_enabled", True)
                     self.shake_enabled = data.get("shake_enabled", True)
-                    self.mobile_mode = data.get("mobile_mode", False)
                     self.geographic_controls = data.get("geographic_controls", False)
                     
                     # Sincronizar volúmenes con AudioManager
@@ -867,6 +912,9 @@ class Game:
             self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
 
     def handle_input(self, events, dt):
+        if self.input_cooldown > 0:
+            self.input_cooldown -= dt
+
         for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -937,6 +985,10 @@ class Game:
 
     def _handle_mouse_click(self, event):
         if event.button != 1: return
+        if self.input_cooldown > 0: return # Bloquear clics si estamos en cooldown
+        
+        # Activar cooldown para el próximo clic
+        self.input_cooldown = 0.3
         
         # --- AVANCE DE TUTORIAL POR CLIC (v0.7.0 Fix) ---
         # El tutorial avanza si no estamos jugando, O si estamos en las fases de explicación congeladas (14-28)
@@ -1108,7 +1160,8 @@ class Game:
                 self.arcade_tutorial_step = 0
                 self.tutorial_text_visible = ""
                 self.tutorial_text_index = 0
-                self.tutorial_text_full = self.t("This is ARCADE mode; there are 5 levels that you must complete in one go. (Press spacebar).", "Este es el modo ARCADE; hay 5 niveles que debes completar de una sola vez. (Presiona espacio).")
+                press = self.t("(Touch screen).", "(Toca la pantalla).") if self.mobile_mode else self.t("(Press spacebar).", "(Presiona espacio).")
+                self.tutorial_text_full = self.t("This is ARCADE mode; there are 5 levels that you must complete in one go. ", "Este es el modo ARCADE; hay 5 niveles que debes completar de una sola vez. ") + press
             elif self.arcade_completed and self.btn_arcade_level_selector_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.test_arcade_level = (self.test_arcade_level % 5) + 1
@@ -1219,6 +1272,15 @@ class Game:
                     self.arcade_active = False
                     self.show_match_point_anim = self.show_golden_goal_anim = False
 
+        elif self.state == STATE_PRESS_TO_START:
+            self.audio.play('hit')
+            self.reset_game()
+        
+        elif self.state == STATE_SERVE:
+            # En el saque, cualquier toque/clic lanza la bola (v0.7.0)
+            if not (self.tutorial_active and self.tutorial_step in [11, 12, 13]):
+                self.serve_timer = 0
+
     def _handle_modifier_clicks(self, event):
         if self.modifiers_tab == "SKINS":
             if self.orange_skin_rect.collidepoint(event.pos):
@@ -1317,6 +1379,14 @@ class Game:
             self.audio.play('pop'); self.cloudy_day_enabled = not self.cloudy_day_enabled
         elif self.cloudy_day_enabled and self.cloud_size_rect.collidepoint(event.pos):
             self.audio.play('pop'); self.cloud_size_idx = (self.cloud_size_idx + 1) % len(self.cloud_size_options)
+        elif self.rainy_day_rect.collidepoint(event.pos) or self.rainy_day_text_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.rainy_day_enabled = not self.rainy_day_enabled
+        elif self.rainy_day_enabled and self.rain_drop_size_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.rain_drop_size_idx = (self.rain_drop_size_idx + 1) % len(self.rain_drop_size_options)
+        elif self.rainy_day_enabled and self.rain_precipitation_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.rain_precipitation_idx = (self.rain_precipitation_idx + 1) % len(self.rain_precipitation_options)
+        elif self.rainy_day_enabled and (self.lightning_rect.collidepoint(event.pos) or self.lightning_text_rect.collidepoint(event.pos)):
+            self.audio.play('pop'); self.lightning_enabled = not self.lightning_enabled
         
         if self.add_mouse_enabled:
             if self.mouse_speed_rect.collidepoint(event.pos):
@@ -1838,10 +1908,14 @@ class Game:
         # Detener sonidos de bucle
         self.audio.stop('fire')
         self.audio.stop('ghost') # Por si acaso
+        self.audio.fadeout('rainy', 1000)
+        self.rain_sound_playing = False
         
         # Reset global round variables (relojes, zonas, multiplicadores)
         self.global_hits = 0
         self.clouds = []
+        self.rain_drops = []
+        self.rain_timer = 0.0
         self.cloud_spawn_timer = 0
         self.hourglass_rect = None
         self.is_x2_item_active = False
@@ -2061,7 +2135,8 @@ class Game:
                     self.reward_text_visible += next_char
                     # Sonar 'pop' si es espacio (fin de palabra) o primer caracter
                     if next_char == " " or len(self.reward_text_visible) == 1:
-                        self.audio.play('pop')
+                        if not self.mobile_mode:
+                            self.audio.play('pop')
             return
 
         if self.state == STATE_ARCADE_LEVEL_START:
@@ -2163,6 +2238,78 @@ class Game:
                     c.update(dt)
                     if not c.active:
                         self.clouds.remove(c)
+                
+            # --- GOTAS DE LLUVIA (RAINY DAY) ---
+            if self.rainy_day_enabled:
+                if self.state == STATE_PLAYING:
+                    self.rain_timer += dt
+                
+                # Gestionar el sonido de fondo ambiental en bucle de lluvia
+                if self.state in [STATE_PLAYING, STATE_SERVE, STATE_PRESS_TO_START]:
+                    if not self.rain_sound_playing:
+                        self.audio.play('rainy', loops=-1, fade_ms=3000)
+                        self.rain_sound_playing = True
+                else:
+                    if self.rain_sound_playing:
+                        self.audio.fadeout('rainy', 1000)
+                        self.rain_sound_playing = False
+                
+                # Progresión suave de 0 a la cantidad de gotas según precipitación en los primeros 12 segundos
+                precip_mult = self.rain_precipitation_options[self.rain_precipitation_idx]
+                max_drops = int(130 * precip_mult)
+                rain_progress = min(1.0, self.rain_timer / 12.0)
+                max_allowed = int(rain_progress * max_drops)
+                
+                if len(self.rain_drops) < max_allowed:
+                    for _ in range(max_allowed - len(self.rain_drops)):
+                        self.rain_drops.append({
+                            "x": random.uniform(0, SCREEN_WIDTH + 150),
+                            "y": random.uniform(-SCREEN_HEIGHT, 0), # Lluvia progresiva que cae desde el cielo
+                            "vx": random.uniform(-120, -60),
+                            "vy": random.uniform(400, 700),
+                            "length": random.uniform(8, 16),
+                            "width": random.randint(1, 2)
+                        })
+                
+                for drop in self.rain_drops:
+                    drop["x"] += drop["vx"] * dt
+                    drop["y"] += drop["vy"] * dt
+                    if drop["y"] > SCREEN_HEIGHT or drop["x"] < -20:
+                        drop["y"] = random.uniform(-20, 0)
+                        drop["x"] = random.uniform(0, SCREEN_WIDTH + 150)
+                        drop["vx"] = random.uniform(-120, -60)
+                        drop["vy"] = random.uniform(400, 700)
+                        drop["length"] = random.uniform(8, 16)
+                        drop["width"] = random.randint(1, 2)
+                
+                # Lógica de Relámpago (LIGHTNING)
+                if self.lightning_enabled and self.state in [STATE_PLAYING, STATE_SERVE]:
+                    if self.lightning_active:
+                        self.lightning_flash_timer -= dt
+                        if self.lightning_flash_timer <= 0:
+                            self.lightning_active = False
+                            self.lightning_flash_timer = 0.0
+                    
+                    self.lightning_timer += dt
+                    if self.lightning_timer >= 1.0:
+                        self.lightning_timer -= 1.0
+                        if random.random() < 0.05:
+                            self.lightning_active = True
+                            self.lightning_flash_timer = 1.1
+                            self.audio.play('thunder')
+                else:
+                    self.lightning_active = False
+                    self.lightning_flash_timer = 0.0
+                    self.lightning_timer = 0.0
+            else:
+                self.rain_drops = []
+                self.rain_timer = 0.0
+                self.lightning_active = False
+                self.lightning_flash_timer = 0.0
+                self.lightning_timer = 0.0
+                if self.rain_sound_playing:
+                    self.audio.fadeout('rainy', 1000)
+                    self.rain_sound_playing = False
 
             # --- FÍSICAS CENTRALIZADAS ---
             self.physics.update(dt)
@@ -2179,12 +2326,13 @@ class Game:
                         self.mouse = Mouse(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
                         self.audio.play('squeak')
                 else:
-                    # Actualizar ratón
-                    if self.balls:
-                        self.mouse.update(dt, self.balls[0], self.mouse_speed_options[self.mouse_speed_idx])
+                    # Actualizar ratón (solo persigue pelotas sólidas, no fantasmas)
+                    solid_balls = [b for b in self.balls if not b.is_ghost]
+                    if solid_balls:
+                        self.mouse.update(dt, solid_balls[0], self.mouse_speed_options[self.mouse_speed_idx])
                         
                         # Colisión con la pelota (Comer/Explotar) - v0.6.0 Arcade Fix
-                        for b in self.balls[:]:
+                        for b in solid_balls:
                             if self.mouse.rect.colliderect(b.rect):
                                 if b.is_orange:
                                     self.audio.play('explosion')
@@ -2257,7 +2405,8 @@ class Game:
                 if self.tutorial_text_index < len(words):
                     self.tutorial_text_visible += (" " if self.tutorial_text_index > 0 else "") + words[self.tutorial_text_index]
                     self.tutorial_text_index += 1
-                    self.audio.play('pop')
+                    if not self.mobile_mode:
+                        self.audio.play('pop')
 
     def _start_tutorial_step(self, step):
         self.tutorial_step = step
@@ -2265,36 +2414,54 @@ class Game:
         self.tutorial_text_visible = ""
         self.tutorial_cooldown_timer = 1.0 # 1 segundo de cooldown al iniciar cada paso (v0.7.0)
         
+        # --- Variables de texto dinámico para PC/Móvil ---
+        if self.mobile_mode:
+            s_cont = self.t("(Touch the screen to continue...)", "(Toca la pantalla para continuar...)")
+            s_press = self.t("(touch the screen)", "(toca la pantalla)")
+            s_click = self.t("touch", "toca")
+            p1_ctrl = self.t("Player 1 Controls: Up: 'left up arrow', Down: 'left down arrow', and power: 'left STAR'", "Controles Jugador 1: Arriba: 'flecha arriba izq', Abajo: 'flecha abajo izq' y Poder: 'ESTRELLA izq'")
+            p2_ctrl = self.t("Player 2 Controls: Up: 'right up arrow', Down: 'right down arrow', and power: 'right STAR'", "Controles Jugador 2: Arriba: 'flecha arriba der', Abajo: 'flecha abajo der' y Poder: 'ESTRELLA der'")
+            p_pow = self.t("the power button (STAR)", "el botón de poder (ESTRELLA)")
+            s_end = self.t("touch the screen.", "toca la pantalla.")
+        else:
+            s_cont = self.t("(Press Space bar to continue...)", "(Pulsa Espacio para continuar...)")
+            s_press = self.t("(press space bar)", "(pulsa espacio)")
+            s_click = self.t("click", "haz clic")
+            p1_ctrl = self.t("Player 1 Controls: Up: 'W', Down: 'S', and Power: 'D'", "Controles Jugador 1: Arriba: 'W', Abajo: 'S' y Poder: 'D'")
+            p2_ctrl = self.t("Player 2 Controls: Up: 'Up Arrow', Down: 'Down Arrow', and Power: 'Left Arrow'", "Controles Jugador 2: Arriba: 'Flecha Arriba', Abajo: 'Flecha Abajo' y Poder: 'Flecha Izquierda'")
+            p_pow = self.t("your power key (D)", "tu tecla de poder (D)")
+            s_end = self.t("press the space bar.", "presiona la barra espaciadora.")
+
         if step == 0:
-            self.tutorial_text_full = self.t("Welcome to the tutorial! (Press Space bar to continue...)", "¡Bienvenido al tutorial! (Pulsa Espacio para continuar...)")
+            self.tutorial_text_full = self.t("Welcome to the tutorial! ", "¡Bienvenido al tutorial! ") + s_cont
         elif step == 1:
             self.tutorial_text_full = self.t("Here is the SETTINGS button. You can change the language and volume", "Aquí está el botón de AJUSTES. Puedes cambiar el idioma y el volumen")
         elif step == 2:
             self.tutorial_text_full = self.t("If you want, change the language to Spanish, or just press 'APPLY'", "Si quieres, cambia el idioma a Español, o simplemente pulsa 'APLICAR'")
         elif step == 3:
-            self.tutorial_text_full = self.t("You can also modify the game; just click the MODIFIERS button", "También puedes modificar el juego; solo haz clic en el botón MODIFICADORES")
+            self.tutorial_text_full = self.t("You can also modify the game; just ", "También puedes modificar el juego; solo ") + s_click + self.t(" the MODIFIERS button", " en el botón MODIFICADORES")
         elif step == 4:
-            self.tutorial_text_full = self.t("Here are the MODIFIERS. In the 'ALL' tab, you can change the game rules (Press space bar to continue...)", "Aquí están los MODIFICADORES. En la pestaña 'TODO', puedes cambiar las reglas del juego (Pulsa espacio para continuar...)")
+            self.tutorial_text_full = self.t("Here are the MODIFIERS. In the 'ALL' tab, you can change the game rules ", "Aquí están los MODIFICADORES. En la pestaña 'TODO', puedes cambiar las reglas del juego ") + s_cont
         elif step == 5:
-            self.tutorial_text_full = self.t("You can switch tabs to see other modifiers. Click on the EXTRAS tab to continue", "Puedes cambiar de pestaña para ver otros modificadores. Haz clic en la pestaña EXTRAS para continuar")
+            self.tutorial_text_full = self.t("You can switch tabs to see other modifiers. ", "Puedes cambiar de pestaña para ver otros modificadores. ") + s_click.capitalize() + self.t(" on the EXTRAS tab to continue", " en la pestaña EXTRAS para continuar")
         elif step == 6:
             self.tutorial_text_full = self.t("You can also change the appearance of some powers in the SKIN tab", "También puedes cambiar la apariencia de algunos poderes en la pestaña ASPECTOS")
         elif step == 7:
-            self.tutorial_text_full = self.t("Here you can see the available skins (Press space bar to continue...)", "Aquí puedes ver los aspectos disponibles (Pulsa espacio para continuar...)")
+            self.tutorial_text_full = self.t("Here you can see the available skins ", "Aquí puedes ver los aspectos disponibles ") + s_cont
         elif step == 8:
             self.tutorial_text_full = self.t("Okay, you now understand how modifiers work. Now let's go back to the menu", "Bien, ahora ya entiendes cómo funcionan los modificadores. Volvamos al menú")
         elif step == 9:
-            self.tutorial_text_full = self.t("Now let's start a game. Click on PLAY", "Ahora empecemos una partida. Haz clic en JUGAR")
+            self.tutorial_text_full = self.t("Now let's start a game. ", "Ahora empecemos una partida. ") + s_click.capitalize() + self.t(" on PLAY", " en JUGAR")
         elif step == 10:
             self.tutorial_text_full = self.t("You can play against the AI or a friend. For this tutorial, we will choose SOLO mode", "Puedes jugar contra la IA o un amigo. Para este tutorial, elegiremos el modo SOLO")
         elif step == 11:
-            self.tutorial_text_full = self.t("Player 1 Controls: Up: 'W', Down: 'S', and Power: 'D'", "Controles Jugador 1: Arriba: 'W', Abajo: 'S' y Poder: 'D'")
+            self.tutorial_text_full = p1_ctrl
         elif step == 12:
-            self.tutorial_text_full = self.t("Player 2 Controls: Up: 'Up Arrow', Down: 'Down Arrow', and Power: 'Left Arrow'", "Controles Jugador 2: Arriba: 'Flecha Arriba', Abajo: 'Flecha Abajo' y Poder: 'Flecha Izquierda'")
+            self.tutorial_text_full = p2_ctrl
         elif step == 13:
             self.tutorial_text_full = self.t("Excellent! You are ready. Let's start the match!", "¡Excelente! Ya estás listo. ¡Empecemos el partido!")
         elif step == 14:
-            self.tutorial_text_full = self.t("Look! A clock, each clock appears every 10 taps spread between the 2 palettes (press space bar)", "¡Mira! Un reloj, cada reloj aparece cada 10 toques repartidos entre las 2 paletas (pulsa espacio)")
+            self.tutorial_text_full = self.t("Look! A clock, each clock appears every 10 taps spread between the 2 palettes ", "¡Mira! Un reloj, cada reloj aparece cada 10 toques repartidos entre las 2 paletas ") + s_press
         elif step == 15:
             self.tutorial_text_full = self.t("There are 5 types of watches: Blue, Red, Violet, Yellow, and White.", "Hay 5 tipos de relojes: Azul, Rojo, Violeta, Amarillo y Blanco.")
         elif step == 16:
@@ -2322,7 +2489,7 @@ class Game:
         elif step == 27:
             self.tutorial_text_full = self.t("Probability of each power: GREEN, RED and YELLOW (30%) and ORANGE (10%).", "Probabilidad de cada poder: VERDE, ROJO y AMARILLO (30%) y NARANJA (10%).")
         elif step == 28:
-            self.tutorial_text_full = self.t("Great! Now press your power key (D) to use your power!", "¡Genial! Ahora presiona tu tecla de poder (D) para usarlo.")
+            self.tutorial_text_full = self.t("Great! Now press ", "¡Genial! Ahora presiona ") + p_pow + self.t(" to use your power!", " para usarlo.")
         elif step == 29:
             self.tutorial_text_full = self.t("Normally a classic game ends at 6 points, but so you can go and try the full game, I set it to 3.", "Normalmente una partida clásica termina a los 6 puntos, pero para que puedas ir a probar el juego completo, lo ajusté a 3.")
         elif step == 30:
@@ -2331,7 +2498,8 @@ class Game:
             self.tutorial_text_full = self.t("I almost forgot! You can press the \"?\" button to watch the tutorial again if you like.", "¡Casi lo olvido! Puedes presionar el botón \"?\" para ver el tutorial de nuevo si quieres.")
             self.tutorial_explosion_played = False
         elif step == 32:
-            self.tutorial_text_full = self.t("That's the end of the tutorial. You can now modify whatever you want. To finish, press the space bar.", "Ese es el final del tutorial. Ahora puedes modificar lo que quieras. Para finalizar, presiona la barra espaciadora.")
+            self.tutorial_text_full = self.t("That's the end of the tutorial. You can now modify whatever you want. To finish, ", "Ese es el final del tutorial. Ahora puedes modificar lo que quieras. Para finalizar, ") + s_end
+
 
     def _next_tutorial_step(self):
         # PROTECCIÓN (v0.7.0 Fix): No avanzar si estamos en cooldown (evita doble click accidental)
@@ -2387,7 +2555,8 @@ class Game:
             self.tutorial_text_visible = self.tutorial_text_full
             return
         
-        self.audio.play('pop')
+        if not self.mobile_mode:
+            self.audio.play('pop')
         self.arcade_tutorial_step += 1
         if self.arcade_tutorial_step > 1:
             self.state = STATE_SOLO_SUBMODE_SELECTION
@@ -2516,6 +2685,16 @@ class Game:
                 for sp in self.sleep_projectiles:
                     sp.draw(temp_surf)
             
+            # Dibujar Gotas de lluvia (Rainy Day) debajo de las nubes pero sobre el resto del juego
+            if self.rainy_day_enabled and self.rain_drops:
+                size_mult = self.rain_drop_size_options[self.rain_drop_size_idx]
+                for drop in self.rain_drops:
+                    length = drop["length"] * size_mult
+                    width = max(1, int(drop["width"] * size_mult))
+                    dx = (drop["vx"] / drop["vy"]) * length
+                    dy = length
+                    pygame.draw.line(temp_surf, (140, 180, 255), (drop["x"], drop["y"]), (drop["x"] + dx, drop["y"] + dy), width)
+            
             if self.cloudy_day_enabled:
                 for c in self.clouds:
                     c.draw(temp_surf)
@@ -2526,7 +2705,10 @@ class Game:
             # Indicador de inicio de partida (v0.6.0)
             if self.state == STATE_PRESS_TO_START:
                 if int(pygame.time.get_ticks() / 500) % 2 == 0:
-                    txt = self.t("PRESS SPACE TO START", "PRESIONA ESPACIO PARA EMPEZAR")
+                    if self.mobile_mode:
+                        txt = self.t("TOUCH TO START", "TOCA PARA EMPEZAR")
+                    else:
+                        txt = self.t("PRESS SPACE TO START", "PRESIONA ESPACIO PARA EMPEZAR")
                     st = self.font.render(txt, True, WHITE)
                     temp_surf.blit(st, st.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
             
@@ -2564,6 +2746,18 @@ class Game:
             self._draw_match_point_anim(temp_surf)
         if self.show_golden_goal_anim and self.golden_goal_anim_timer > 0: 
             self._draw_golden_goal_anim(temp_surf)
+            
+        # Capa de Relámpago (LIGHTNING)
+        if self.rainy_day_enabled and self.lightning_enabled and self.lightning_active and self.lightning_flash_timer > 0:
+            if self.lightning_flash_timer > 0.5:
+                opacity = 255
+            else:
+                opacity = int((self.lightning_flash_timer / 0.5) * 255)
+            opacity = max(0, min(255, opacity))
+            flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            flash_surf.fill(WHITE)
+            flash_surf.set_alpha(opacity)
+            temp_surf.blit(flash_surf, (0, 0))
         
         self.screen.fill(BLACK)
         self.screen.blit(temp_surf, (off_x, off_y))
@@ -2747,55 +2941,73 @@ class Game:
                 if m2[r][c]: pygame.draw.rect(surface, GOLD, (cx+5+c*px, cy-10+r*px, px, px))
 
     def _draw_mobile_controls(self, surface):
-        """Dibuja botones virtuales temáticos (v0.7.0)"""
-        # P1 Buttons
-        p1_color = self.paddle1.color
-        p1_btns = [(self.btn_p1_up, "ʌ"), (self.btn_p1_down, "v"), (self.btn_p1_power, "POW")]
-        if self.geographic_controls: p1_btns = [(self.btn_p1_power, "POW")]
+        """Dibuja botones virtuales temáticos Pixel-Art Semi-transparentes (v0.7.2)"""
+        
+        up_matrix = [
+            [0,0,0,1,0,0,0],
+            [0,0,1,1,1,0,0],
+            [0,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1]
+        ]
+        
+        down_matrix = [
+            [1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,0],
+            [0,0,1,1,1,0,0],
+            [0,0,0,1,0,0,0]
+        ]
+        
+        # Estrella pixel-art de 8 bits (Estilo retro limpio y sólido, 13x13): 0=transparente, 1=sólido
+        star_matrix = [
+            [0,0,0,0,0,0,1,0,0,0,0,0,0],
+            [0,0,0,0,0,1,1,1,0,0,0,0,0],
+            [0,0,0,0,0,1,1,1,0,0,0,0,0],
+            [0,0,0,0,1,1,1,1,1,0,0,0,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,1,1,1,1,1,1,0],
+            [0,0,1,1,1,1,1,1,1,1,1,0,0],
+            [0,0,0,1,1,1,1,1,1,1,0,0,0],
+            [0,0,1,1,1,1,0,1,1,1,1,0,0],
+            [0,1,1,1,1,0,0,0,1,1,1,1,0],
+            [0,1,1,1,0,0,0,0,0,1,1,1,0],
+            [1,1,1,0,0,0,0,0,0,0,1,1,1],
+            [1,1,0,0,0,0,0,0,0,0,0,1,1]
+        ]
 
-        for r, lbl in p1_btns:
-            # Detectar si se está pulsando este botón específico
-            is_active = any(r.collidepoint(pos) for pos in self.fingers.values())
-            alpha = 200 if is_active else 120 # Más opaco al pulsar
-            
-            # Color temático y estilo Premium (Bordes redondeados + Brillo)
-            base_color = p1_color if lbl == "POW" else (220, 220, 220)
-            if is_active:
-                # Efecto de pulsación (oscurecer un poco)
-                base_color = tuple(max(0, c - 50) for c in base_color)
+        def draw_pixel_icon(surf, matrix, rect, color, pixel_size=10):
+            rows, cols = len(matrix), len(matrix[0])
+            sx = rect.centerx - (cols * pixel_size) // 2
+            sy = rect.centery - (rows * pixel_size) // 2
+            for r in range(rows):
+                for c in range(cols):
+                    if matrix[r][c]:
+                        pygame.draw.rect(surf, color, (sx + c * pixel_size, sy + r * pixel_size, pixel_size, pixel_size))
 
-            s = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
-            pygame.draw.rect(s, (*base_color, alpha), (0, 0, r.width, r.height), border_radius=15)
-            # Borde blanco más nítido
-            pygame.draw.rect(s, (255, 255, 255, 220), (0, 0, r.width, r.height), 3, border_radius=15)
-            surface.blit(s, r.topleft)
-            
-            luminance = (0.299*base_color[0] + 0.587*base_color[1] + 0.114*base_color[2])
-            txt_color = BLACK if luminance > 160 and alpha > 150 else WHITE
-            # P2 Buttons (Solo si no es IA)
+        players = [(self.paddle1, [(self.btn_p1_up, up_matrix), (self.btn_p1_down, down_matrix), (self.btn_p1_power, star_matrix)])]
         if not self.is_ai_mode:
-            p2_color = self.paddle2.color
-            p2_btns = [(self.btn_p2_up, "ʌ"), (self.btn_p2_down, "v"), (self.btn_p2_power, "POW")]
-            if self.geographic_controls: p2_btns = [(self.btn_p2_power, "POW")]
+            players.append((self.paddle2, [(self.btn_p2_up, up_matrix), (self.btn_p2_down, down_matrix), (self.btn_p2_power, star_matrix)]))
 
-            for r, lbl in p2_btns:
+        for paddle, btns in players:
+            if self.geographic_controls:
+                btns = [(btns[2][0], star_matrix)] # Solo power
+                
+            for r, matrix in btns:
                 is_active = any(r.collidepoint(pos) for pos in self.fingers.values())
-                alpha = 200 if is_active else 120
                 
-                base_color = p2_color if lbl == "POW" else (220, 220, 220)
-                if is_active: base_color = tuple(max(0, c - 50) for c in base_color)
-
-                s = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
-                pygame.draw.rect(s, (*base_color, alpha), (0, 0, r.width, r.height), border_radius=15)
-                pygame.draw.rect(s, (255, 255, 255, 220), (0, 0, r.width, r.height), 3, border_radius=15)
-                surface.blit(s, r.topleft)
+                # Blit del fondo semi-transparente pre-asignado libre de overhead
+                bg_surf = self.mobile_btn_surf_active if is_active else self.mobile_btn_surf_normal
+                surface.blit(bg_surf, r.topleft)
                 
-                luminance = (0.299*base_color[0] + 0.587*base_color[1] + 0.114*base_color[2])
-                txt_color = BLACK if luminance > 160 and alpha > 150 else WHITE
-                
-                font_to_use = self.large_font if lbl != "POW" else self.small_font
-                st = font_to_use.render(lbl, True, txt_color)
-                surface.blit(st, st.get_rect(center=r.center))
+                if matrix == star_matrix:
+                    # Dibuja la estrella con color temático según el poder o color del paddle
+                    R, G, B = paddle.color
+                    mult = 1.0 if is_active else 0.75
+                    color = (int(R * mult), int(G * mult), int(B * mult))
+                    draw_pixel_icon(surface, matrix, r, color, pixel_size=4)
+                else:
+                    # Flechas: Blanco si activo, gris si no
+                    color = WHITE if is_active else (160, 160, 160)
+                    draw_pixel_icon(surface, matrix, r, color, pixel_size=8)
 
     def _draw_score(self, surface):
         c1 = self.paddle1.encapsulated_color if (self.encapsulate_powers_enabled and self.paddle1.power_encapsulated != POWER_NONE) else (BLACK if (self.zone_type == 4 and self.slow_zone_owner == 1) else WHITE)
