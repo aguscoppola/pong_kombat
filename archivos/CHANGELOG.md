@@ -1,3 +1,61 @@
+## [0.7.2] - 2026-05-18
+### The Meditation, Arcade Rework & Web Sound Update (v0.7.2)
+Esta actualización rediseña por completo el Reloj Violeta con un sistema de meditación quieta, reestructura por completo el Modo Arcade con 7 niveles dinámicos con reglas específicas de puntaje (Golden Goal, Match Point, variantes climatológicas y peleas de jefe), desbloquea incondicionalmente el selector de nivel "TEST LEVEL" en el menú para facilitar las pruebas y **reactiva el sonido nativo en la versión Web Assembly para celulares y PC** con una arquitectura de insonorización segura ante excepciones.
+
+#### Agregado (Mecánica de Meditación y Extras)
+- **Audio Web Segura**:
+    - Se eliminaron las restricciones estáticas de `sys.platform == "emscripten"` en el `AudioManager`.
+    - Todas las llamadas del mezclador de canales de Pygame (`pygame.mixer.Sound` y `pygame.mixer.music`) ahora corren bajo bloques `try...except Exception` protectores, tolerando políticas de autoplay y restricciones de códecs de los navegadores sin crashear el motor del juego.
+- **Reloj Violeta Rediseñado**:
+    - Se elimina la antigua mecánica de toques (hits) para obtener poderes con el Reloj Violeta activo.
+    - **Nueva mecánica de Meditación**: Si la paleta del **jugador que capturó el reloj** se mantiene **totalmente quieta durante 3 segundos** de forma voluntaria, medita y recibe un poder aleatorio directamente. El rival no se ve afectado ni recibe este beneficio.
+    - **Visualización en tiempo real**: Se dibuja una barra de carga violeta pixel art sobre la paleta que indica el progreso de la meditación. Si la paleta se desplaza, la barra y el temporizador se reinician a cero de inmediato.
+    - **Sonido e Impacto**: Al completarse la carga, se reproduce el sonido característico de campana (`bell`) y se emite un estallido de partículas violetas alrededor de la paleta.
+- **Inteligencia Artificial (IA) Integrada**:
+    *   La IA (Player 2) ahora comprende y evalúa de forma estratégica la meditación violeta en `ai_controller.py`.
+    *   Toma la decisión de quedarse completamente quieta para cargar su poder cuando no hay amenazas enemigas en curso y la pelota se encuentra en la mitad contraria del campo.
+    *   Bajo peligro inminente (pelota cruzando la mitad o proyectiles letales), interrumpe su meditación de forma inmediata para volver a defender el arco.
+- **Tutorial Integrado**:
+    - Actualización del texto descriptivo del paso 18 en el tutorial para explicar detalladamente el funcionamiento de la meditación y el temporizador de 3 segundos.
+- **Selector de Nivel para Pruebas Desbloqueado**:
+    - Se elimina el requisito de haber completado la campaña para ver e interactuar con el panel **TEST LEVEL** en la selección de submodos Solo.
+    - Se incrementó el límite de selección a 7 niveles para permitir saltar directamente a cualquiera de los nuevos desafíos.
+    - Se actualizó el tutorial integrado para reflejar la existencia de los 7 niveles.
+
+#### Modificado (Rework y Balance del Modo Arcade)
+- **Campaña de 7 Niveles**:
+    - **Nivel 1 & 2**: Limitados a 1 punto bajo la regla de **GOL DE ORO** (`is_golden_goal_round`).
+    - **Nivel 3**: Limitado a 1 punto base pero con **MATCH POINT** activo (se debe ganar por una ventaja de 2 puntos).
+    - **Nivel 4**: Configurado a 3 puntos tanto para la variante 1 (Poderes raros) como para la variante 2 (Ratón + Clásicos).
+    - **Nivel 5 (Duelo Táctico Estacionario con Planetas)**:
+        - Configurado a **3 puntos** base sin Match Point.
+        - Se activan **2 portales** (`portals_enabled = True`, `more_portals_enabled = False`).
+        - Planetas por defecto (no destructibles, gravedad Planet, radio 180) activos en pista (`floating_planets_enabled = True`, `destructible_planets_enabled = False`).
+        - Solo poderes clásicos (rojo, verde, amarillo, naranja) y **revólver** activos. El resto de poderes raros quedan desactivados.
+        - Frecuencia de poder/reloj ajustada a **5 toques**.
+        - Mecánica de **Los relojes se quedan** (`watches_kept_enabled = True`) activa.
+        - Mecánica de **Números encapsuladores** (`encapsulate_powers_enabled = True`) activa.
+    - **Nivel 6 (El Clima de la Discordia)**:
+        - **Variante 1**:
+            - Día Lluvioso (`rainy_day_enabled = True`) con todos sus sub-modificadores al máximo (Gota TORRENCIAL y Precipitación de 50 mm) + Relámpagos (`lightning_enabled = True`).
+            - Restricción estricta de habilidades: Solo poderes Chicle, Fantasma, Sueño y Revólver al 100% de aparición.
+            - Frecuencia de poder/reloj a **3 toques**. Partida al mejor de 3 (sin Match Point).
+        - **Variante 2**:
+            - Día Nublado (`cloudy_day_enabled = True`) con intensidad TORRENCIAL.
+            - Día Lluvioso básico (10 mm, sin relámpagos).
+            - Planetas por defecto (no destructibles, gravedad Planet, radio 180) activos en pista (`floating_planets_enabled = True`, `destructible_planets_enabled = False`).
+            - **TODOS** los poderes clásicos y raros activos en pista.
+            - Solo activado el **reloj violeta** (el resto de relojes se eliminan).
+            - Frecuencia de poder/reloj a **3 toques**, partida al mejor de 3, con **2 portales** activos.
+    - **Nivel 7 (Boss Final Definitivo - Rediseño Rojo Oscuro)**:
+        - **TODOS los modificadores de EXTRAS activos** (exceptuando el ratón). Esto incluye planetas flotantes con gravedad, portales, multiplicador de X2, etc.
+        - **4 portales** activos.
+        - Planetas flotantes destructibles (`floating_planets_enabled = True`, `destructible_planets_enabled = True`).
+        - Regla de **Gol de Oro experimental** (`experimental_golden_goal = True`), **Match Point** y multiplicador **X2** inicial activos en partida al mejor de 6 puntos.
+        - Frecuencia de poder/reloj a **5 toques**.
+        - Clima nublado y lluvioso por defecto con relámpagos activos (`lightning_enabled = True`).
+        - Revólver con 100% de aparición.
+
 ## [0.7.1] - 2026-05-18
 ### The Rainy Kombat & Local Network Update (v0.7.1)
 Esta actualización consolida la versión web y móvil del juego, solucionando todos los bloqueos de red local, agregando la espectacular ambientación y el sonido generativo de lluvia, y garantizando la compatibilidad perfecta tanto en PC de escritorio como en celulares.

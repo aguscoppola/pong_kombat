@@ -757,8 +757,9 @@ class Game:
             self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
             
         elif level == 2:
-            self.max_score = 3
+            self.max_score = 1
             self.match_point_enabled = False
+            self.is_golden_goal_round = True
             # Activar relojes (Clásico)
             self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
             self.orange_watch_enabled = False
@@ -771,21 +772,22 @@ class Game:
             self.paddle2.grant_random_power(self)
             
             self.arcade_intro_text = self.t(
-                "Enable |BLUE|CLASSIC|WHITE| powers\nthe best of 3 wins.",
-                "Poderes |BLUE|CLÁSICOS|WHITE| activados\nal mejor de 3 gana."
+                "Enable |BLUE|CLASSIC|WHITE| powers.\n|GOLD|GOLDEN GOAL.",
+                "Poderes |BLUE|CLÁSICOS|WHITE| activados.\n|GOLD|GOL DE ORO."
             )
             self.arcade_intro_timer = 6.0 
             self.arcade_intro_x = SCREEN_WIDTH + 500
             
             self.state = STATE_SERVE
-            self.serve_timer = 6.0 # Menos tiempo porque no hay animación Match Point inicial
+            self.serve_timer = 8.5 # Intro(6s) + GoldenGoalAnim(2.5s)
+            self.show_golden_goal_anim = False
             self.serve_direction = random.choice([1, -1])
             self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
             self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
             
         elif level == 3:
-            self.max_score = 3
-            self.match_point_enabled = False
+            self.max_score = 1
+            self.match_point_enabled = True
             # Relojes cada 5 toques
             self.watch_spawn_hits_idx = 1 # 5 hits
             self.power_auto_grant_hits_idx = 1 # 5 hits
@@ -802,8 +804,8 @@ class Game:
             self.paddle2.grant_random_power(self)
             
             self.arcade_intro_text = self.t(
-                "Power/Clock every 5 hits.\n|ORANGE|ORANGE|WHITE| clock and |YELLOW|X2|WHITE| enabled.\nBest of 3 wins.",
-                "Poder/Reloj cada 5 toques.\nReloj |ORANGE|NARANJA|WHITE| y |YELLOW|X2|WHITE| activos.\nAl mejor de 3 gana."
+                "Power/Clock every 5 hits.\n|ORANGE|ORANGE|WHITE| clock and |YELLOW|X2|WHITE| enabled.\n|GOLD|MATCH POINT|WHITE| at 1 point.",
+                "Poder/Reloj cada 5 toques.\nReloj |ORANGE|NARANJA|WHITE| y |YELLOW|X2|WHITE| activos.\n|GOLD|PUNTO DE PARTIDA|WHITE| a 1 punto."
             )
             self.arcade_intro_timer = 6.0 
             self.arcade_intro_x = SCREEN_WIDTH + 500
@@ -838,16 +840,16 @@ class Game:
                     "NIVEL ESPECIAL: |PURPLE|VARIANTE 1|WHITE|\n|GRAY|MAGNETO|WHITE|, |GHOST|FANTASMA|WHITE|, |PINK|CHICLE|WHITE| y |GOLD|REVÓLVER|WHITE|.\nReloj cada 5 toques. Al mejor de 3."
                 )
             else:
-                self.max_score = 6
+                self.max_score = 3
                 # Clásico + Ratón
                 self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
                 self.add_mouse_enabled = True
                 self.mouse_speed_idx = 1
-                self.mouse_appear_idx = 0 # 1st hit (v0.6.0 Fix)
+                self.mouse_appear_idx = 0 # 1st hit
                 
                 self.arcade_intro_text = self.t(
-                    "SPECIAL LEVEL: |PURPLE|VARIANT 2|WHITE|\n|BLUE|CLASSIC|WHITE| mechanics + |GRAY|MOUSE|WHITE|.\n6-point game. Clock every 5 hits.",
-                    "NIVEL ESPECIAL: |PURPLE|VARIANTE 2|WHITE|\nMećanicas |BLUE|CLÁSICAS|WHITE| + |GRAY|RATÓN|WHITE|.\nPartida a 6. Reloj cada 5 toques."
+                    "SPECIAL LEVEL: |PURPLE|VARIANT 2|WHITE|\n|BLUE|CLASSIC|WHITE| mechanics + |GRAY|MOUSE|WHITE|.\n3-point game. Clock every 5 hits.",
+                    "NIVEL ESPECIAL: |PURPLE|VARIANTE 2|WHITE|\nMećanicas |BLUE|CLÁSICAS|WHITE| + |GRAY|RATÓN|WHITE|.\nPartida a 3. Reloj cada 5 toques."
                 )
             
             # Otorgar poder inicial
@@ -863,44 +865,243 @@ class Game:
             self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
 
         elif level == 5:
+            self.max_score = 3
+            self.match_point_enabled = False
+            self.show_match_point_anim = False
+            self.show_golden_goal_anim = False
+            self.experimental_golden_goal = False
+            self.is_golden_goal_round = False
+            
+            self.watch_spawn_hits_idx = 1 # 5 hits
+            self.power_auto_grant_hits_idx = 1 # 5 hits
+            
+            # Velocidad inicial x1.0
+            self.initial_ball_speed_idx = 1 # Default (1.0)
+            
+            # 2 Portales activos
+            self.portals_enabled = True
+            self.more_portals_enabled = False
+            self.portal_size_idx = 2 # Original (75)
+            self._update_portal_rects()
+            
+            # Planetas por defecto (no destructibles)
+            self.floating_planets_enabled = True
+            self.gravity_force_idx = 1 # Planet
+            self.gravity_radius_idx = 3 # Planet (180)
+            self.destructible_planets_enabled = False
+            
+            # Relojes se quedan
+            self.watches_kept_enabled = True
+            
+            # Números encapsuladores
+            self.encapsulate_powers_enabled = True
+            
+            # Poderes clásicos y revólver activos
+            self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
+            self.orange_watch_enabled = False
+            self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
+            
+            self.magnet_power_enabled = False
+            self.ghost_power_enabled = False
+            self.gum_power_enabled = False
+            self.sleeping_power_enabled = False
+            self.revolver_enabled = True
+            self.revolver_prob_idx = 1 # Default
+            
+            self.start_with_power_enabled = True
+            self.paddle1.grant_random_power(self)
+            self.paddle2.grant_random_power(self)
+            
+            # Desactivar clima y extras no deseados
+            self.cloudy_day_enabled = False
+            self.rainy_day_enabled = False
+            self.lightning_enabled = False
+            self.add_mouse_enabled = False
+            self.start_x2_enabled = False
+            
+            self.arcade_intro_text = self.t(
+                "|RED|LEVEL 5|WHITE|\n|PURPLE|Planets|WHITE|, 2 |BLUE|POR|RED|TALS|WHITE|, |BLUE|CLASSIC|WHITE| Powers & |GOLD|Revolver|WHITE|.\n|ORANGE|Hourglasses|WHITE| Stay and |YELLOW|Encapsulating Numbers|WHITE| active.\nPower every 5 hits. Win 3 points.",
+                "|RED|NIVEL 5|WHITE|\n|PURPLE|Planetas|WHITE|, 2 |BLUE|POR|RED|TALES|WHITE|, Poderes |BLUE|CLÁSICOS|WHITE| y |GOLD|Revólver|WHITE|.\nLos |ORANGE|Relojes|WHITE| se Quedan y |YELLOW|Números Encapsuladores|WHITE| activos.\nPoder cada 5 toques. Gana a 3 puntos."
+            )
+            self.arcade_intro_timer = 6.0 
+            self.arcade_intro_x = SCREEN_WIDTH + 500
+            
+            self.state = STATE_SERVE
+            self.serve_timer = 6.0
+            self.serve_direction = random.choice([1, -1])
+            self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
+            self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
+
+        elif level == 6:
+            variant = random.choice([1, 2])
+            self.watch_spawn_hits_idx = 0 # 3 hits
+            self.power_auto_grant_hits_idx = 0 # 3 hits
+            self.max_score = 3
+            self.match_point_enabled = False
+            self.show_match_point_anim = False
+            self.show_golden_goal_anim = False
+            self.is_golden_goal_round = False
+            
+            self.initial_ball_speed_idx = 3 # 1.25
+
+            # Reseteamos todas las variables para evitar herencias
+            self.floating_planets_enabled = False
+            self.portals_enabled = False
+            self.more_portals_enabled = False
+            self.add_mouse_enabled = False
+            self.experimental_golden_goal = False
+            self.watches_kept_enabled = False
+            self.encapsulate_powers_enabled = False
+            self.start_x2_enabled = False
+            
+            if variant == 1:
+                # Enable RAINY day, con todos sus sub-modificadores activos + Lightning
+                self.rainy_day_enabled = True
+                self.lightning_enabled = True
+                self.rain_drop_size_idx = 4 # TORRENCIAL (size 5.0)
+                self.rain_precipitation_idx = 3 # 50 mm (precipitation 3.0)
+                
+                self.cloudy_day_enabled = False
+                
+                # solo poderes: Gum, Ghost, Sleeping, REVOLVER (100%)
+                self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = True
+                self.magnet_power_enabled = False
+                self.ghost_power_enabled = True
+                self.gum_power_enabled = True
+                self.sleeping_power_enabled = True
+                self.revolver_enabled = True
+                self.revolver_prob_idx = 3 # 100% Always
+                
+                # Relojes activos todos
+                self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
+                self.orange_watch_enabled = True
+                
+                self.arcade_intro_text = self.t(
+                    "|RED|LEVEL 6: VARIANT 1|WHITE|\n|CYAN|RAINY Day|WHITE| (|BLUE|Torrencial|WHITE| + |YELLOW|Lightning|WHITE|).\nPowers: |PINK|Gum|WHITE|, |GHOST|Ghost|WHITE|, |PURPLE|Sleep|WHITE| & |GOLD|Revolver|WHITE| (100%).\nPower every 3 hits. Best of 3.",
+                    "|RED|NIVEL 6: VARIANTE 1|WHITE|\n|CYAN|DÍA LLUVIOSO|WHITE| (|BLUE|Torrencial|WHITE| + |YELLOW|Relámpago|WHITE|).\nPoderes: |PINK|Chicle|WHITE|, |GHOST|Fantasma|WHITE|, |PURPLE|Sueño|WHITE| y |GOLD|Revólver|WHITE| (100%).\nPoder cada 3 toques. Al mejor de 3."
+                )
+            else:
+                # Variante 2: Enable CLOUDY day, con TORRENCIAL size, Enable RAINY day pero solo lluvia basica (10mm)
+                self.cloudy_day_enabled = True
+                self.cloud_size_idx = 3 # TORRENCIAL (size 2.0)
+                
+                self.rainy_day_enabled = True
+                self.lightning_enabled = False
+                self.rain_drop_size_idx = 1 # Default (x1)
+                self.rain_precipitation_idx = 1 # 10 mm
+                
+                # Planetas por defecto (no destructibles)
+                self.floating_planets_enabled = True
+                self.gravity_force_idx = 1 # Planet
+                self.gravity_radius_idx = 3 # Planet (180)
+                self.destructible_planets_enabled = False
+                
+                # TODOS los poderes activos (verde, chicle, revolver, sleeping, etc)
+                self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
+                self.magnet_power_enabled = True
+                self.ghost_power_enabled = True
+                self.gum_power_enabled = True
+                self.sleeping_power_enabled = True
+                self.revolver_enabled = True
+                self.revolver_prob_idx = 1 # Default
+                
+                # solo esta activado el reloj violeta
+                self.remove_blue = True
+                self.remove_red = True
+                self.remove_purple = False
+                self.remove_white = True
+                self.remove_yellow = True
+                self.orange_watch_enabled = False
+                
+                # 2 portales activos
+                self.portals_enabled = True
+                self.more_portals_enabled = False
+                self.portal_size_idx = 2 # Default (75)
+                self._update_portal_rects()
+                
+                self.arcade_intro_text = self.t(
+                    "|RED|LEVEL 6: VARIANT 2|WHITE|\n|PURPLE|Planets|WHITE|, |GRAY|CLOUDY Day|WHITE| (|BLUE|Torrencial|WHITE|) & |CYAN|Rainy|WHITE| (10mm).\n|GREEN|ALL|WHITE| Powers enabled. 2 |BLUE|POR|RED|TALS|WHITE| active.\nOnly |PURPLE|Purple Watch|WHITE| active (3 hits). Best of 3.",
+                    "|RED|NIVEL 6: VARIANTE 2|WHITE|\n|PURPLE|Planetas|WHITE|, |GRAY|DÍA NUBLADO|WHITE| (|BLUE|Torrencial|WHITE|) y |CYAN|Lluvia|WHITE| (10mm).\n|GREEN|TODOS|WHITE| los poderes. 2 |BLUE|POR|RED|TALES|WHITE|.\nSolo |PURPLE|Reloj Violeta|WHITE| (cada 3 toques). Al mejor de 3."
+                )
+                
+            self.start_with_power_enabled = True
+            self.paddle1.grant_random_power(self)
+            self.paddle2.grant_random_power(self)
+            
+            self.arcade_intro_timer = 6.0 
+            self.arcade_intro_x = SCREEN_WIDTH + 500
+            self.state = STATE_SERVE
+            self.serve_timer = 6.0
+            self.serve_direction = random.choice([1, -1])
+            self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
+            self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
+
+        elif level == 7:
             # --- NIVEL FINAL: BOSS BATTLE STYLE ---
             self.max_score = 6
             self.match_point_enabled = True
-            self.show_match_point_anim = False # Resetear anuncios previos (v0.6.0 Fix)
+            self.show_match_point_anim = False
             self.show_golden_goal_anim = False
-            self.experimental_golden_goal = True 
+            self.experimental_golden_goal = True # Para que si se empata al final se decida por Gol de Oro
             
-            self.watch_spawn_hits_idx = 1 
-            self.power_auto_grant_hits_idx = 1 
+            # poderes/relojes cada 5 toques
+            self.watch_spawn_hits_idx = 1 # 5 hits
+            self.power_auto_grant_hits_idx = 1 # 5 hits
             
-            # Velocidad inicial x1.25 (v0.6.0 Fix)
-            self.initial_ball_speed_idx = 3 # 1.25
+            # Velocidad inicial x1.0 (v0.7.2)
+            self.initial_ball_speed_idx = 1 # Default (1.0)
             
             # Entorno Caótico: 4 Portales (FORZAR RECTÁNGULOS)
             self.portals_enabled = True
             self.more_portals_enabled = True
-            self.portal_size_idx = 2 # Original (75) - Regresado por petición del usuario
+            self.portal_size_idx = 2 # Original (75)
             self._update_portal_rects()
             
-            # Planetas: PLANET (idx 1, Radio 180)
+            # TODOS los modificadores de EXTRAS activos (exceptuando el ratón)
+            self.orange_watch_enabled = True
+            self.start_x2_enabled = True
+            self.magnet_power_enabled = True
+            self.ghost_power_enabled = True
+            self.ghost_identical_enabled = True
+            self.gum_power_enabled = True
+            self.experimental_golden_goal = True
+            
+            # Planetas flotantes destructibles
             self.floating_planets_enabled = True
             self.gravity_force_idx = 1 # Planet
             self.gravity_radius_idx = 3 # Planet (180)
             self.destructible_planets_enabled = True
             self.planet_resistance_idx = 1 # Planet (3 hits)
             
+            self.add_mouse_enabled = False # Excluido
+            self.sleeping_power_enabled = True
+            
+            # REVOLVER 100%
+            self.revolver_enabled = True
+            self.revolver_prob_idx = 3 # 100% / Always
+            
+            # Cloudy y Rainy day en default + Lightning
+            self.cloudy_day_enabled = True
+            self.cloud_size_idx = 1 # Default (Cloudy)
+            
+            self.rainy_day_enabled = True
+            self.lightning_enabled = True
+            self.rain_drop_size_idx = 1 # Default
+            self.rain_precipitation_idx = 1 # 10 mm
+            
+            # Todos los relojes y poderes clásicos permitidos
             self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
-            self.orange_watch_enabled = True
             self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
-            self.magnet_power_enabled = self.ghost_power_enabled = self.gum_power_enabled = self.revolver_enabled = True
+            self.watches_kept_enabled = False
+            self.encapsulate_powers_enabled = False
             
             self.start_with_power_enabled = True
             self.paddle1.grant_random_power(self)
             self.paddle2.grant_random_power(self)
             
             self.arcade_intro_text = self.t(
-                "|RED|FINAL LEVEL|WHITE|\nPlanets, 4 Portals, All Powers enabled.\n|GOLD|MATCH POINT|WHITE| and |RED|GOLDEN GOAL|WHITE|.\nPower every 5 hits. Win 6 points.",
-                "|RED|NIVEL FINAL|WHITE|\nPlanetas, 4 Portales, Todos los poderes activos.\n|GOLD|MATCH POINT|WHITE| y |RED|GOL DE ORO|WHITE|.\nPoder cada 5 toques. Gana a 6 puntos."
+                "|RED|FINAL BOSS (LEVEL 7)|WHITE|\n4 |BLUE|POR|RED|TALS|WHITE|, |PURPLE|Destructible Planets|WHITE|, |CYAN|Extreme Weather|WHITE|.\n|GOLD|MATCH POINT|WHITE|, |YELLOW|X2|WHITE| & |RED|GOLDEN GOAL|WHITE|.\nPower every 5 hits. Win 6 points.",
+                "|RED|BOSS FINAL (NIVEL 7)|WHITE|\n4 |BLUE|POR|RED|TALES|WHITE|, |PURPLE|Planetas Destructibles|WHITE|, |CYAN|Clima Extremo|WHITE|.\n|GOLD|MATCH POINT|WHITE|, |YELLOW|X2|WHITE| y |RED|GOL DE ORO|WHITE|.\nPoder cada 5 toques. Gana a 6 puntos."
             )
             self.arcade_intro_timer = 6.0 
             self.arcade_intro_x = SCREEN_WIDTH + 500
@@ -990,6 +1191,11 @@ class Game:
         # Activar cooldown para el próximo clic
         self.input_cooldown = 0.3
         
+        # --- AVANCE DE TUTORIAL ARCADE POR CLIC (v0.7.2) ---
+        if self.state == STATE_ARCADE_TUTORIAL:
+            self._next_arcade_tutorial_step()
+            return
+            
         # --- AVANCE DE TUTORIAL POR CLIC (v0.7.0 Fix) ---
         # El tutorial avanza si no estamos jugando, O si estamos en las fases de explicación congeladas (14-28)
         is_frozen_gameplay = self.state == STATE_PLAYING and (14 <= self.tutorial_step <= 28)
@@ -1151,8 +1357,8 @@ class Game:
                 self.state = STATE_PRESS_TO_START # Modo clásico es el de siempre
             elif self.btn_arcade_rect.collidepoint(event.pos):
                 self.audio.play('hit')
-                # Si no ha completado el arcade, siempre empieza en el 1 (v0.6.0 Fix)
-                start_lvl = self.test_arcade_level if self.arcade_completed else 1
+                # Empieza en el nivel seleccionado (Desbloqueado v0.7.3)
+                start_lvl = self.test_arcade_level
                 self.start_arcade_level(start_lvl)
             elif self.btn_arcade_tutorial_help_rect.collidepoint(event.pos):
                 self.audio.play('pop')
@@ -1161,10 +1367,10 @@ class Game:
                 self.tutorial_text_visible = ""
                 self.tutorial_text_index = 0
                 press = self.t("(Touch screen).", "(Toca la pantalla).") if self.mobile_mode else self.t("(Press spacebar).", "(Presiona espacio).")
-                self.tutorial_text_full = self.t("This is ARCADE mode; there are 5 levels that you must complete in one go. ", "Este es el modo ARCADE; hay 5 niveles que debes completar de una sola vez. ") + press
-            elif self.arcade_completed and self.btn_arcade_level_selector_rect.collidepoint(event.pos):
+                self.tutorial_text_full = self.t("This is ARCADE mode; there are 7 levels that you must complete in one go. ", "Este es el modo ARCADE; hay 7 niveles que debes completar de una sola vez. ") + press
+            elif self.btn_arcade_level_selector_rect.collidepoint(event.pos):
                 self.audio.play('hit')
-                self.test_arcade_level = (self.test_arcade_level % 5) + 1
+                self.test_arcade_level = (self.test_arcade_level % 7) + 1
             elif self.btn_solo_sub_back_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.state = STATE_MODE_SELECTION
@@ -1242,10 +1448,10 @@ class Game:
         elif self.state == STATE_GAME_OVER:
             if self.tutorial_active: return 
             
-            # Modo Arcade Nivel 5: Solo botón de recompensa (v0.6.0)
-            is_level_5_win = self.arcade_active and int(self.arcade_level) == 5 and self.score1 > self.score2
+            # Modo Arcade Nivel 7: Solo botón de recompensa (v0.7.3)
+            is_level_7_win = self.arcade_active and int(self.arcade_level) == 7 and self.score1 > self.score2
             
-            if is_level_5_win:
+            if is_level_7_win:
                 if self.btn_gameover_restart.collidepoint(event.pos):
                     # Sonido quitado por petición del usuario (v0.6.0)
                     self.state = STATE_ARCADE_REWARD
@@ -1281,6 +1487,9 @@ class Game:
             if not (self.tutorial_active and self.tutorial_step in [11, 12, 13]):
                 self.serve_timer = 0
 
+        elif self.state == STATE_ARCADE_REWARD:
+            self._advance_arcade_reward()
+
     def _handle_modifier_clicks(self, event):
         if self.modifiers_tab == "SKINS":
             if self.orange_skin_rect.collidepoint(event.pos):
@@ -1296,7 +1505,7 @@ class Game:
         elif self.modifiers_tab == "ALL":
             if self.score_btn_rect.collidepoint(event.pos):
                 self.audio.play('hit')
-                self.max_score = 6 if self.max_score == 3 else (9 if self.max_score == 6 else 3)
+                self.max_score = 3 if self.max_score == 1 else (6 if self.max_score == 3 else (9 if self.max_score == 6 else 1))
             elif self.ball_speed_btn_rect.collidepoint(event.pos):
                 self.audio.play('pop'); self.ball_speed_multiplier_idx = (self.ball_speed_multiplier_idx + 1) % len(self.ball_speed_multiplier_options)
             elif self.initial_ball_speed_rect.collidepoint(event.pos):
@@ -1457,23 +1666,14 @@ class Game:
             self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
 
     def _handle_keydown(self, event):
+        if self.state == STATE_ARCADE_TUTORIAL:
+            if event.key == pygame.K_SPACE:
+                self._next_arcade_tutorial_step()
+            return
+
         if self.state == STATE_ARCADE_REWARD:
             if event.key == pygame.K_SPACE:
-                if len(self.reward_text_visible) < len(self.reward_text_full):
-                    # Saltar animación
-                    self.reward_text_visible = self.reward_text_full
-                else:
-                    self.audio.play('hit')
-                    if self.reward_step == 0:
-                        self.reward_step = 1
-                        self._init_reward_text()
-                    else:
-                        self.reset_game()
-                        self.state = STATE_MAIN_MENU
-                        self.save_progress() # Guardar cambios en ajustes
-                        self.arcade_active = False
-                        self.arcade_completed = True # ¡DESBLOQUEADO!
-                        self.save_progress() # Guardar victoria arcade
+                self._advance_arcade_reward()
             return
 
         if self.tutorial_active:
@@ -1690,19 +1890,20 @@ class Game:
 
             req = self.power_auto_grant_hits_options[self.power_auto_grant_hits_idx]
             
-            # Reloj Púrpura (Efecto especial: Poder cada 3 toques)
-            current_z = (self.p1_zone_type if paddle == self.paddle1 else self.p2_zone_type) if self.watches_kept_enabled else self.zone_type
-            is_purple = (current_z == 3)
+            # Reloj Púrpura (Efecto especial: Meditación - Poder por quedarse quieto)
+            if self.watches_kept_enabled:
+                is_purple = (self.p1_zone_type == 3) if paddle == self.paddle1 else (self.p2_zone_type == 3)
+            else:
+                is_purple = (self.zone_type == 3 and self.slow_zone_owner == (1 if paddle == self.paddle1 else 2))
             
             got_power = False
             # Bloqueo de Re-roll para SLEEP (No sobrescribir si ya lo tenemos)
             if paddle.power_stored == POWER_SLEEP:
                 pass 
             elif is_purple:
-                if paddle.hits >= 3:
-                    paddle.grant_random_power(self)
-                    paddle.hits = 0
-                    got_power = True
+                # Mecánica v0.7.2: Bajo el reloj violeta, la paleta no recibe poderes por golpes.
+                # Se obtienen quedándose completamente quieto por 5 segundos.
+                pass
             elif paddle.hits >= req:
                 paddle.grant_random_power(self)
                 paddle.hits = 0
@@ -1783,6 +1984,8 @@ class Game:
                     self.revolver_angle = 0.0
 
     def reset_ball_visuals(self, ball):
+        ball.is_orange = False
+        ball.is_fireball = False
         if ball.is_ghost: ball.color = GHOST_COLOR
         else: ball.color = GOLD if self.ball_is_x2 and ball == self.balls[0] else WHITE
 
@@ -1946,8 +2149,8 @@ class Game:
             self.is_golden_goal_round = False
             msg_win = self.t(f"PLAYER {player} WINS!", f"¡EL JUGADOR {player} GANA!")
             self.winner_text = msg_win
-            # Ocultar razón en nivel 5 para mayor limpieza (v0.6.0 Fix)
-            if int(self.arcade_level) != 5:
+            # Ocultar razón en nivel 7 para mayor limpieza (v0.7.3)
+            if int(self.arcade_level) != 7:
                 msg_reason = self.t(f"(Player {player} won by GOLDEN Goal rule)", f"(El Jugador {player} ganó por Gol de Oro)")
                 self.winner_text += f"\n|YELLOW|{msg_reason}"
             if player == 1: self.score1 = self.max_score
@@ -1979,8 +2182,8 @@ class Game:
                 winner = 1 if self.score1 >= tut_max_score else 2
                 msg_win = self.t(f"PLAYER {winner} WINS!", f"¡EL JUGADOR {winner} GANA!")
                 self.winner_text = msg_win
-                # No mostrar mensaje de ventaja en nivel 5 ni si fue gol de oro (v0.6.0 Fix)
-                if self.match_point_enabled and not self.tutorial_active and int(self.arcade_level) != 5 and not self.is_golden_goal_round:
+                # No mostrar mensaje de ventaja en nivel 7 ni si fue gol de oro (v0.7.3)
+                if self.match_point_enabled and not self.tutorial_active and int(self.arcade_level) != 7 and not self.is_golden_goal_round:
                     self.winner_text += "\n|YELLOW|" + self.t(f"(By advantage of 2 points)", f"(Por ventaja de 2 puntos)")
                 self.state = STATE_GAME_OVER
                 
@@ -2017,8 +2220,8 @@ class Game:
         self.mouse_hits_counter = 0
 
     def _trigger_victory_celebration(self, winner):
-        # Solo en el nivel 5 del modo arcade (v0.6.0)
-        if int(self.arcade_level) == 5:
+        # Solo en el nivel 7 del modo arcade (v0.7.3)
+        if int(self.arcade_level) == 7:
             if winner == 1:
                 self.audio.play('victory_arcade')
                 self.vfx.confetti_rain(500)
@@ -2028,13 +2231,32 @@ class Game:
             else:
                 self.audio.play('error')
 
+    def _advance_arcade_reward(self):
+        if len(self.reward_text_visible) < len(self.reward_text_full):
+            # Saltar animación
+            self.reward_text_visible = self.reward_text_full
+        else:
+            self.audio.play('hit')
+            if self.reward_step == 0:
+                self.reward_step = 1
+                self._init_reward_text()
+            else:
+                self.reset_game()
+                self.state = STATE_MAIN_MENU
+                self.save_progress() # Guardar cambios en ajustes
+                self.arcade_active = False
+                self.arcade_completed = True # ¡DESBLOQUEADO!
+                self.save_progress() # Guardar victoria arcade
+
     def _init_reward_text(self):
         if self.reward_step == 0:
-            self.reward_text_full = self.t("CONGRATULATIONS! You beat ARCADE mode, you're now a PONG KOMBAT pro. (Press the spacebar to continue)", 
-                                         "¡FELICIDADES! Has superado el modo ARCADE, ahora eres un profesional de PONG KOMBAT. (Pulsa espacio para continuar)")
+            instr = self.t(" (Touch screen to continue)", " (Toca la pantalla para continuar)") if self.mobile_mode else self.t(" (Press spacebar to continue)", " (Pulsa espacio para continuar)")
+            self.reward_text_full = self.t("CONGRATULATIONS! You beat ARCADE mode, you're now a PONG KOMBAT pro.", 
+                                         "¡FELICIDADES! Has superado el modo ARCADE, ahora eres un profesional de PONG KOMBAT.") + instr
         else:
+            instr = self.t(" (Touch screen to finish)", " (Toca la pantalla para finalizar)") if self.mobile_mode else self.t(" (Press spacebar to finish)", " (Pulsa espacio para finalizar)")
             self.reward_text_full = self.t("You can now equip the CROWN in the SKINS section of the menu.", 
-                                         "Ahora puedes equipar la CORONA en la sección de ASPECTOS del menú.")
+                                         "Ahora puedes equipar la CORONA en la sección de ASPECTOS del menú.") + instr
         self.reward_text_visible = ""
         self.reward_char_timer = 0
 
@@ -2469,7 +2691,7 @@ class Game:
         elif step == 17:
             self.tutorial_text_full = self.t("Red Watch: Accelerate the ball by 25% when it enters your half of the court.", "Reloj Rojo: Acelera la pelota en un 25% cuando entra en tu mitad de la cancha.")
         elif step == 18:
-            self.tutorial_text_full = self.t("Violet Watch: You get powers every 3 hits instead of the normal amount.", "Reloj Violeta: Obtienes poderes cada 3 golpes en lugar de la cantidad normal.")
+            self.tutorial_text_full = self.t("Violet Watch: You get a power if your paddle stays completely still for 3 seconds.", "Reloj Violeta: Obtienes un poder si tu paleta se queda completamente quieta por 3 segundos.")
         elif step == 19:
             self.tutorial_text_full = self.t("Yellow Watch: Grants an extra life, blocking the next goal against you.", "Reloj Amarillo: Otorga una vida extra, bloqueando el próximo gol en tu contra.")
         elif step == 20:
@@ -2729,8 +2951,8 @@ class Game:
         elif self.state == STATE_CREDITS:
             self.menus.draw_credits(temp_surf)
         elif self.state == STATE_ARCADE_LEVEL_START:
-            # Fondo Rojo Oscuro para el Nivel Final (v0.6.0)
-            bg_color = (60, 0, 0) if self.arcade_level == 5 else BLACK
+            # Fondo Rojo Oscuro para el Nivel Final (v0.7.3)
+            bg_color = (60, 0, 0) if self.arcade_level == 7 else BLACK
             temp_surf.fill(bg_color)
             txt = self.large_font.render(f"LEVEL {self.arcade_level}", True, WHITE)
             temp_surf.blit(txt, txt.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))

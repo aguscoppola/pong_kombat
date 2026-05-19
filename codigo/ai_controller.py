@@ -31,6 +31,23 @@ class AIController:
                     if r1 and r2:
                         if r1.inflate(20, 20).colliderect(target_ball.rect): target_y = r2.centery; break
                         elif r2.inflate(20, 20).colliderect(target_ball.rect): target_y = r1.centery; break
+            
+            # Lógica estratégica de esquinas para el Reloj Violeta (v0.7.2)
+            is_purple = False
+            if self.game.watches_kept_enabled:
+                is_purple = (self.game.p2_zone_type == 3)
+            else:
+                is_purple = (self.game.zone_type == 3 and self.game.slow_zone_owner == 2)
+                
+            if is_purple and p2.power_stored == POWER_NONE and p2.power_active == POWER_NONE:
+                # Si la pelota viene hacia nosotros y se está acercando a la zona de golpe
+                if target_ball.vx > 0 and target_ball.rect.centerx > SCREEN_WIDTH * 0.5:
+                    if target_y < SCREEN_HEIGHT // 2:
+                        # Esquina superior de la paleta -> centery debe ser mayor que el de la pelota
+                        target_y = target_y + (p2.rect.height // 2 - 8)
+                    else:
+                        # Esquina inferior de la paleta -> centery debe ser menor que el de la pelota
+                        target_y = target_y - (p2.rect.height // 2 - 8)
 
         # 2. Prioridad: Esquivar proyectiles
         dodge_offset = 0
@@ -92,7 +109,27 @@ class AIController:
         final_y = target_y if target_y is not None else SCREEN_HEIGHT // 2
         final_y += dodge_offset
         
-        if not p2.is_stuck:
+        # Lógica de Meditación para el Reloj Violeta (v0.7.2)
+        is_purple = False
+        if self.game.watches_kept_enabled:
+            is_purple = (self.game.p2_zone_type == 3)
+        else:
+            is_purple = (self.game.zone_type == 3 and self.game.slow_zone_owner == 2)
+            
+        should_meditate = False
+        if is_purple and p2.power_stored == POWER_NONE and p2.power_active == POWER_NONE:
+            # Evaluar si es seguro quedarse quieto a meditar
+            has_threat = any(t.vx > 0 for t in threats)
+            ball_safe = True
+            if valid_balls:
+                # Si la pelota viene hacia nosotros y ya está lo suficientemente cerca para alinearnos y golpearla
+                if target_ball.vx > 0 and target_ball.rect.centerx > SCREEN_WIDTH * 0.72:
+                    ball_safe = False
+            
+            if not has_threat and ball_safe:
+                should_meditate = True
+
+        if not p2.is_stuck and not should_meditate:
             if final_y < p2.rect.centery - 10: p2.move(-1, dt, PADDLE_SPEED)
             elif final_y > p2.rect.centery + 10: p2.move(1, dt, PADDLE_SPEED)
 

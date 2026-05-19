@@ -49,7 +49,6 @@ class AudioManager:
 
     def _load_single_sound(self, name):
         """Carga un sonido individual de forma segura (Lazy Loading)"""
-        if self.is_web: return False # v0.7.0 Silencio en Web
         if name in self.sound_configs:
             filename, vol = self.sound_configs[name]
             path = os.path.join(self.sounds_dir, filename)
@@ -67,32 +66,39 @@ class AudioManager:
         return False
 
     def play(self, name, loops=0, fadeout=0, fade_ms=0):
-        if self.is_web: return # v0.7.0 Silencio en Web
         # Si el sonido no está cargado, intentamos cargarlo ahora (Lazy Loading)
         if name not in self.sounds:
             if not self._load_single_sound(name):
                 return # No se pudo cargar, ignoramos para no romper el juego
 
         if name in self.sounds:
-            self.sounds[name].set_volume(self.sound_base_volumes[name] * self.master_volume)
-            if fadeout > 0:
-                self.sounds[name].fadeout(fadeout)
-            else:
-                self.sounds[name].play(loops, fade_ms=fade_ms)
+            try:
+                self.sounds[name].set_volume(self.sound_base_volumes[name] * self.master_volume)
+                if fadeout > 0:
+                    self.sounds[name].fadeout(fadeout)
+                else:
+                    self.sounds[name].play(loops, fade_ms=fade_ms)
+            except Exception as e:
+                print(f"Error al reproducir el sonido {name}: {e}")
         else:
             # Silenciamos el log en producción para no saturar la consola del navegador
             pass
 
     def stop(self, name):
         if name in self.sounds:
-            self.sounds[name].stop()
+            try:
+                self.sounds[name].stop()
+            except Exception as e:
+                print(f"Error al detener el sonido {name}: {e}")
 
     def fadeout(self, name, time):
         if name in self.sounds:
-            self.sounds[name].fadeout(time)
+            try:
+                self.sounds[name].fadeout(time)
+            except Exception as e:
+                print(f"Error al fadeout el sonido {name}: {e}")
 
     def play_music(self, filename, volume=0.5, fade_ms=1500):
-        if self.is_web: return # v0.7.0 Silencio en Web
         # v0.7.0 Smart Loader para Música
         base_name = os.path.splitext(filename)[0]
         ogg_path = os.path.join(self.sounds_dir, f"{base_name}.ogg")
@@ -109,7 +115,13 @@ class AudioManager:
                 print(f"Error cargando música {path}: {e}")
 
     def stop_music(self, fadeout_ms=1500):
-        pygame.mixer.music.fadeout(fadeout_ms)
+        try:
+            pygame.mixer.music.fadeout(fadeout_ms)
+        except Exception as e:
+            print(f"Error al detener la música: {e}")
 
     def set_music_volume(self, volume):
-        pygame.mixer.music.set_volume(volume * self.master_volume)
+        try:
+            pygame.mixer.music.set_volume(volume * self.master_volume)
+        except Exception as e:
+            print(f"Error al ajustar el volumen de la música: {e}")

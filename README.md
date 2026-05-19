@@ -1,20 +1,24 @@
-¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal y una IA que no tiene piedad.
+¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal, modificadores climatológicos y una IA que no tiene piedad.
 
-## 🔭 ¿Qué hay de nuevo en la v0.7.1?
-¡La **Rainy Combat & Local Network Update** ha llegado! 📱🌐🌧️
-*   **Sonido Generativo de Lluvia:** Nuevo efecto de lluvia pura creado algorítmicamente con loop continuo perfecto y libre de clics. 🌧️🔊
-*   **Interceptor de Fetch Global:** Carga ultra-rápida y garantizada del motor web en cualquier red local (móviles/PC) eliminando las trabas de la pantalla de carga. ⚡📡
-*   **Soporte Táctil & Háptico:** Juega con botones virtuales estilo cristal o modo geográfico, ahora con vibración integrada. 🖐️📳
-*   **Escalado Dinámico Inteligente:** La imagen se adapta a cualquier resolución de pantalla (PC o Móvil) manteniendo la nitidez original. 📐
-*   **Web-Ready & PWA:** Compatible con navegadores e instalable como App en Android/iOS con soporte offline. 🚀
-*   **Persistencia Total:** Tus ajustes móviles y progreso se guardan automáticamente. 💾
+## 🔭 ¿Qué hay de nuevo en la v0.7.2?
+¡La **Meditation, Arcade Rework & Web Sound Update** ha llegado! 📱🌐🧘🔊
+*   **Campaña Arcade de 7 Niveles:** Rediseño total de la progresión para un solo jugador con 7 niveles con reglas, desafíos y modificadores únicos (Duelos de Gol de Oro, Match Point de ventaja, lluvias torrenciales y planetas flotantes).
+*   **Boss Final Definitivo (Nivel 7):** Combate definitivo a 6 puntos en una pista roja oscura de alta tensión con 4 portales, clima de tormentas extremas, planetas destructibles y munición de revólver al 100%.
+*   **Reloj Violeta y Mecánica de Meditación:** Olvídate de golpear la bola para conseguir poderes. Ahora, quédate completamente quieto por 3 segundos para meditar, cargando una barra violeta retro animada para invocar un estallido de partículas y recibir una habilidad especial. ¡La IA también comprende esto y medita estratégicamente!
+*   **Audio Web Totalmente Habilitado:** Los celulares y navegadores en la versión web ahora reproducen todos los efectos de sonido y la música de forma nativa y robusta. Insonorizado con bloques protectores ante políticas de Autoplay o restricciones de códecs.
+*   **Selector de Niveles (Test Level) Desbloqueado:** Salta directamente a probar cualquiera de los 7 niveles desde el menú Solo sin tener que completar la campaña primero.
+*   **Textos Enriquecidos a Color:** Los introductores pixel art de la campaña Arcade ahora se despliegan en atractivos colores vivos acordes al ambiente de cada nivel.
+
+---
 
 ## 📂 Estructura del Proyecto
 *   **`main.py`**: El lanzador principal (ejecuta este archivo para jugar).
 *   **`codigo_fuente/`**: El motor principal del juego.
-*   **`codigo/`**: Módulos, entidades y constantes.
-*   **`sounds/`**: Todos los efectos de sonido originales.
-*   **`archivos/`**: Documentación y especificaciones.
+*   **`codigo/`**: Módulos, entidades, constantes y AudioManager.
+*   **`sounds/`**: Todos los efectos de sonido y pistas musicales.
+*   **`archivos/`**: Documentación técnica, changelogs e historial de desarrollo.
+
+---
 
 ## 🛠️ Cómo instalar y jugar
 1. Necesitas tener Python instalado.
@@ -27,17 +31,20 @@
    python main.py
    ```
 
+---
+
 ## 🎮 Controles 🕹️
-*   **Jugador 1 (Izquierda):** Movimiento `W/S`. Poder `D`.
+*   **Jugador 1 (Izquierda):** Movimiento `W/S`. Poder/Confirmar `D`.
 *   **Jugador 2 (Derecha/IA):** Movimiento `Flechas`. Poder `Flecha Derecha`.
 *   **Globales:** `ENTER` para empezar, `ESC` para volver al menú.
-*   **Navegación:** Usa el **Mouse** para gestionar los menús, modificadores y ajustes.
+*   **Navegación:** Usa el **Mouse** (o toques en pantalla en móviles) para gestionar los menús, modificadores y ajustes.
+
+---
 
 ## 🛡️ Mecánicas Kombat 🔥
-*   **Poderes:** ¡NUEVO! Revolver y Chicle, además de Fuego, Escudo, Imán, Fantasma y Demolición.
-*   **Relojes de Arena:** 6 tipos de modificadores temporales que alteran el flujo del tiempo y el espacio.
-*   **Modificadores:** Más de 30 opciones para crear la partida de tus sueños (o de tus pesadillas).
+*   **Poderes:** Revolver letal, Chicle adherente, Sueño inmovilizador, Fuego destructor, Escudo reflectante, Imán atractor, Fantasma spectral y Demolición naranja.
+*   **Relojes de Arena:** Modificadores temporales (Violeta, Amarillo, Rojo, Blanco, Azul, Naranja) que alteran la gravedad, el tiempo y la vida.
+*   **Climas Extremos:** Días nublados y tormentas eléctricas torrenciales que cambian las físicas ambientales del juego.
 
 ---
 ¡Prepárate para el Kombat definitivo! ☄️🌌
-

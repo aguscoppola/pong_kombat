@@ -64,6 +64,9 @@ class Paddle:
         # Variables para SLEEP (v0.6.0)
         self.sleep_hits_left = 0
         self.sleep_timer = 0.0
+        # Variables para Reloj Violeta (v0.7.2)
+        self.purple_still_timer = 0.0
+        self.last_y = y
 
     def reset(self):
         self.rect.height = PADDLE_HEIGHT
@@ -93,6 +96,8 @@ class Paddle:
         self.revolver_timer = 0.0
         self.sleep_hits_left = 0
         self.sleep_timer = 0.0
+        self.purple_still_timer = 0.0
+        self.last_y = self.rect.y
 
     def grant_random_power(self, game):
         all_p = [
@@ -232,6 +237,33 @@ class Paddle:
             if self.sleep_timer <= 0:
                 self.sleep_hits_left = 0
 
+        # Reloj Violeta (Mecánica v0.7.2: Meditación por 5 segundos)
+        if game.watches_kept_enabled:
+            is_purple = (game.p1_zone_type == 3) if self == game.paddle1 else (game.p2_zone_type == 3)
+        else:
+            is_purple = (game.zone_type == 3 and game.slow_zone_owner == (1 if self == game.paddle1 else 2))
+        
+        if not hasattr(self, 'last_y'):
+            self.last_y = self.rect.y
+            
+        if game.state == "playing" and is_purple:
+            if self.rect.y == self.last_y:
+                if self.power_stored == POWER_NONE and self.power_active == POWER_NONE:
+                    self.purple_still_timer += dt
+                    if self.purple_still_timer >= 3.0:
+                        self.grant_random_power(game)
+                        self.purple_still_timer = 0.0
+                        game.audio.play('bell')
+                        game.vfx.burst(self.rect.centerx, self.rect.centery, SLEEP_PURPLE, count=25)
+                else:
+                    self.purple_still_timer = 0.0
+            else:
+                self.purple_still_timer = 0.0
+        else:
+            self.purple_still_timer = 0.0
+            
+        self.last_y = self.rect.y
+
     def draw(self, surface, game):
         if self.is_destroyed: return
         if self.power_active == POWER_ORANGE and game.orange_skin_idx == 1:
@@ -272,6 +304,21 @@ class Paddle:
         if self.power_active == POWER_MAGNET:
             pygame.draw.rect(surface, RED, (self.rect.x, self.rect.y, self.rect.width, 10))
             pygame.draw.rect(surface, BLUE, (self.rect.x, self.rect.bottom - 10, self.rect.width, 10))
+
+        # Dibujar barra de carga de Meditación (Reloj Violeta) (v0.7.2)
+        if self.purple_still_timer > 0.0:
+            bar_w = self.rect.width + 10
+            bar_h = 5
+            bar_x = self.rect.centerx - bar_w // 2
+            bar_y = self.rect.y - 15
+            # Dibujar fondo de barra (Violeta oscuro)
+            pygame.draw.rect(surface, (40, 0, 60), (bar_x, bar_y, bar_w, bar_h))
+            # Dibujar relleno (Violeta brillante)
+            fill_w = int(bar_w * min(1.0, self.purple_still_timer / 3.0))
+            if fill_w > 0:
+                pygame.draw.rect(surface, SLEEP_PURPLE, (bar_x, bar_y, fill_w, bar_h))
+            # Dibujar borde (Blanco/Violeta sutil)
+            pygame.draw.rect(surface, (220, 180, 255), (bar_x, bar_y, bar_w, bar_h), 1)
 
 class SleepProjectile:
     def __init__(self, x, y, vx, vy, is_child=False):

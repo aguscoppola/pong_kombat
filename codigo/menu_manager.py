@@ -102,7 +102,7 @@ class MenuManager:
         self._draw_tutorial_box(surface)
 
     def _draw_tutorial_box(self, surface):
-        if not self.game.tutorial_active: return
+        if not self.game.tutorial_active and self.game.state != STATE_ARCADE_TUTORIAL: return
         # Rectángulo inferior para explicaciones (Soporta 3 renglones)
         box_h = 100
         box = pygame.Rect(0, SCREEN_HEIGHT - box_h, SCREEN_WIDTH, box_h)
@@ -212,13 +212,12 @@ class MenuManager:
         h_col = (100, 0, 0) if is_hover_h else (60, 0, 0)
         self._draw_pixel_help_button(surface, r_h, h_col, RED)
         
-        # Level Selector (Debug/Testing) - Solo si ya completó el Arcade (v0.6.0 Fix)
-        if self.game.arcade_completed:
-            hover_ls = self.game.btn_arcade_level_selector_rect.collidepoint(mpos)
-            pygame.draw.rect(surface, (30, 30, 30) if hover_ls else BLACK, self.game.btn_arcade_level_selector_rect)
-            pygame.draw.rect(surface, GRAY, self.game.btn_arcade_level_selector_rect, 1)
-            txt_ls = self.game.tiny_font.render(f"TEST LEVEL: {self.game.test_arcade_level}", True, GRAY)
-            surface.blit(txt_ls, txt_ls.get_rect(center=self.game.btn_arcade_level_selector_rect.center))
+        # Level Selector (Debug/Testing) - Desbloqueado para testearlo mejor (v0.7.3)
+        hover_ls = self.game.btn_arcade_level_selector_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (30, 30, 30) if hover_ls else BLACK, self.game.btn_arcade_level_selector_rect)
+        pygame.draw.rect(surface, GRAY, self.game.btn_arcade_level_selector_rect, 1)
+        txt_ls = self.game.tiny_font.render(f"TEST LEVEL: {self.game.test_arcade_level}", True, GRAY)
+        surface.blit(txt_ls, txt_ls.get_rect(center=self.game.btn_arcade_level_selector_rect.center))
         
         # Back Button
         hover_b = self.game.btn_solo_sub_back_rect.collidepoint(mpos)
@@ -301,7 +300,9 @@ class MenuManager:
         cy = 100
         surface.blit(self.game.small_font.render(self.game.t("Score limit:", "Límite de puntos:"), True, WHITE), (lm, self.game.modifiers_panel_rect.y + cy - off))
         self.game.score_btn_rect.update(ox, self.game.modifiers_panel_rect.y + cy - 5 - off, 80, 40); pygame.draw.rect(surface, BLACK, self.game.score_btn_rect); pygame.draw.rect(surface, WHITE, self.game.score_btn_rect, 2)
-        surface.blit(self.game.small_font.render(str(self.game.max_score), True, WHITE), self.game.small_font.render(str(self.game.max_score), True, WHITE).get_rect(center=self.game.score_btn_rect.center))
+        score_text = self.game.t("Unique", "Único") if self.game.max_score == 1 else str(self.game.max_score)
+        font_to_use = self.game.small_font if self.game.max_score == 1 else self.game.small_font
+        surface.blit(font_to_use.render(score_text, True, WHITE), font_to_use.render(score_text, True, WHITE).get_rect(center=self.game.score_btn_rect.center))
         cy += 80; self._draw_sub_selector(cy, self.game.t("Ball speed increase:", "Aumento de velocidad:"), self.game.ball_speed_multiplier_names[self.game.ball_speed_multiplier_idx], self.game.ball_speed_btn_rect, off, ox, lm, surface, sub_val=f"{self.game.ball_speed_multiplier_options[self.game.ball_speed_multiplier_idx]-1:g}")
         cy += 80; self._draw_sub_selector(cy, self.game.t("Initial ball speed:", "Velocidad inicial:"), self.game.initial_ball_speed_names[self.game.initial_ball_speed_idx], self.game.initial_ball_speed_rect, off, ox, lm, surface, sub_val=f"x{self.game.initial_ball_speed_options[self.game.initial_ball_speed_idx]}")
         cy += 80; self._draw_sub_selector(cy, self.game.t("|YELLOW|Yellow |WHITE|Power Speed Up:", "Aumento de velocidad\ndel poder |YELLOW|AMARILLO"), self.game.yellow_speed_up_names[self.game.yellow_speed_up_idx], self.game.yellow_speed_up_rect, off, ox, lm, surface, sub_val=f"{int(self.game.yellow_speed_up_options[self.game.yellow_speed_up_idx]*100)}%")
@@ -571,10 +572,10 @@ class MenuManager:
             
         self.game.btn_gameover_restart.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 40, 300, 50); self.game.btn_gameover_menu.update(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 105, 300, 50)
         
-        # Modo Arcade Nivel 5: Solo botón de recompensa (v0.6.0)
-        is_level_5_win = self.game.arcade_active and int(self.game.arcade_level) == 5 and self.game.score1 > self.game.score2
+        # Modo Arcade Nivel 7: Solo botón de recompensa (v0.7.3)
+        is_level_7_win = self.game.arcade_active and int(self.game.arcade_level) == 7 and self.game.score1 > self.game.score2
         
-        if is_level_5_win:
+        if is_level_7_win:
             r = self.game.btn_gameover_restart
             txt = self.game.t("Receive Reward", "Recibir recompensa")
             is_hover = r.collidepoint(pygame.mouse.get_pos())
@@ -690,9 +691,20 @@ class MenuManager:
         surface.blit(self.cached_reward_surface, (50, SCREEN_HEIGHT - box_h + 30))
 
     def draw_arcade_tutorial(self, surface):
-        # Manto negro al fondo (v0.6.0)
-        surface.blit(self.ov_200, (0,0))
-        # Caja de texto abajo
+        # 1. Dibujar el fondo del menú de selección de submodo solo
+        self.draw_solo_submode_selection(surface)
+        
+        # 2. Manto negro al fondo (overlay semi-transparente)
+        surface.blit(self.ov_180, (0,0))
+        
+        # 3. Resaltar el botón ARCADE con el "foco"
+        r = self.game.btn_arcade_rect
+        pygame.draw.rect(surface, (60, 0, 0), r)
+        pygame.draw.rect(surface, RED, r, 3)
+        txt_a = self.game.font.render("ARCADE", True, RED)
+        surface.blit(txt_a, txt_a.get_rect(center=r.center))
+        
+        # 4. Caja de texto abajo
         self._draw_tutorial_box(surface)
 
     def _draw_pixel_help_button(self, surface, rect, bg_color, border_color):
