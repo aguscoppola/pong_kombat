@@ -1,0 +1,179 @@
+@startuml PongKombatClassDiagram
+
+title Diagrama de Clases - Pong Kombat v0.7.2
+skinparam BackgroundColor #111111
+skinparam ArrowColor #FF5555
+skinparam ClassBorderColor #5555FF
+skinparam ClassBackgroundColor #222222
+skinparam ClassFontColor #FFFFFF
+skinparam ClassHeaderBackgroundColor #333333
+skinparam ClassAttributeIconSize 0
+
+package "Core & Engine" {
+    class Game {
+        + screen: Surface
+        + clock: Clock
+        + audio: AudioManager
+        + vfx: VFXManager
+        + menus: MenuManager
+        + ai_controller: AIController
+        + physics: PhysicsEngine
+        + paddle1: Paddle
+        + paddle2: Paddle
+        + balls: List<Ball>
+        + sleep_projectiles: List<SleepProjectile>
+        + state: String
+        + mobile_mode: Boolean
+        + geographic_controls: Boolean
+        + init_fonts()
+        + init_entities()
+        + init_game_state()
+        + init_modifier_variables()
+        + run()
+        + run_async()
+        + _advance_arcade_reward()
+    }
+}
+
+package "Sub-Managers" {
+    class AudioManager {
+        + sfx_volume: float
+        + music_volume: float
+        + music_enabled: boolean
+        + sfx_enabled: boolean
+        + play(key: String)
+        + play_music(key: String, volume: float)
+        + stop_music()
+    }
+
+    class MenuManager {
+        - game: Game
+        + draw_main_menu(surface: Surface)
+        + draw_solo_submode_selection(surface: Surface)
+        + draw_settings(surface: Surface)
+        + draw_modifiers(surface: Surface)
+        + draw_arcade_reward(surface: Surface)
+    }
+
+    class PhysicsEngine {
+        - game: Game
+        + update(dt: float)
+        + _process_ball_physics(ball: Ball, dt: float)
+        + _check_world_collisions(ball: Ball)
+        + _teleport_ball(ball: Ball, ...)
+    }
+
+    class VFXManager {
+        + particles: List<Particle>
+        + confetti_rain(count: int)
+        + explosion(x: float, y: float, color: Color)
+        + burst(x: float, y: float, color: Color)
+        + update(dt: float)
+        + draw(surface: Surface)
+    }
+
+    class AIController {
+        - game: Game
+        + update(dt: float)
+        + steer_paddle(paddle: Paddle, target_y: float)
+    }
+}
+
+package "Entities" {
+    class Paddle {
+        + rect: Rect
+        + original_x: int
+        + color: Color
+        + power_stored: int
+        + power_encapsulated: int
+        + power_active: int
+        + speed_multiplier: float
+        + purple_still_timer: float
+        + sleep_hits_left: int
+        + reset()
+        + grant_random_power(game: Game)
+        + activate_power(game: Game)
+        + move(direction: int, dt: float, speed: float)
+        + update(dt: float, game: Game)
+        + draw(surface: Surface, game: Game)
+    }
+
+    class Ball {
+        + rect: Rect
+        + vx: float
+        + vy: float
+        + speed: float
+        + is_fireball: boolean
+        + is_orange: boolean
+        + is_ghost: boolean
+        + serve(dir_x: int, start_speed: float)
+        + update(dt: float, speed_mult: float)
+        + draw(surface: Surface, skin: String, ...)
+    }
+
+    class SleepProjectile {
+        + rect: Rect
+        + vx: float
+        + vy: float
+        + active: boolean
+        + is_child: boolean
+        + update(dt: float, game: Game)
+        + draw(surface: Surface)
+    }
+
+    class GumProjectile {
+        + rect: Rect
+        + vx: float
+        + active: boolean
+        + update(dt: float)
+        + draw(surface: Surface)
+    }
+
+    class Mouse {
+        + rect: Rect
+        + speed: float
+        + facing_right: boolean
+        + update(dt: float, target_ball: Ball, ...)
+        + draw(surface: Surface)
+    }
+
+    class Particle {
+        + x: float
+        + y: float
+        + color: Color
+        + lifetime: float
+        + update(dt: float)
+        + draw(surface: Surface)
+    }
+
+    class Cloud {
+        + x: float
+        + y: float
+        + speed: float
+        + update(dt: float)
+        + draw(surface: Surface)
+    }
+}
+
+' Relationships & Connections
+Game *-- AudioManager : "1"
+Game *-- VFXManager : "1"
+Game *-- MenuManager : "1"
+Game *-- PhysicsEngine : "1"
+Game *-- AIController : "1"
+
+Game *-- Paddle : "2 (paddle1, paddle2)"
+Game *-- Ball : "1..* (balls)"
+Game *-- SleepProjectile : "* (sleep_projectiles)"
+
+MenuManager --> Game : "queries & triggers"
+PhysicsEngine --> Game : "manipulates states & physics"
+AIController --> Game : "manages CPU inputs"
+
+VFXManager *-- Particle : "* (particles)"
+
+Paddle --> Ball : "collides / sticky grip"
+PhysicsEngine --> Ball : "calculates collisions"
+PhysicsEngine --> Paddle : "checks bounds"
+
+@enduml
