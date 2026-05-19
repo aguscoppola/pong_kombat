@@ -125,7 +125,47 @@ stateDiagram-v2
 
 ---
 
-## 7. Diagrama de Clases (Referencia)
+## 7. Pipeline de Compilación Web y Arquitectura PWA (Celular)
+
+Para lograr un rendimiento óptimo y una compatibilidad multiplataforma transparente en dispositivos móviles y navegadores modernos, el proyecto implementa un completo pipeline de compilación y post-procesamiento en cuatro etapas gestionado por el script integrador **`compilar_web.py`**.
+
+```
++----------------------------------------------------------------------------------------+
+|                                  compilar_web.py                                       |
++--------------------+-------------------+--------------------+--------------------------+
+                     |                   |                    |
+                     v                   v                    v
++--------------------+---+ +-------------+-----+ +-------------+----+ +-------------------+----+
+| 1. Compilación Pygbag  | | 2. Copia y Rutas  | | 3. BrowserFS e   | | 4. Rotación y     |
+| (WASM y Bytecode)      | | (Saneamiento PWA) | | Interceptores    | | Touch-Mapping JS  |
++------------------------+ +-------------------+ +------------------+ +-----------------------+
+```
+
+### A. Fase 1: Compilación a WebAssembly (`pygbag`)
+*   **Acción**: Ejecuta `pygbag --disable-sound-format-error --build .` para transpilar el código Python de **Pong Kombat** a bytecode empaquetado y compilar los módulos del motor en un entorno virtualizado en WebAssembly.
+*   **Resultado**: Genera la estructura base del directorio `build/web/` con los archivos binarios emscripten y el cargador inicial HTML.
+
+### B. Fase 2: Saneamiento de Rutas y Encapsulado PWA (`arreglar_web.py`)
+*   **Desacoplamiento de Servidor**: El script recorre `index.html` y sanitiza expresiones regulares que apunten a direcciones locales de desarrollo (`http://0.0.0.0:8000/`, `localhost`, o IPs específicas), convirtiéndolas a rutas relativas lógicas (`./`). Esto hace que el paquete web compilado sea completamente portátil e independiente de la IP o puerto del servidor de origen.
+*   **Inclusión Local de Recursos (BrowserFS)**: Descarga físicamente `browserfs.min.js` e inyecta su inclusión de manera local en lugar de consultar dependencias CDN externas.
+*   **Bundling Offline PWA**: Copia los recursos definidos en `web_pwa/` (como `manifest.json`, iconos adaptativos de varios tamaños y el gestor de caché `service-worker.js`) directamente al directorio de distribución final, habilitando la instalación del juego de forma nativa en celulares Android e iOS, y permitiendo su ejecución completa sin conexión a Internet.
+
+### C. Fase 3: Robustecimiento del Sistema de Archivos e Interceptores de Red (`sanitizar_index.py`)
+*   **Aislamiento y Mitigación de Caídas de Carga**: Modifica la plantilla de ejecución de Pygbag para corregir discrepancias sintácticas en subprocesos JS, e inyecta bloques protectores `try-catch` para la extracción de tarfiles en BrowserFS, evitando cuellos de botella y bloqueos por permisos en navegadores web móviles estrictos.
+*   **Fetch Interceptor (Aislamiento de Entorno)**: Se inyecta un interceptor global a nivel de API Fetch en `index.html`. Este bloque intercepta llamadas salientes de red destinadas a descargar dependencias del núcleo de `pygame_ce` (como las librerías CDN de `pygame-web.github.io/cdn/`) y las redirige de forma instantánea al origen local `/cdn/` del servidor propio. Esto garantiza que el juego cargue y compile sus dependencias de manera autónoma en redes móviles que bloqueen dominios externos o cuenten con firewalls restrictivos.
+
+### D. Fase 4: Fuerza Bruta de Orientación e Intercepción de Coordenadas Táctiles (`forzar_rotacion.py`)
+Dado que **Pong Kombat** está diseñado para jugarse en formato horizontal (Landscape) con resolución fija, esta fase inyecta un sistema de fuerza bruta en JS de bajo nivel para celulares que interactúa dinámicamente con el hardware:
+1.  **Rotación Física y Escalado por CSS**: Si un dispositivo móvil se encuentra sostenido verticalmente (modo Portrait), reglas CSS inyectadas de forma dinámica rotan el lienzo gráfico (`canvas.emscripten`) a 90 grados mediante transformadas 3D (`transform: translate(-50%, -50%) rotate(90deg)`), ajustando perfectamente la relación de aspecto 4:3 en el ancho del dispositivo sin deformar la imagen.
+2.  **Intercepción y Transformación de Coordenadas de Entrada (Touch-Mapping)**: Al rotar físicamente el Canvas por CSS, las coordenadas de toques táctiles (`Touch`) y del cursor del mouse (`MouseEvent`) quedan desalineadas respecto a la posición lógica de los elementos gráficos en Pygame. Para solucionar esto, el script redefine los getters de los prototipos nativos de JavaScript `MouseEvent.prototype` y `Touch.prototype`:
+    *   Si el dispositivo está en modo Portrait, el valor lógico de `clientX` se mapea dinámicamente al valor de `clientY` físico, y el de `clientY` se calcula como el ancho real del navegador menos la coordenada `clientX` física.
+    *   Esto realiza una rotación matemática de 90° del vector de entrada al vuelo, permitiendo que las pulsaciones y arrastres sobre la pantalla respondan con absoluta precisión a la posición física real de las paletas táctiles y botones en pantalla.
+3.  **Aislamiento Virtual de Dimensiones del Canvas**: SDL2 tiende a reaccionar ante los cambios de escala de los navegadores móviles (como cuando la barra de direcciones se oculta al hacer scroll), provocando reinicios del búfer WebGL. Para neutralizar esto, se virtualizan las propiedades `innerWidth`, `innerHeight`, `clientWidth`, `clientHeight`, `offsetWidth` y `offsetHeight` de la ventana y el canvas, forzando a que reporten **siempre** una resolución estática de `800x600` coincidente con el entorno de Python.
+4.  **Auto Fullscreen & Hardware Orientation Lock**: Registra sensores de toques interactivos en el navegador móvil para solicitar acceso nativo a pantalla completa (`requestFullscreen`) y forzar el bloqueo del acelerómetro del celular a modo horizontal de forma mandatoria mediante la API `screen.orientation.lock("landscape")`.
+
+---
+
+## 8. Diagrama de Clases (Referencia)
 
 El modelo estructural detallado de clases y sus relaciones se encuentra definido y estructurado en el archivo PlantUML adjunto en el proyecto:
 *   [diagrama_clases.puml](file:///c:/Users/agustin/Documents/workspace/pong_kombat/pong_kombat/archivos/diagrama_clases.puml)
