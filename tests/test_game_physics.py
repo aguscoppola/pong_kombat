@@ -17,9 +17,7 @@ def test_paddle_ball_collision_logic(game):
     ball.speed = 1000 # IMPORTANTE: Definir la velocidad base para el rebote
     game.balls = [ball]
     
-    # IMPORTANTE: Mover la pelota primero
-    ball.update(0.02)
-    # Luego procesar colisiones
+    # Procesar la física (se actualiza el movimiento e interactúa con la paleta)
     game.physics.update(0.02)
     
     # Debería haber rebotado (vx positivo ahora)

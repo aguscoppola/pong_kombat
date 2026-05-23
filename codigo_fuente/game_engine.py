@@ -17,8 +17,24 @@ from physics_engine import PhysicsEngine
 import assets
 
 class Game:
-    def __init__(self):
-        # Aumentar el buffer a 4096 para evitar crujidos en móviles (WebAssembly AudioContext)
+    def __init__(self, base_dir=None):
+
+       # 1. Definimos la ruta de la carpeta en AppData
+        appdata_path = os.path.join(os.environ['APPDATA'], 'PongKombat')
+        if not os.path.exists(appdata_path):
+            os.makedirs(appdata_path)
+        
+        # 2. Definimos el archivo de guardado
+        self.save_path = os.path.join(appdata_path, "save_data.json")
+        print(f"DEBUG: Guardando configuraciones en: {self.save_path}")
+
+        # 3. Cargamos el progreso
+        self.first_time_playing = True
+        self.load_progress()
+
+        # Mantenemos self.base_dir solo para los assets (imágenes/sonidos)
+        self.base_dir = base_dir if base_dir else os.path.dirname(os.path.abspath(__file__))
+
         pygame.mixer.pre_init(44100, -16, 2, 4096)
         pygame.init()
         pygame.mixer.init()
@@ -29,14 +45,14 @@ class Game:
         pygame.display.set_caption("Pong Kombat v0.7.0 - Mobile & Web Edition")
         # Icono de ventana (v0.6.0)
         try:
-            icon_path = os.path.join("archivos", "pong_kombat_cover.png")
+            icon_path = os.path.join(self.base_dir, "archivos", "pong_kombat_cover.png")
             if os.path.exists(icon_path):
                 icon = pygame.image.load(icon_path)
                 pygame.display.set_icon(icon)
             else:
                 icon = pygame.Surface((32, 32))
                 icon.fill((10, 10, 10))
-                pygame.draw.rect(icon, (255, 50, 50), (2, 6, 6, 20)) 
+                pygame.draw.rect(icon, (255, 50, 50), (2, 6, 6, 20))
                 pygame.draw.rect(icon, (50, 150, 255), (24, 6, 6, 20))
                 pygame.draw.circle(icon, (255, 255, 255), (16, 16), 4)
                 pygame.display.set_icon(icon)
@@ -69,6 +85,7 @@ class Game:
         self.init_entities()
         self.init_game_state()
         self.init_modifier_variables()
+        self.init_endless_pool()
         self.load_progress() # NUEVO v0.6.1: Cargar progreso al iniciar
         
         # Iniciar música del menú
@@ -118,6 +135,14 @@ class Game:
         # MODO MÓVIL (v0.7.0)
         self.mobile_mode = False
         self.geographic_controls = False
+        
+        # MODO ENDLESS (v0.8.0)
+        self.endless_active = False
+        self.endless_level = 1
+        self.endless_active_modifiers = []
+        self.endless_new_modifier_text = ""
+        self.endless_intro_timer = 0.0
+        self.endless_intro_x = SCREEN_WIDTH
         self.fingers = {} # finger_id -> (x, y)
         
         # Screen Shake
@@ -284,11 +309,11 @@ class Game:
 
         # Relojes y Poderes
         self.watch_spawn_hits_options = [3, 5, 10, 15]
-        self.watch_spawn_hits_idx = 2
+        self.watch_spawn_hits_idx = 1
         self.watch_spawn_hits_rect = pygame.Rect(0,0,80,40)
         self.watch_spawn_hits_text_rect = pygame.Rect(0,0,0,0)
         self.power_auto_grant_hits_options = [3, 5, 7, 10, 12]
-        self.power_auto_grant_hits_idx = 2
+        self.power_auto_grant_hits_idx = 1
         self.power_auto_grant_hits_rect = pygame.Rect(0,0,80,40)
         self.power_auto_grant_hits_text_rect = pygame.Rect(0,0,0,0)
         self.start_with_power_enabled = True
@@ -330,6 +355,13 @@ class Game:
         self.orange_watch_enabled = False
         self.orange_watch_rect = pygame.Rect(0,0,30,30)
         self.orange_watch_text_rect = pygame.Rect(0,0,0,0)
+        self.tictactoe_enabled = False
+        self.tictactoe_rect = pygame.Rect(0,0,30,30)
+        self.tictactoe_text_rect = pygame.Rect(0,0,0,0)
+        self.tictactoe_board = [None] * 9
+        self.tictactoe_winner = None
+        self.tictactoe_win_line = None
+        self.tictactoe_win_timer = 0.0
         self.magnet_power_enabled = False
         self.magnet_power_rect = pygame.Rect(0,0,30,30)
         self.magnet_power_text_rect = pygame.Rect(0,0,0,0)
@@ -391,7 +423,7 @@ class Game:
         self.portals_rect = pygame.Rect(0,0,30,30)
         self.portals_text_rect = pygame.Rect(0,0,0,0)
         self.portal_size_options = [25, 50, 75, 125, 180, 200]
-        self.portal_size_names = ["Minion", "Short", "Default", "Big", "Planet (180)", "Giant"]
+        self.portal_size_names = ["Minion", "Short", "Default", "Big", "Huge", "Giant"]
         self.portal_size_idx = 2
         self.portal_size_rect = pygame.Rect(0,0,130,40)
         self.portal_size_text_rect = pygame.Rect(0,0,0,0)
@@ -447,6 +479,29 @@ class Game:
         self.portal_red_rect = pygame.Rect(0,0,0,0)
         self.portal_green_rect = pygame.Rect(0,0,0,0)
         
+        # Endless CHAOS
+        self.endless_chaos_enabled = False
+        self.endless_chaos_rect = pygame.Rect(0,0,30,30)
+        self.endless_chaos_text_rect = pygame.Rect(0,0,0,0)
+        
+        self.endless_chaos_options = [0, 1, 2, 3, 4, 5]
+        self.endless_chaos_names = ["0 mods", "1 mod", "2 mods", "3 mods", "4 mods", "5 mods"]
+        self.endless_chaos_idx = 0
+        self.endless_chaos_amount_rect = pygame.Rect(0,0,130,40)
+        self.endless_chaos_amount_text_rect = pygame.Rect(0,0,0,0)
+        
+        self.endless_chaos_accumulation = False
+        self.endless_chaos_accumulation_rect = pygame.Rect(0,0,30,30)
+        self.endless_chaos_accumulation_text_rect = pygame.Rect(0,0,0,0)
+        
+        # State variables for banner animations
+        self.chaos_banner_text = ""
+        self.chaos_banner_timer = 0.0
+        self.chaos_banner_duration = 0.0
+        self.chaos_banner_x = SCREEN_WIDTH + 400
+        self.chaos_active_modifiers = []
+        self.initial_modifier_snapshot = {}
+        
         self._update_portal_rects()
 
         # Planetas
@@ -481,10 +536,13 @@ class Game:
         self.btn_solo_rect = pygame.Rect(SCREEN_WIDTH*3//4 - bw//2, SCREEN_HEIGHT//2 - bh//2 + 30, bw, bh)
         
         # Modo SOLO sub-modos (v0.6.0)
-        self.btn_classic_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 40, 300, 70)
-        self.btn_arcade_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 50, 300, 70)
-        self.btn_arcade_tutorial_help_rect = pygame.Rect(self.btn_arcade_rect.right + 10, self.btn_arcade_rect.y + 10, 50, 50)
-        self.btn_arcade_level_selector_rect = pygame.Rect(SCREEN_WIDTH//2 - 100, self.btn_arcade_rect.bottom + 15, 200, 30)
+        self.btn_classic_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 110, 300, 60)
+        self.btn_arcade_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 30, 300, 60)
+        self.btn_arcade_tutorial_help_rect = pygame.Rect(self.btn_arcade_rect.right + 10, self.btn_arcade_rect.y + 5, 50, 50)
+        self.btn_arcade_level_selector_rect = pygame.Rect(SCREEN_WIDTH//2 - 100, self.btn_arcade_rect.bottom + 5, 200, 30)
+        self.btn_endless_rect = pygame.Rect(SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 + 50, 300, 60)
+        self.btn_help_endless_rect = pygame.Rect(self.btn_endless_rect.right + 10, self.btn_endless_rect.y + 5, 50, 50)
+        self.show_endless_help = False
         self.arcade_tutorial_step = 0
         self.test_arcade_level = 1
         self.btn_solo_sub_back_rect = pygame.Rect(20, 20, 80, 40)
@@ -512,6 +570,7 @@ class Game:
         
         # Gorro de Corona (v0.6.0)
         self.arcade_completed = False # Desbloqueable
+        self.endless_chaos_unlocked = False # Recompensa de nivel 7/7 endless
         self.crown_hat_options = ["None", "Player 1", "Player 2", "Both"]
         self.crown_hat_idx = 0
         self.crown_hat_rect = pygame.Rect(0,0,130,40)
@@ -539,7 +598,7 @@ class Game:
         
         self.mouse_speed_options = [0.1, 0.25, 0.5, 1.0]
         self.mouse_speed_names = ["Slow", "Normal", "Default", "Fast"]
-        self.mouse_speed_idx = 2
+        self.mouse_speed_idx = 1
         self.mouse_speed_rect = pygame.Rect(0,0,130,40)
         self.mouse_speed_text_rect = pygame.Rect(0,0,0,0)
         
@@ -587,12 +646,13 @@ class Game:
         self.equal_watches_enabled = False
         self.equal_powers_enabled = False
         self.watches_kept_enabled = False
-        self.watch_spawn_hits_idx = 2
-        self.power_auto_grant_hits_idx = 2
+        self.watch_spawn_hits_idx = 1
+        self.power_auto_grant_hits_idx = 1
         self.start_with_power_enabled = True
         self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
         self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
         self.orange_watch_enabled = False
+        self.tictactoe_enabled = False
         self.magnet_power_enabled = False
         self.ghost_power_enabled = False
         self.ghost_identical_enabled = False
@@ -607,9 +667,33 @@ class Game:
         self.sleeping_power_enabled = False
         self.start_x2_enabled = False
         self.add_mouse_enabled = False
+        self.mouse_speed_idx = 1
         self.initial_ball_speed_idx = 1
         self.ball_speed_multiplier_idx = 1
         self.destructible_planets_enabled = False
+        self.endless_chaos_enabled = False
+        self.endless_chaos_idx = 0
+        self.endless_chaos_accumulation = False
+        
+        # Resetear variables y estados de Clima
+        self.cloudy_day_enabled = False
+        self.cloud_size_idx = 1
+        self.clouds = []
+        self.cloud_spawn_timer = 0
+        self.rainy_day_enabled = False
+        self.rain_drops = []
+        self.rain_timer = 0.0
+        self.rain_drop_size_idx = 1
+        self.rain_precipitation_idx = 1
+        self.lightning_enabled = False
+        self.lightning_active = False
+        self.lightning_flash_timer = 0.0
+        self.lightning_timer = 0.0
+        if self.rain_sound_playing:
+            self.audio.fadeout('rainy', 500)
+            self.rain_sound_playing = False
+            
+        self.reset_tictactoe()
         self._update_portal_rects()
 
     def save_progress(self):
@@ -625,19 +709,22 @@ class Game:
             "music_volume": self.music_volume,
             "vfx_enabled": self.vfx_enabled,
             "shake_enabled": self.shake_enabled,
-            "geographic_controls": self.geographic_controls
+            "geographic_controls": self.geographic_controls,
+            "endless_chaos_unlocked": getattr(self, 'endless_chaos_unlocked', False)
         }
         try:
-            with open("save_data.json", "w") as f:
+            with open(self.save_path, "w") as f:
                 json.dump(data, f)
         except Exception as e:
             print(f"Error al guardar progreso: {e}")
 
     def load_progress(self):
         """Carga el progreso del usuario desde el archivo JSON (v0.6.1)"""
-        if os.path.exists("save_data.json"):
+        # Cámbialo por esto:
+        if os.path.exists(self.save_path):            
             try:
-                with open("save_data.json", "r") as f:
+                # Cámbialo por esto
+                with open(self.save_path, "r") as f:
                     data = json.load(f)
                     self.first_time_playing = data.get("first_time_playing", True)
                     self.show_tutorial_prompt = self.first_time_playing
@@ -651,6 +738,11 @@ class Game:
                     self.vfx_enabled = data.get("vfx_enabled", True)
                     self.shake_enabled = data.get("shake_enabled", True)
                     self.geographic_controls = data.get("geographic_controls", False)
+                    self.endless_chaos_unlocked = data.get("endless_chaos_unlocked", False)
+                    
+                    # FORZAR RESET PARA TESTEO (v0.7.4): Permitir siempre ver la pantalla de recompensa final en cada inicio de juego
+                    self.endless_chaos_unlocked = False
+                    self.arcade_completed = False
                     
                     # Sincronizar volúmenes con AudioManager
                     self.audio.master_volume = self.sfx_volume
@@ -676,6 +768,7 @@ class Game:
         self.ball_is_x2 = False
         self.is_x2_item_active = False
         self.pending_x2_spawn = False
+        self.reset_tictactoe()
         
         self.paddle1.reset()
         self.paddle2.reset()
@@ -694,14 +787,493 @@ class Game:
         self.mouse = None
         self.mouse_hits_counter = 0
         
+        # Resetear variables dinámicas y de renderizado de Clima
+        self.clouds = []
+        self.rain_drops = []
+        self.rain_timer = 0.0
+        self.cloud_spawn_timer = 0
+        self.lightning_active = False
+        self.lightning_flash_timer = 0.0
+        self.lightning_timer = 0.0
+        if self.rain_sound_playing:
+            self.audio.fadeout('rainy', 500)
+            self.rain_sound_playing = False
+        
+        # Reset Endless Chaos variables
+        self.chaos_banner_text = ""
+        self.chaos_banner_timer = 0.0
+        self.chaos_banner_duration = 0.0
+        self.chaos_banner_x = SCREEN_WIDTH + 400
+        self.chaos_active_modifiers = []
+        self.initial_modifier_snapshot = {}
+        self.trigger_endless_chaos()
+
         self.state = STATE_SERVE
         self.serve_timer = 2.0
+        if hasattr(self, "chaos_banner_timer") and self.chaos_banner_timer > 0.0:
+            self.serve_timer = self.chaos_banner_timer
         self.serve_direction = random.choice([1, -1])
         self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
         self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
         
         if not skip_announcement:
             self._check_for_announcements()
+
+    def reset_tictactoe(self):
+        self.tictactoe_board = [None] * 9
+        self.tictactoe_winner = None
+        self.tictactoe_win_line = None
+        self.tictactoe_win_timer = 0.0
+
+    def _check_tictactoe_win(self):
+        winning_lines = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], # Horizontales
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], # Verticales
+            [0, 4, 8], [2, 4, 6]             # Diagonales
+        ]
+        for line in winning_lines:
+            v0 = self.tictactoe_board[line[0]]
+            v1 = self.tictactoe_board[line[1]]
+            v2 = self.tictactoe_board[line[2]]
+            if v0 is not None and v0 == v1 and v1 == v2:
+                self.tictactoe_winner = v0
+                self.tictactoe_win_line = line
+                self.tictactoe_win_timer = 0.8
+                self.audio.play('explosion')
+                winner_paddle = self.paddle1 if v0 == 1 else self.paddle2
+                self._grant_tictactoe_power(winner_paddle)
+                break
+
+    def _grant_tictactoe_power(self, paddle):
+        if paddle.power_active in [POWER_SHIELD, POWER_MAGNET]:
+            return
+        all_p = [
+            (POWER_FIREBALL, RED, not self.remove_power_red),
+            (POWER_SHIELD, GREEN, not self.remove_power_green),
+            (POWER_SPEED, YELLOW, not self.remove_power_yellow),
+            (POWER_ORANGE, ORANGE, not self.remove_power_orange),
+            (POWER_MAGNET, GRAY, self.magnet_power_enabled),
+            (POWER_GHOST, GHOST_COLOR, self.ghost_power_enabled),
+            (POWER_GUM, GUM_PINK, self.gum_power_enabled),
+            (POWER_SLEEP, SLEEP_PURPLE, self.sleeping_power_enabled)
+        ]
+        available = [p for p in all_p if p[2]]
+        if not available:
+            return
+        p_type, p_color, _ = random.choice(available)
+        
+        if paddle.power_stored == POWER_NONE:
+            paddle.power_stored = p_type
+            paddle.color = p_color
+            if p_type == POWER_GUM:
+                paddle.power_active = POWER_GUM
+                paddle.gum_charges = 3
+                paddle.color = GUM_PINK
+                paddle.power_stored = POWER_NONE
+        elif self.encapsulate_powers_enabled:
+            paddle.power_encapsulated = p_type
+            paddle.encapsulated_color = p_color
+
+    def init_endless_pool(self):
+        self.endless_pool = [
+            # Toggles
+            {"id": "encapsulate_powers", "type": "toggle", "field": "encapsulate_powers_enabled", 
+             "text_en": "|GRAY|Encapsulating|WHITE| powers", "text_es": "Poderes |GRAY|encapsulados|WHITE|"},
+            {"id": "cloudy_day", "type": "toggle", "field": "cloudy_day_enabled", 
+             "text_en": "Enable |GRAY|CLOUDY|WHITE| day", "text_es": "Día |GRAY|NUBLADO|WHITE| activo"},
+            {"id": "rainy_day", "type": "toggle", "field": "rainy_day_enabled", 
+             "text_en": "Enable |BLUE|RAINY|WHITE| day", "text_es": "Día |BLUE|LLUVIOSO|WHITE| activo"},
+            {"id": "lightning", "type": "toggle", "field": "lightning_enabled", "depends_on": "rainy_day_enabled",
+             "text_en": "Enable |YELLOW|LIGHTNING|WHITE| in rain", "text_es": "|YELLOW|RELÁMPAGOS|WHITE| en lluvia"},
+            {"id": "floating_planets", "type": "toggle", "field": "floating_planets_enabled", 
+             "text_en": "Allow floating |CYAN|planets|WHITE|", "text_es": "|CYAN|Planetas|WHITE| flotantes activos"},
+            {"id": "destructible_planets", "type": "toggle", "field": "destructible_planets_enabled", "depends_on": "floating_planets_enabled",
+             "text_en": "Destructible |RED|planets|WHITE|", "text_es": "|RED|Planetas|WHITE| destructibles"},
+            {"id": "portals", "type": "toggle", "field": "portals_enabled", 
+             "text_en": "Dimensional |PURPLE|PORTALS|WHITE|", "text_es": "|PURPLE|PORTALES|WHITE| dimensionales"},
+            {"id": "portals_vertical", "type": "toggle", "field": "portals_vertical", "depends_on": "portals_enabled",
+             "text_en": "Vertical |PURPLE|PORTALS|WHITE|", "text_es": "|PURPLE|PORTALES|WHITE| verticales"},
+            {"id": "more_portals", "type": "toggle", "field": "more_portals_enabled", "depends_on": "portals_enabled",
+             "text_en": "2 more |PURPLE|PORTALS|WHITE|", "text_es": "2 |PURPLE|PORTALES|WHITE| más"},
+            {"id": "revolver", "type": "toggle", "field": "revolver_enabled", 
+             "text_en": "Enable |GOLD|REVOLVER|WHITE| power", "text_es": "Poder de |GOLD|REVÓLVER|WHITE| activo"},
+            {"id": "sleeping_power", "type": "toggle", "field": "sleeping_power_enabled", 
+             "text_en": "Enable |PURPLE|SLEEPING|WHITE| power", "text_es": "Poder de |PURPLE|SUEÑO|WHITE| activo"},
+            {"id": "start_x2", "type": "toggle", "field": "start_x2_enabled", 
+             "text_en": "Enable |YELLOW|X2|WHITE| multiplier", "text_es": "Multiplicador |YELLOW|X2|WHITE| activo"},
+            {"id": "add_mouse", "type": "toggle", "field": "add_mouse_enabled", 
+             "text_en": "Intrusive |GRAY|Mouse|WHITE|", "text_es": "|GRAY|Ratón|WHITE| Intruso activo"},
+            {"id": "orange_watch", "type": "toggle", "field": "orange_watch_enabled", 
+             "text_en": "Enable |ORANGE|ORANGE|WHITE| watch", "text_es": "Reloj |ORANGE|NARANJA|WHITE| activo"},
+            {"id": "magnet_power", "type": "toggle", "field": "magnet_power_enabled", 
+             "text_en": "Enable |GRAY|MAGNET|WHITE| power", "text_es": "Poder |GRAY|MAGNÉTICO|WHITE| activo"},
+            {"id": "ghost_power", "type": "toggle", "field": "ghost_power_enabled", 
+             "text_en": "Enable |GHOST|GHOST|WHITE| power", "text_es": "Poder |GHOST|FANTASMA|WHITE| activo"},
+            {"id": "ghost_identical", "type": "toggle", "field": "ghost_identical_enabled", "depends_on": "ghost_power_enabled",
+             "text_en": "Identical |GHOST|GHOST|WHITE| ball", "text_es": "Pelota |GHOST|fantasma|WHITE| idéntica"},
+            {"id": "gum_power", "type": "toggle", "field": "gum_power_enabled", 
+             "text_en": "Enable |PINK|GUM|WHITE| power", "text_es": "Poder de |PINK|CHICLE|WHITE| activo"},
+            {"id": "tictactoe", "type": "toggle", "field": "tictactoe_enabled", 
+             "text_en": "Enable |CYAN|Tic-tac-toe|WHITE|", "text_es": "Activar |CYAN|Ta-Te-Ti|WHITE|"},
+            {"id": "experimental_golden_goal", "type": "toggle", "field": "experimental_golden_goal", 
+             "text_en": "|GOLD|GOLDEN GOAL|WHITE| rule", "text_es": "Regla de |GOLD|GOL DE ORO|WHITE|"},
+            {"id": "equal_powers", "type": "toggle", "field": "equal_powers_enabled", 
+             "text_en": "Equal powers (|YELLOW|25%|WHITE|)", "text_es": "Poderes iguales (|YELLOW|25%|WHITE|)"},
+            {"id": "equal_watches", "type": "toggle", "field": "equal_watches_enabled", 
+             "text_en": "Equal watches (|YELLOW|20%|WHITE|)", "text_es": "Relojes iguales (|YELLOW|20%|WHITE|)"},
+            {"id": "watches_kept", "type": "toggle", "field": "watches_kept_enabled", 
+             "text_en": "Watches kept in |CYAN|zone|WHITE|", "text_es": "Relojes guardados en |CYAN|zona|WHITE|"},
+            
+            # Removal Accordions
+            {"id": "remove_blue", "type": "toggle", "field": "remove_blue", 
+             "text_en": "Remove |BLUE|BLUE|WHITE| watch", "text_es": "Eliminar reloj |BLUE|AZUL|WHITE|"},
+            {"id": "remove_red", "type": "toggle", "field": "remove_red", 
+             "text_en": "Remove |RED|RED|WHITE| watch", "text_es": "Eliminar reloj |RED|ROJO|WHITE|"},
+            {"id": "remove_purple", "type": "toggle", "field": "remove_purple", 
+             "text_en": "Remove |PURPLE|PURPLE|WHITE| watch", "text_es": "Eliminar reloj |PURPLE|VIOLETA|WHITE|"},
+            {"id": "remove_white", "type": "toggle", "field": "remove_white", 
+             "text_en": "Remove |WHITE|WHITE|WHITE| watch", "text_es": "Eliminar reloj |WHITE|BLANCO|WHITE|"},
+            {"id": "remove_yellow", "type": "toggle", "field": "remove_yellow", 
+             "text_en": "Remove |YELLOW|YELLOW|WHITE| watch", "text_es": "Eliminar reloj |YELLOW|AMARILLO|WHITE|"},
+             
+            {"id": "remove_power_red", "type": "toggle", "field": "remove_power_red", 
+             "text_en": "Remove |RED|RED|WHITE| power", "text_es": "Eliminar poder |RED|ROJO|WHITE|"},
+            {"id": "remove_power_green", "type": "toggle", "field": "remove_power_green", 
+             "text_en": "Remove |GREEN|GREEN|WHITE| power", "text_es": "Eliminar poder |GREEN|VERDE|WHITE|"},
+            {"id": "remove_power_yellow", "type": "toggle", "field": "remove_power_yellow", 
+             "text_en": "Remove |YELLOW|YELLOW|WHITE| power", "text_es": "Eliminar poder |YELLOW|AMARILLO|WHITE|"},
+            {"id": "remove_power_orange", "type": "toggle", "field": "remove_power_orange", 
+             "text_en": "Remove |ORANGE|ORANGE|WHITE| power", "text_es": "Eliminar poder |ORANGE|NARANJA|WHITE|"},
+
+            # Scales (indices of options)
+            {"id": "cloud_size", "type": "scale", "field": "cloud_size_idx", "max_idx": 3, "depends_on_any": ["cloudy_day_enabled", "rainy_day_enabled"],
+             "names_en": ["Clear |GRAY|clouds|WHITE|", "|GRAY|Cloudy|WHITE|", "|BLUE|Rainy|WHITE| clouds", "|YELLOW|TORRENCIAL|WHITE| clouds"],
+             "names_es": ["|GRAY|Nubes|WHITE| despejadas", "|GRAY|Nublado|WHITE|", "|BLUE|Nubes|WHITE| de lluvia", "|YELLOW|Nubes TORRENCIALES|WHITE|"]},
+            {"id": "rain_drop_size", "type": "scale", "field": "rain_drop_size_idx", "max_idx": 4, "depends_on": "rainy_day_enabled",
+             "names_en": ["Thin |BLUE|rain|WHITE| drops", "Default |BLUE|rain|WHITE| drops", "Mid |BLUE|rain|WHITE| drops", "Big |BLUE|rain|WHITE| drops", "|YELLOW|TORRENCIAL|WHITE| rain drops"],
+             "names_es": ["|BLUE|Gotas|WHITE| finas de lluvia", "|BLUE|Gotas|WHITE| normales", "|BLUE|Gotas|WHITE| medianas", "|BLUE|Gotas|WHITE| grandes", "|YELLOW|Gotas TORRENCIALES|WHITE|"]},
+            {"id": "rain_precipitation", "type": "scale", "field": "rain_precipitation_idx", "max_idx": 3, "depends_on": "rainy_day_enabled",
+             "names_en": ["|BLUE|2 mm|WHITE| precipitation", "|BLUE|10 mm|WHITE| precipitation", "|BLUE|30 mm|WHITE| precipitation", "|YELLOW|50 mm|WHITE| precipitation"],
+             "names_es": ["Precipitación de |BLUE|2 mm|WHITE|", "Precipitación de |BLUE|10 mm|WHITE|", "Precipitación de |BLUE|30 mm|WHITE|", "Precipitación de |YELLOW|50 mm|WHITE|"]},
+            {"id": "gravity_force", "type": "scale", "field": "gravity_force_idx", "max_idx": 3, "depends_on": "floating_planets_enabled",
+             "names_en": ["|GRAY|Moon|WHITE| gravity", "|CYAN|Planet|WHITE| gravity", "|ORANGE|Gas Giant|WHITE| gravity", "|YELLOW|Star|WHITE| gravity"],
+             "names_es": ["Gravedad de |GRAY|Luna|WHITE|", "Gravedad de |CYAN|Planeta|WHITE|", "Gravedad de |ORANGE|Gigante Gaseoso|WHITE|", "Gravedad de |YELLOW|Estrella|WHITE|"]},
+            {"id": "gravity_radius", "type": "scale", "field": "gravity_radius_idx", "max_idx": 3, "depends_on": "floating_planets_enabled",
+             "names_en": ["|GRAY|Moon|WHITE| gravity radius", "|CYAN|Planet|WHITE| gravity radius", "|ORANGE|Gas Giant|WHITE| gravity radius", "|YELLOW|Star|WHITE| gravity radius"],
+             "names_es": ["Radio de gravedad de |GRAY|Luna|WHITE|", "Radio de gravedad de |CYAN|Planeta|WHITE|", "Radio de gravedad de |ORANGE|Gigante|WHITE|", "Radio de gravedad de |YELLOW|Estrella|WHITE|"]},
+            {"id": "planet_resistance", "type": "scale", "field": "planet_resistance_idx", "max_idx": 3, "depends_on": "floating_planets_enabled",
+             "names_en": ["|GRAY|Moon|WHITE| planet resistance", "|CYAN|Planet|WHITE| resistance", "|ORANGE|Gas Giant|WHITE| resistance", "|YELLOW|Star|WHITE| planet resistance"],
+             "names_es": ["Resistencia de |GRAY|Luna|WHITE|", "Resistencia de |CYAN|Planeta|WHITE|", "Resistencia de |ORANGE|Gigante|WHITE|", "Resistencia de |YELLOW|Estrella|WHITE|"]},
+            {"id": "portal_size", "type": "scale", "field": "portal_size_idx", "max_idx": 5, "depends_on": "portals_enabled",
+             "names_en": ["|PURPLE|Minion|WHITE| portal size", "|PURPLE|Short|WHITE| portal size", "|PURPLE|Default|WHITE| portal size", "|PURPLE|Big|WHITE| portal size", "|PURPLE|Planet|WHITE| portal size", "|PURPLE|Giant|WHITE| portal size"],
+             "names_es": ["Portal tamaño |PURPLE|Minion|WHITE|", "Portal tamaño |PURPLE|Corto|WHITE|", "Portal tamaño |PURPLE|Normal|WHITE|", "Portal tamaño |PURPLE|Grande|WHITE|", "Portal tamaño |PURPLE|Planeta|WHITE|", "Portal tamaño |PURPLE|Gigante|WHITE|"]},
+            {"id": "revolver_prob", "type": "scale", "field": "revolver_prob_idx", "max_idx": 3, "depends_on": "revolver_enabled",
+             "names_en": ["Low |GOLD|revolver|WHITE| prob", "Default |GOLD|revolver|WHITE| prob", "Quite |GOLD|revolver|WHITE| prob", "|GOLD|Always revolver|WHITE| prob"],
+             "names_es": ["Probabilidad de |GOLD|revólver|WHITE| baja", "Probabilidad normal", "Probabilidad bastante alta", "Probabilidad del |GOLD|100%|WHITE|"]},
+            {"id": "mouse_speed", "type": "scale", "field": "mouse_speed_idx", "max_idx": 3, "depends_on": "add_mouse_enabled",
+             "names_en": ["Slow |GRAY|mouse|WHITE| speed", "Normal |GRAY|mouse|WHITE| speed", "Default |GRAY|mouse|WHITE| speed", "|RED|Fast mouse|WHITE| speed"],
+             "names_es": ["Velocidad de |GRAY|ratón|WHITE| lenta", "Velocidad de |GRAY|ratón|WHITE| normal", "Velocidad de |GRAY|ratón|WHITE| estándar", "Velocidad de |RED|ratón rápida|WHITE|"]},
+            {"id": "mouse_appear", "type": "scale", "field": "mouse_appear_idx", "max_idx": 3, "depends_on": "add_mouse_enabled",
+             "names_en": ["|GRAY|Mouse|WHITE| on 1st hit", "|GRAY|Mouse|WHITE| on 2nd hit", "|GRAY|Mouse|WHITE| on 3rd hit", "|GRAY|Mouse|WHITE| on 5th hit"],
+             "names_es": ["|GRAY|Ratón|WHITE| al primer golpe", "|GRAY|Ratón|WHITE| al segundo golpe", "|GRAY|Ratón|WHITE| al tercer golpe", "|GRAY|Ratón|WHITE| al quinto golpe"]},
+            {"id": "initial_ball_speed", "type": "scale", "field": "initial_ball_speed_idx", "max_idx": 4,
+             "names_en": ["Low initial ball speed", "Default initial ball speed", "Mid initial ball speed", "|RED|Fast|WHITE| initial ball speed", "|YELLOW|FLASH|WHITE| initial ball speed"],
+             "names_es": ["Velocidad inicial de pelota baja", "Velocidad inicial normal", "Velocidad inicial media", "Velocidad inicial |RED|rápida|WHITE|", "Velocidad inicial |YELLOW|FLASH|WHITE|"]},
+            {"id": "ball_speed_multiplier", "type": "scale", "field": "ball_speed_multiplier_idx", "max_idx": 3,
+             "names_en": ["Low ball speed increase", "Default ball speed increase", "Original ball speed increase", "|RED|Fast|WHITE| ball speed increase"],
+             "names_es": ["Aumento de velocidad de pelota bajo", "Aumento normal", "Aumento original", "Aumento |RED|rápido|WHITE|"]},
+            {"id": "yellow_speed_up", "type": "scale", "field": "yellow_speed_up_idx", "max_idx": 3,
+             "names_en": ["Low |YELLOW|yellow|WHITE| speed up", "Default |YELLOW|yellow|WHITE| speed up", "Big |YELLOW|yellow|WHITE| speed up", "Giant |YELLOW|yellow|WHITE| speed up"],
+             "names_es": ["Aumento |YELLOW|amarillo|WHITE| bajo", "Aumento |YELLOW|amarillo|WHITE| normal", "Aumento |YELLOW|amarillo|WHITE| grande", "Aumento |YELLOW|amarillo|WHITE| gigante"]},
+            {"id": "watch_spawn_hits", "type": "scale", "field": "watch_spawn_hits_idx", "max_idx": 3,
+             "names_en": ["Watches spawn every |RED|3|WHITE| hits", "Watches spawn every 5 hits", "Watches spawn every 10 hits", "Watches spawn every 15 hits"],
+             "names_es": ["Relojes cada |RED|3|WHITE| golpes", "Relojes cada 5 golpes", "Relojes cada 10 golpes", "Relojes cada 15 golpes"]},
+            {"id": "power_auto_grant_hits", "type": "scale", "field": "power_auto_grant_hits_idx", "max_idx": 4,
+             "names_en": ["Power every |RED|3|WHITE| hits", "Power every 5 hits", "Power every 7 hits", "Power every 10 hits", "Power every 12 hits"],
+             "names_es": ["Poder cada |RED|3|WHITE| toques", "Poder cada 5 toques", "Poder cada 7 toques", "Poder cada 10 toques", "Poder cada 12 toques"]}
+        ]
+
+    def apply_chaos_modifiers(self):
+        # 1. Restore all modifiers to their snapshot baseline
+        for field, val in self.initial_modifier_snapshot.items():
+            setattr(self, field, val)
+        
+        # 2. Re-apply portal rects updating if any portal modifier changed
+        portals_updated = False
+
+        # 3. Apply cumulatively each active chaos modifier
+        for mod in self.chaos_active_modifiers:
+            field = mod["field"]
+            if mod["type"] == "toggle":
+                setattr(self, field, True)
+                if field in ["portals_enabled", "more_portals_enabled", "portals_vertical"]:
+                    portals_updated = True
+            elif mod["type"] == "scale":
+                setattr(self, field, mod["value"])
+                if field == "portal_size_idx":
+                    portals_updated = True
+
+        if portals_updated:
+            self._update_portal_rects()
+
+    def trigger_endless_chaos(self):
+        # Check if Endless Chaos is active, and we are not in Endless or Arcade mode
+        if self.endless_active or self.arcade_active:
+            return
+        if not getattr(self, "endless_chaos_enabled", False):
+            return
+        
+        # 1. Take snapshot on the very first point of the match
+        if not hasattr(self, "initial_modifier_snapshot") or not self.initial_modifier_snapshot:
+            self.initial_modifier_snapshot = {}
+            for item in self.endless_pool:
+                self.initial_modifier_snapshot[item["field"]] = getattr(self, item["field"])
+            self.chaos_active_modifiers = []
+        else:
+            if not getattr(self, "endless_chaos_accumulation", False):
+                self.chaos_active_modifiers = []
+            self.apply_chaos_modifiers()
+            
+        # 2. Pick random modifiers from self.endless_pool
+        added_en = []
+        added_es = []
+        
+        k = self.endless_chaos_options[self.endless_chaos_idx]
+        
+        for idx_range in range(k):
+            # Apply existing chaos modifiers first to ensure current state is correct for dependency checks
+            self.apply_chaos_modifiers()
+            
+            # Find eligible candidates
+            candidates = []
+            for item in self.endless_pool:
+                # Regla: El ratón no puede aumentar su velocidad
+                if item["id"] == "mouse_speed":
+                    continue
+
+                # Reglas: No permitir Gol de Oro experimental ni Multiplicador X2 en Modo Infinito / Caos
+                if item["id"] in ["start_x2", "experimental_golden_goal"]:
+                    continue
+
+                # Regla: Los modificadores de "Remove..." solo pueden aparecer si no se filtran
+                if item["id"].startswith("remove_"):
+                    continue
+
+                field = item["field"]
+                snap_val = self.initial_modifier_snapshot.get(field, None)
+                
+                if item["type"] == "toggle":
+                    # If manually enabled from the start, or already active in game, not eligible
+                    if snap_val is True or getattr(self, field) is True:
+                        continue
+                elif item["type"] == "scale":
+                    # If manually set to max from the start, or already at max in game, not eligible
+                    if snap_val == item["max_idx"] or getattr(self, field) >= item["max_idx"]:
+                        continue
+                
+                # Check dependencies:
+                if "depends_on" in item:
+                    dep_field = item["depends_on"]
+                    if not getattr(self, dep_field):
+                        continue
+                if "depends_on_any" in item:
+                    dep_fields = item["depends_on_any"]
+                    if not any(getattr(self, f) for f in dep_fields):
+                        continue
+                
+                candidates.append(item)
+            
+            if not candidates:
+                break
+                
+            chosen = random.choice(candidates)
+            
+            if chosen["type"] == "toggle":
+                new_mod = {
+                    "id": chosen["id"],
+                    "type": "toggle",
+                    "field": chosen["field"],
+                    "text_en": chosen["text_en"],
+                    "text_es": chosen["text_es"]
+                }
+                added_en.append(chosen["text_en"])
+                added_es.append(chosen["text_es"])
+            else:
+                curr_idx = getattr(self, chosen["field"])
+                next_idx = curr_idx + 1
+                new_mod = {
+                    "id": chosen["id"],
+                    "type": "scale",
+                    "field": chosen["field"],
+                    "value": next_idx,
+                    "text_en": chosen["names_en"][next_idx],
+                    "text_es": chosen["names_es"][next_idx]
+                }
+                added_en.append(chosen["names_en"][next_idx])
+                added_es.append(chosen["names_es"][next_idx])
+                
+            self.chaos_active_modifiers.append(new_mod)
+        
+        # Apply the accumulated modifications
+        self.apply_chaos_modifiers()
+        
+        # Trigger banner/text sliding from right to left!
+        if added_en:
+            txt_en = f"NEW CHAOS: {' - '.join(added_en)}"
+            txt_es = f"NUEVO CAOS: {' - '.join(added_es)}"
+            self.chaos_banner_text = self.t(txt_en, txt_es)
+            num_mods = len(added_en)
+            self.chaos_banner_duration = 5.0 + num_mods * 0.5
+            self.chaos_banner_timer = self.chaos_banner_duration
+            self.chaos_banner_x = SCREEN_WIDTH + 400
+
+    def apply_endless_modifiers(self):
+        # 1. Restablecer todos los modificadores a baseline
+        self._reset_modifiers()
+        
+        # 2. Forzar partida a 1 punto
+        self.max_score = 1
+        self.match_point_enabled = False
+        self.experimental_golden_goal = False
+        
+        # 3. Aplicar acumulativamente cada modificador activo
+        for mod in self.endless_active_modifiers:
+            field = mod["field"]
+            if mod["type"] == "toggle":
+                setattr(self, field, True)
+                if field in ["portals_enabled", "more_portals_enabled", "portals_vertical"]:
+                    self._update_portal_rects()
+            elif mod["type"] == "scale":
+                setattr(self, field, mod["value"])
+                if field == "portal_size_idx":
+                    self._update_portal_rects()
+
+    def generate_next_endless_modifier(self):
+        added_en = []
+        added_es = []
+        
+        for _ in range(self.endless_level):
+            # 1. Aplicar los modificadores temporales de self para evaluar estado
+            self.apply_endless_modifiers()
+            
+            # 2. Encontrar candidatos elegibles en el pool
+            candidates = []
+            extras_ids = {
+                "orange_watch", "magnet_power", "ghost_power", "ghost_identical", 
+                "gum_power", "tictactoe", "floating_planets", "destructible_planets", 
+                "portals", "portals_vertical", "more_portals", "add_mouse", "revolver", 
+                "sleeping_power", "cloudy_day", "rainy_day", "lightning"
+            }
+            
+            for item in self.endless_pool:
+                # Regla: El ratón no puede aumentar su velocidad en Endless
+                if item["id"] == "mouse_speed":
+                    continue
+
+                # Reglas: No permitir Gol de Oro experimental ni Multiplicador X2 en Modo Infinito
+                if item["id"] in ["start_x2", "experimental_golden_goal"]:
+                    continue
+
+                # Regla: Los modificadores de "Remove..." solo pueden aparecer desde el nivel 3 en adelante
+                if self.endless_level < 3 and item["id"].startswith("remove_"):
+                    continue
+                
+                # Regla: En el primer nivel (nivel 1), obligatoriamente debe ser del apartado EXTRAS
+                if self.endless_level == 1 and item["id"] not in extras_ids:
+                    continue
+
+                # Comprobar dependencias requeridas
+                if "depends_on" in item:
+                    dep_field = item["depends_on"]
+                    if not getattr(self, dep_field):
+                        continue
+                if "depends_on_any" in item:
+                    dep_fields = item["depends_on_any"]
+                    if not any(getattr(self, f) for f in dep_fields):
+                        continue
+
+                field = item["field"]
+                if item["type"] == "toggle":
+                    if not getattr(self, field):
+                        candidates.append(item)
+                elif item["type"] == "scale":
+                    curr_idx = getattr(self, field)
+                    if field in ["watch_spawn_hits_idx", "power_auto_grant_hits_idx"]:
+                        if curr_idx == 1:
+                            candidates.append(item)
+                    else:
+                        if curr_idx < item["max_idx"]:
+                            candidates.append(item)
+            
+            if not candidates:
+                if not added_en:
+                    self.endless_new_modifier_text = self.t("MAXIMUM CHAOS REACHED!", "¡CAOS MÁXIMO ALCANZADO!")
+                    return
+                else:
+                    break
+                
+            # 3. Elegir uno al azar
+            chosen = random.choice(candidates)
+            
+            # 4. Formatear y añadir al registro de modificadores activos
+            if chosen["type"] == "toggle":
+                new_mod = {
+                    "id": chosen["id"],
+                    "type": "toggle",
+                    "field": chosen["field"],
+                    "text_en": chosen["text_en"],
+                    "text_es": chosen["text_es"]
+                }
+                added_en.append(chosen["text_en"])
+                added_es.append(chosen["text_es"])
+            else:
+                curr_idx = getattr(self, chosen["field"])
+                if chosen["field"] in ["watch_spawn_hits_idx", "power_auto_grant_hits_idx"]:
+                    next_idx = 0
+                else:
+                    next_idx = curr_idx + 1
+                new_mod = {
+                    "id": chosen["id"],
+                    "type": "scale",
+                    "field": chosen["field"],
+                    "value": next_idx,
+                    "text_en": chosen["names_en"][next_idx],
+                    "text_es": chosen["names_es"][next_idx]
+                }
+                added_en.append(chosen["names_en"][next_idx])
+                added_es.append(chosen["names_es"][next_idx])
+                
+            self.endless_active_modifiers.append(new_mod)
+            self.apply_endless_modifiers()
+            
+        if added_en:
+            txt_en = f"NEW CHAOS: {' - '.join(added_en)}"
+            txt_es = f"NUEVO CAOS: {' - '.join(added_es)}"
+            self.endless_new_modifier_text = self.t(txt_en, txt_es)
+
+    def start_endless_mode(self):
+        self.endless_active = True
+        self.arcade_active = False
+        self.is_ai_mode = True
+        self.endless_level = 1
+        self.endless_active_modifiers = []
+        self.score1 = self.score2 = 0
+        self.tutorial_active = False
+        
+        # Generar el primer modificador
+        self.generate_next_endless_modifier()
+        
+        self.reset_game(skip_announcement=True)
+        
+        # Iniciar animaciones de HUD y saque
+        self.endless_intro_timer = 4.0 + (self.endless_level - 1)
+        self.endless_intro_x = SCREEN_WIDTH + 400
+        self.serve_timer = self.endless_intro_timer + 1.0
+        self.serve_direction = random.choice([1, -1])
+        
+        # Iniciar saques
+        self.state = STATE_SERVE
+        self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
 
     def start_arcade_level(self, level):
         self._reset_modifiers() # Limpieza total antes de empezar (v0.6.0 Fix)
@@ -844,7 +1416,7 @@ class Game:
                 # Clásico + Ratón
                 self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
                 self.add_mouse_enabled = True
-                self.mouse_speed_idx = 1
+                self.mouse_speed_idx = 0
                 self.mouse_appear_idx = 0 # 1st hit
                 
                 self.arcade_intro_text = self.t(
@@ -1189,7 +1761,7 @@ class Game:
         if self.input_cooldown > 0: return # Bloquear clics si estamos en cooldown
         
         # Activar cooldown para el próximo clic
-        self.input_cooldown = 0.3
+        self.input_cooldown = 0.1
         
         # --- AVANCE DE TUTORIAL ARCADE POR CLIC (v0.7.2) ---
         if self.state == STATE_ARCADE_TUTORIAL:
@@ -1350,28 +1922,114 @@ class Game:
             elif self.back_btn_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.state = STATE_MAIN_MENU
-        
         elif self.state == STATE_SOLO_SUBMODE_SELECTION:
-            if self.btn_classic_rect.collidepoint(event.pos):
+            # === 1. POSICIONAMIENTO DE BOTONES (Se ejecuta siempre al entrar) ===
+            if self.arcade_completed:
+                self.btn_endless_rect.y = self.btn_arcade_level_selector_rect.bottom + 15
+            else:
+                self.btn_endless_rect.y = SCREEN_HEIGHT // 2 + 50
+
+            self.btn_help_endless_rect.x = self.btn_endless_rect.right + 10
+            self.btn_help_endless_rect.y = self.btn_endless_rect.y + 5
+
+           # === EVALUACIÓN DE CLICS (ADENTRO DEL SUBMENÚ) ===
+            
+            # PRIORIDAD 1: El botón exclusivo de volver (¡Ahora sí!)
+            if self.btn_solo_sub_back_rect.collidepoint(event.pos):
                 self.audio.play('hit')
-                self.state = STATE_PRESS_TO_START # Modo clásico es el de siempre
-            elif self.btn_arcade_rect.collidepoint(event.pos):
-                self.audio.play('hit')
-                # Empieza en el nivel seleccionado (Desbloqueado v0.7.3)
-                start_lvl = self.test_arcade_level
-                self.start_arcade_level(start_lvl)
+                self.state = STATE_MAIN_MENU
+                
+           # PRIORIDAD 2: El botón de ayuda de ARCADE
             elif self.btn_arcade_tutorial_help_rect.collidepoint(event.pos):
                 self.audio.play('pop')
                 self.state = STATE_ARCADE_TUTORIAL
+                
+                # Vaciamos los textos por si quedó algo de la vez anterior
+                self.tutorial_text_visible = ""
+                self.tutorial_text_full = ""
+                
+                self.arcade_tutorial_step = 0  # <--- Empezamos en 0
+                self._next_arcade_tutorial_step()  # Al llamar a la función, le suma 1 y cae PERFECTO en el Paso 1
+
+            # PRIORIDAD 3: Si la ayuda de Endless estaba abierta, cualquier otro clic la cierra
+            elif self.show_endless_help:
+                self.show_endless_help = False
+
+            # PRIORIDAD 4: Si toca el botón (?) de ENDLESS, se abre su ayuda
+            elif self.btn_help_endless_rect.collidepoint(event.pos):
+                self.show_endless_help = True
+
+            # PRIORIDAD 5: Los modos de juego
+            elif self.btn_classic_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.state = STATE_PRESS_TO_START
+                
+            elif self.btn_arcade_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                start_lvl = self.test_arcade_level if self.arcade_completed else 1
+                self.start_arcade_level(start_lvl)
+                
+            elif self.btn_endless_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.start_endless_mode()
+               # Sincronizar la posición del botón ENDLESS según si el test LEVEL está desbloqueado
+            if self.arcade_completed:
+                self.btn_endless_rect.y = self.btn_arcade_level_selector_rect.bottom + 15
+            else:
+                self.btn_endless_rect.y = SCREEN_HEIGHT // 2 + 50
+
+            # Sincronizar la posición del botón amarillo (?)
+            self.btn_help_endless_rect.x = self.btn_endless_rect.right + 10
+            self.btn_help_endless_rect.y = self.btn_endless_rect.y + 5
+
+# === EVALUACIÓN DE CLICS (ADENTRO DEL SUBMENÚ) ===
+            
+            # PRIORIDAD 1: El botón exclusivo de volver
+            if self.btn_solo_sub_back_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.state = STATE_MAIN_MENU
+                
+            # PRIORIDAD 2: El botón de ayuda de ARCADE
+            elif self.btn_arcade_tutorial_help_rect.collidepoint(event.pos):
+                self.audio.play('pop')
+                self.state = STATE_ARCADE_TUTORIAL
+                self.tutorial_text_visible = ""
+                self.tutorial_text_full = ""
+                self.arcade_tutorial_step = 0
+                self._next_arcade_tutorial_step()
+
+            elif self.btn_help_endless_rect.collidepoint(event.pos):
+                 self.audio.play('pop')
+                 self.state = STATE_ENDLESS_TUTORIAL
+
+            # Limpiamos los textos viejos y disparamos el paso 1
+                 self.tutorial_text_visible = ""
+                 self.tutorial_text_full = ""
+                 self.endless_tutorial_step = 0
+                 self._next_endless_tutorial_step()
+
+            # PRIORIDAD 4: Los botones para iniciar los modos de juego
+            elif self.btn_classic_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.state = STATE_PRESS_TO_START
+                
+            elif self.btn_arcade_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                start_lvl = self.test_arcade_level if self.arcade_completed else 1
+                self.start_arcade_level(start_lvl)
+                
+            elif self.btn_endless_rect.collidepoint(event.pos):
+                self.audio.play('hit')
+                self.start_endless_mode()
                 self.arcade_tutorial_step = 0
                 self.tutorial_text_visible = ""
                 self.tutorial_text_index = 0
-                press = self.t("(Touch screen).", "(Toca la pantalla).") if self.mobile_mode else self.t("(Press spacebar).", "(Presiona espacio).")
+                press = "|GRAY|" + (self.t("(touch the screen).", "(toca la pantalla).") if self.mobile_mode else self.t("(press space).", "(presiona espacio)."))
                 self.tutorial_text_full = self.t("This is ARCADE mode; there are 7 levels that you must complete in one go. ", "Este es el modo ARCADE; hay 7 niveles que debes completar de una sola vez. ") + press
-            elif self.btn_arcade_level_selector_rect.collidepoint(event.pos):
+        elif self.arcade_completed and self.btn_arcade_level_selector_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.test_arcade_level = (self.test_arcade_level % 7) + 1
-            elif self.btn_solo_sub_back_rect.collidepoint(event.pos):
+        elif self.btn_solo_sub_back_rect.collidepoint(event.pos):
                 self.audio.play('hit')
                 self.state = STATE_MODE_SELECTION
         
@@ -1445,6 +2103,9 @@ class Game:
             if self.back_btn_rect.collidepoint(event.pos):
                 self.audio.play('hit'); self.state = STATE_MAIN_MENU
 
+        elif self.state == STATE_ENDLESS_REWARD:
+            self._advance_endless_reward()
+
         elif self.state == STATE_GAME_OVER:
             if self.tutorial_active: return 
             
@@ -1460,7 +2121,21 @@ class Game:
             else:
                 if self.btn_gameover_restart.collidepoint(event.pos):
                     self.audio.play('hit')
-                    if self.arcade_active:
+                    if self.endless_active:
+                        if self.score1 > self.score2:
+                            self.endless_level += 1
+                        else:
+                            self.endless_level = 1
+                            self.endless_active_modifiers = []
+                        self.generate_next_endless_modifier()
+                        self.reset_game(skip_announcement=True)
+                        self.endless_intro_timer = 4.0 + (self.endless_level - 1)
+                        self.endless_intro_x = SCREEN_WIDTH + 400
+                        self.serve_timer = self.endless_intro_timer + 1.0
+                        self.serve_direction = random.choice([1, -1])
+                        self.state = STATE_SERVE
+                        self.balls[0].serve(self.serve_direction, 300 * self.initial_ball_speed_options[self.initial_ball_speed_idx])
+                    elif self.arcade_active:
                         if self.score1 > self.score2:
                             self.arcade_level += 1
                             self.start_arcade_level(self.arcade_level)
@@ -1471,11 +2146,14 @@ class Game:
                         self.state = STATE_PRESS_TO_START
                 elif self.btn_gameover_menu.collidepoint(event.pos):
                     self.audio.play('hit')
-                    if self.arcade_active:
+                    if self.endless_active:
                         self._reset_modifiers()
+                        self.endless_active = False
+                    elif self.arcade_active:
+                        self._reset_modifiers()
+                        self.arcade_active = False
                     self.reset_game(skip_announcement=True)
                     self.state = STATE_MAIN_MENU
-                    self.arcade_active = False
                     self.show_match_point_anim = self.show_golden_goal_anim = False
 
         elif self.state == STATE_PRESS_TO_START:
@@ -1558,7 +2236,20 @@ class Game:
             self._handle_experimental_clicks(event)
 
     def _handle_experimental_clicks(self, event):
-        if self.orange_watch_rect.collidepoint(event.pos) or self.orange_watch_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.orange_watch_enabled = not self.orange_watch_enabled
+        if self.endless_chaos_rect.collidepoint(event.pos) or self.endless_chaos_text_rect.collidepoint(event.pos):
+            if getattr(self, "endless_chaos_unlocked", False):
+                self.audio.play('pop')
+                self.endless_chaos_enabled = not self.endless_chaos_enabled
+        elif self.endless_chaos_enabled and self.endless_chaos_amount_rect.collidepoint(event.pos):
+            if getattr(self, "endless_chaos_unlocked", False):
+                self.audio.play('pop')
+                self.endless_chaos_idx = (self.endless_chaos_idx + 1) % len(self.endless_chaos_options)
+        elif self.endless_chaos_enabled and (self.endless_chaos_accumulation_rect.collidepoint(event.pos) or self.endless_chaos_accumulation_text_rect.collidepoint(event.pos)):
+            if getattr(self, "endless_chaos_unlocked", False):
+                self.audio.play('pop')
+                self.endless_chaos_accumulation = not self.endless_chaos_accumulation
+        elif self.tictactoe_rect.collidepoint(event.pos) or self.tictactoe_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.tictactoe_enabled = not self.tictactoe_enabled
+        elif self.orange_watch_rect.collidepoint(event.pos) or self.orange_watch_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.orange_watch_enabled = not self.orange_watch_enabled
         elif self.magnet_power_rect.collidepoint(event.pos) or self.magnet_power_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.magnet_power_enabled = not self.magnet_power_enabled
         elif self.experimental_golden_goal_rect.collidepoint(event.pos) or self.experimental_golden_goal_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.experimental_golden_goal = not self.experimental_golden_goal
         elif self.floating_planets_rect.collidepoint(event.pos) or self.floating_planets_text_rect.collidepoint(event.pos): self.audio.play('pop'); self.floating_planets_enabled = not self.floating_planets_enabled
@@ -1633,7 +2324,21 @@ class Game:
             # Solo detectamos hover para el botón de volver en settings si queremos, 
             # pero el usuario pidió silenciar los botones DENTRO de settings.
             pass
-                
+        elif self.state == STATE_SOLO_SUBMODE_SELECTION:
+            # Ponemos en una lista todos los botones de esta pantalla
+            botones_submenu = [
+                self.btn_classic_rect, 
+                self.btn_arcade_rect, 
+                self.btn_endless_rect, 
+                self.btn_solo_sub_back_rect,
+                self.btn_help_endless_rect,
+                self.btn_arcade_tutorial_help_rect
+            ]
+            # Si el mouse está sobre cualquiera de ellos, lo marcamos como el hover actual
+            for r in botones_submenu:
+                if r.collidepoint(mpos):
+                    current_hover = r        
+        
         # 2. Si entramos en un botón nuevo, sonar 'pop'
         if current_hover and current_hover != self.last_hovered_rect:
             self.audio.play('pop')
@@ -1670,10 +2375,17 @@ class Game:
             if event.key == pygame.K_SPACE:
                 self._next_arcade_tutorial_step()
             return
-
+        
+        elif self.state == STATE_ENDLESS_TUTORIAL:
+            self._next_endless_tutorial_step()
         if self.state == STATE_ARCADE_REWARD:
             if event.key == pygame.K_SPACE:
                 self._advance_arcade_reward()
+            return
+
+        if self.state == STATE_ENDLESS_REWARD:
+            if event.key == pygame.K_SPACE:
+                self._advance_endless_reward()
             return
 
         if self.tutorial_active:
@@ -2014,6 +2726,8 @@ class Game:
             self.hourglass_type = 1
             self.tutorial_first_watch_spawned = True
     def activate_paddle_power(self, paddle, owner):
+        if paddle.power_active in [POWER_SHIELD, POWER_MAGNET]:
+            return
         # Si el poder es REVOLVER y no está activo, activarlo
         if paddle.power_stored == POWER_REVOLVER:
             self.audio.play('item_get')
@@ -2140,6 +2854,7 @@ class Game:
         # Resetear SLEEP (v0.6.0)
         self.sleep_projectiles = []
         self.mouse_hits_counter = 0
+        self.reset_tictactoe()
 
     def goal_scored(self, player):
         self.audio.play('goal')
@@ -2180,15 +2895,38 @@ class Game:
                 pass
             else:
                 winner = 1 if self.score1 >= tut_max_score else 2
-                msg_win = self.t(f"PLAYER {winner} WINS!", f"¡EL JUGADOR {winner} GANA!")
-                self.winner_text = msg_win
-                # No mostrar mensaje de ventaja en nivel 7 ni si fue gol de oro (v0.7.3)
-                if self.match_point_enabled and not self.tutorial_active and int(self.arcade_level) != 7 and not self.is_golden_goal_round:
-                    self.winner_text += "\n|YELLOW|" + self.t(f"(By advantage of 2 points)", f"(Por ventaja de 2 puntos)")
-                self.state = STATE_GAME_OVER
+                if self.endless_active:
+                    if winner == 1:
+                        self.winner_text = self.t(f"LEVEL {self.endless_level} PASSED!", f"¡NIVEL {self.endless_level} SUPERADO!")
+                    else:
+                        self.winner_text = self.t("GAME OVER", "FIN DE JUEGO")
+                else:
+                    msg_win = self.t(f"PLAYER {winner} WINS!", f"¡EL JUGADOR {winner} GANA!")
+                    self.winner_text = msg_win
+                    # No mostrar mensaje de ventaja en nivel 7 ni si fue gol de oro (v0.7.3)
+                    if self.match_point_enabled and not self.tutorial_active and int(self.arcade_level) != 7 and not self.is_golden_goal_round:
+                        self.winner_text += "\n|YELLOW|" + self.t(f"(By advantage of 2 points)", f"(Por ventaja de 2 puntos)")
+                
+                if self.endless_active and winner == 1 and self.endless_level == 7 and not getattr(self, 'endless_chaos_unlocked', False):
+                    self.state = STATE_ENDLESS_REWARD
+                    self.reward_step = 0
+                    self._init_endless_reward_text()
+                else:
+                    self.state = STATE_GAME_OVER
                 
                 # CELEBRACIÓN NIVEL FINAL (v0.6.0)
-                self._trigger_victory_celebration(winner)
+                if not self.endless_active:
+                    self._trigger_victory_celebration(winner)
+                else:
+                    if winner == 1:
+                        is_reward_level = (self.endless_level == 7)
+                        if is_reward_level and not getattr(self, 'endless_chaos_unlocked', False):
+                            self.audio.play('victory_arcade')
+                            self.vfx.confetti_rain(200)
+                        else:
+                            self.audio.play('bell')
+                    else:
+                        self.audio.play('error')
 
                 # TUTORIAL ENDGAME
                 if self.tutorial_active:
@@ -2196,6 +2934,7 @@ class Game:
                 return
 
         # Si no hay victoria, preparamos el saque
+        self.trigger_endless_chaos()
         self.state = STATE_SERVE
         self.serve_direction = s_dir
         self.balls = [Ball(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)]
@@ -2203,6 +2942,8 @@ class Game:
         
         # Activar el temporizador de saque y anuncios (Match Point, etc)
         self.serve_timer = 1.75 # Cooldown de seguridad
+        if hasattr(self, "chaos_banner_timer") and self.chaos_banner_timer > 0.0:
+            self.serve_timer = self.chaos_banner_timer
         self._check_for_announcements()
         
         if self.state == STATE_SERVE:
@@ -2223,13 +2964,28 @@ class Game:
         # Solo en el nivel 7 del modo arcade (v0.7.3)
         if int(self.arcade_level) == 7:
             if winner == 1:
-                self.audio.play('victory_arcade')
-                self.vfx.confetti_rain(500)
+                if not self.arcade_completed:
+                    self.audio.play('victory_arcade')
+                else:
+                    self.audio.play('bell')
                 # Evitar duplicar el texto si ya se añadió
                 if "|GOLD|" not in self.winner_text:
                     self.winner_text += "\n|GOLD|CHAMPION!" if self.language=="EN" else "\n|GOLD|¡CAMPEÓN!"
             else:
                 self.audio.play('error')
+
+    def _advance_endless_reward(self):
+        if len(getattr(self, "reward_text_visible", "")) < len(getattr(self, "reward_text_full", "")):
+            self.reward_text_visible = self.reward_text_full
+        else:
+            self.audio.play('hit')
+            if getattr(self, "reward_step", 0) == 0:
+                self.reward_step = 1
+                self._init_endless_reward_text()
+                self.endless_chaos_unlocked = True
+                self.save_progress()
+            else:
+                self.state = STATE_GAME_OVER
 
     def _advance_arcade_reward(self):
         if len(self.reward_text_visible) < len(self.reward_text_full):
@@ -2250,13 +3006,25 @@ class Game:
 
     def _init_reward_text(self):
         if self.reward_step == 0:
-            instr = self.t(" (Touch screen to continue)", " (Toca la pantalla para continuar)") if self.mobile_mode else self.t(" (Press spacebar to continue)", " (Pulsa espacio para continuar)")
+            instr = "|GRAY|" + (self.t(" (touch the screen to continue)", " (toca la pantalla para continuar)") if self.mobile_mode else self.t(" (press space to continue)", " (pulsa espacio para continuar)"))
             self.reward_text_full = self.t("CONGRATULATIONS! You beat ARCADE mode, you're now a PONG KOMBAT pro.", 
                                          "¡FELICIDADES! Has superado el modo ARCADE, ahora eres un profesional de PONG KOMBAT.") + instr
         else:
-            instr = self.t(" (Touch screen to finish)", " (Toca la pantalla para finalizar)") if self.mobile_mode else self.t(" (Press spacebar to finish)", " (Pulsa espacio para finalizar)")
+            instr = "|GRAY|" + (self.t(" (touch the screen to finish)", " (toca la pantalla para finalizar)") if self.mobile_mode else self.t(" (press space to finish)", " (pulsa espacio para finalizar)"))
             self.reward_text_full = self.t("You can now equip the CROWN in the SKINS section of the menu.", 
-                                         "Ahora puedes equipar la CORONA en la sección de ASPECTOS del menú.") + instr
+                                         "Ahora puedes equipar la CORONA en el apartado de SKINS del menú.") + instr
+        self.reward_text_visible = ""
+        self.reward_char_timer = 0
+
+    def _init_endless_reward_text(self):
+        if self.reward_step == 0:
+            instr = "|GRAY|" + (self.t(" (touch the screen to continue)", " (toca la pantalla para continuar)") if self.mobile_mode else self.t(" (press space to continue)", " (pulsa espacio para continuar)"))
+            self.reward_text_full = self.t("|WHITE|Wow, you're having an amazing streak in ENDLESS mode! You deserve a new modifier.", 
+                                         "|WHITE|¡Wow, llevas una racha increíble en el modo ENDLESS! Te mereces un nuevo modificador.") + instr
+        else:
+            instr = "|GRAY|" + (self.t(" (touch the screen to finish)", " (toca la pantalla para finalizar)") if self.mobile_mode else self.t(" (press space to finish)", " (pulsa espacio para finalizar)"))
+            self.reward_text_full = self.t("|WHITE|You can now try it in the EXTRAS tab", 
+                                         "|WHITE|Ahora puedes probarlo en la pestaña EXTRAS") + instr
         self.reward_text_visible = ""
         self.reward_char_timer = 0
 
@@ -2301,6 +3069,30 @@ class Game:
             return
 
     def update(self, dt):
+        if hasattr(self, "chaos_banner_timer") and self.chaos_banner_timer > 0.0:
+            self.chaos_banner_timer -= dt
+            if self.chaos_banner_timer < 0.0:
+                self.chaos_banner_timer = 0.0
+            
+            t = self.chaos_banner_timer
+            duration = getattr(self, "chaos_banner_duration", 5.0)
+            if duration <= 2.0:
+                duration = 5.0
+            
+            if t > duration - 1.0:
+                progress = duration - t
+                self.chaos_banner_x = SCREEN_WIDTH + 600 - (SCREEN_WIDTH + 600 - SCREEN_WIDTH // 2) * progress
+            elif t > 1.0:
+                self.chaos_banner_x = SCREEN_WIDTH // 2
+            else:
+                progress = 1.0 - t
+                self.chaos_banner_x = SCREEN_WIDTH // 2 - (SCREEN_WIDTH // 2 + 600) * progress
+
+        if self.tictactoe_enabled and self.tictactoe_win_timer > 0.0:
+            self.tictactoe_win_timer -= dt
+            if self.tictactoe_win_timer <= 0.0:
+                self.reset_tictactoe()
+
         self.vfx.enabled = self.vfx_enabled
         self.vfx.update(dt)
 
@@ -2348,14 +3140,20 @@ class Game:
             self.golden_goal_anim_timer -= dt
             if self.golden_goal_anim_timer <= 0: self.show_golden_goal_anim = False
 
-        if self.state == STATE_ARCADE_REWARD:
-            if len(self.reward_text_visible) < len(self.reward_text_full):
+        if self.endless_active and self.endless_intro_timer > 0:
+            self.endless_intro_timer -= dt
+            if self.endless_intro_x > SCREEN_WIDTH // 2:
+                self.endless_intro_x -= 1000 * dt
+                if self.endless_intro_x < SCREEN_WIDTH // 2:
+                    self.endless_intro_x = SCREEN_WIDTH // 2
+
+        if self.state == STATE_ARCADE_REWARD or self.state == STATE_ENDLESS_REWARD:
+            if len(getattr(self, "reward_text_visible", "")) < len(getattr(self, "reward_text_full", "")):
                 self.reward_char_timer -= dt
                 if self.reward_char_timer <= 0:
                     self.reward_char_timer = 0.03
                     next_char = self.reward_text_full[len(self.reward_text_visible)]
                     self.reward_text_visible += next_char
-                    # Sonar 'pop' si es espacio (fin de palabra) o primer caracter
                     if next_char == " " or len(self.reward_text_visible) == 1:
                         if not self.mobile_mode:
                             self.audio.play('pop')
@@ -2375,6 +3173,10 @@ class Game:
                 self.paddle2.update(dt, self)
                 self._update_tutorial(dt)
                 return
+
+            if hasattr(self, "chaos_banner_timer") and self.chaos_banner_timer > 0.0:
+                if self.serve_timer < self.chaos_banner_timer:
+                    self.serve_timer = self.chaos_banner_timer
 
             self.serve_timer -= dt
             if self.serve_timer <= 0: self.state = STATE_PLAYING; self.paddle1.is_destroyed = self.paddle2.is_destroyed = False
@@ -2613,8 +3415,8 @@ class Game:
                 self.serve_timer = 3.0
 
     def _update_tutorial(self, dt):
-        if not self.tutorial_active and self.state != STATE_ARCADE_TUTORIAL: return
-        
+        if not self.tutorial_active and self.state != STATE_ARCADE_TUTORIAL and self.state != STATE_ENDLESS_TUTORIAL: return
+       
         # Efecto Typewriter (Palabra por palabra)
         if self.tutorial_cooldown_timer > 0:
             self.tutorial_cooldown_timer -= dt
@@ -2638,16 +3440,16 @@ class Game:
         
         # --- Variables de texto dinámico para PC/Móvil ---
         if self.mobile_mode:
-            s_cont = self.t("(Touch the screen to continue...)", "(Toca la pantalla para continuar...)")
-            s_press = self.t("(touch the screen)", "(toca la pantalla)")
+            s_cont = "|GRAY|" + self.t("(touch the screen to continue...)", "(toca la pantalla para continuar...)")
+            s_press = "|GRAY|" + self.t("(touch the screen)", "(toca la pantalla)")
             s_click = self.t("touch", "toca")
             p1_ctrl = self.t("Player 1 Controls: Up: 'left up arrow', Down: 'left down arrow', and power: 'left STAR'", "Controles Jugador 1: Arriba: 'flecha arriba izq', Abajo: 'flecha abajo izq' y Poder: 'ESTRELLA izq'")
             p2_ctrl = self.t("Player 2 Controls: Up: 'right up arrow', Down: 'right down arrow', and power: 'right STAR'", "Controles Jugador 2: Arriba: 'flecha arriba der', Abajo: 'flecha abajo der' y Poder: 'ESTRELLA der'")
             p_pow = self.t("the power button (STAR)", "el botón de poder (ESTRELLA)")
             s_end = self.t("touch the screen.", "toca la pantalla.")
         else:
-            s_cont = self.t("(Press Space bar to continue...)", "(Pulsa Espacio para continuar...)")
-            s_press = self.t("(press space bar)", "(pulsa espacio)")
+            s_cont = "|GRAY|" + self.t("(press space to continue...)", "(pulsa espacio para continuar...)")
+            s_press = "|GRAY|" + self.t("(press space)", "(pulsa espacio)")
             s_click = self.t("click", "haz clic")
             p1_ctrl = self.t("Player 1 Controls: Up: 'W', Down: 'S', and Power: 'D'", "Controles Jugador 1: Arriba: 'W', Abajo: 'S' y Poder: 'D'")
             p2_ctrl = self.t("Player 2 Controls: Up: 'Up Arrow', Down: 'Down Arrow', and Power: 'Left Arrow'", "Controles Jugador 2: Arriba: 'Flecha Arriba', Abajo: 'Flecha Abajo' y Poder: 'Flecha Izquierda'")
@@ -2776,16 +3578,138 @@ class Game:
         if self.tutorial_text_visible != self.tutorial_text_full:
             self.tutorial_text_visible = self.tutorial_text_full
             return
-        
+
         if not self.mobile_mode:
             self.audio.play('pop')
+            
         self.arcade_tutorial_step += 1
-        if self.arcade_tutorial_step > 1:
+        
+        if self.arcade_tutorial_step > 2:
             self.state = STATE_SOLO_SUBMODE_SELECTION
-        else:
+            return
+
+        # --- CONTROL DE TEXTOS CON DOS IDIOMAS ---
+        if self.arcade_tutorial_step == 1:
             self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "This is ARCADE mode! 7 levels, each one harder than the last (press space to continue).",
+                "¡Este es el modo ARCADE! 7 niveles, cada uno más difícil que el anterior (presiona espacio para continuar)."
+            )
             self.tutorial_text_index = 0
-            self.tutorial_text_full = self.t("The difficulty increases with each level you pass. If you beat the final level, you'll receive a reward.", "La dificultad aumenta con cada nivel superado. Si vences el nivel final, recibirás una recompensa.")
+            self.tutorial_text_timer = 0
+
+        elif self.arcade_tutorial_step == 2:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "The difficulty increases with each level you pass. If you beat the final level, you'll receive a reward.",
+                "La dificultad aumenta con cada nivel superado. Si vences el nivel final, recibirás una recompensa."
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+
+    def _next_endless_tutorial_step(self):
+        # Si la máquina de escribir no terminó, la forzamos a terminar de golpe
+        if self.tutorial_text_visible != self.tutorial_text_full:
+            self.tutorial_text_visible = self.tutorial_text_full
+            return
+
+        # Reproducir sonido si no estamos en celular
+        if not self.mobile_mode:
+            self.audio.play('pop')
+            
+        # Sumamos 1 al paso del tutorial
+        self.endless_tutorial_step += 1
+        
+        # Si nos pasamos del paso 2, cerramos el tutorial y volvemos al submenú
+        if self.endless_tutorial_step > 2:
+            self.state = STATE_SOLO_SUBMODE_SELECTION
+            self.tutorial_text_full = ""
+            self.tutorial_text_visible = ""
+            return
+
+        # === CONTROL DE TEXTOS DEL MODO ENDLESS ===
+        if self.endless_tutorial_step == 1:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "Welcome to ENDLESS mode! Here, the goal is simply to survive as long as possible.",
+                "¡Bienvenido al modo SIN FIN! Aquí, el objetivo es simplemente sobrevivir tanto como sea posible."
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+
+        elif self.endless_tutorial_step == 2:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "The ball gets faster with every hit. Precision is key. Good luck! (press space to finish).",
+                "La pelota se vuelve más rápida con cada golpe. La precisión es clave. ¡Buena suerte! (presiona espacio para terminar)."
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+
+    def _next_endless_tutorial_step(self):
+        # Si la máquina de escribir no terminó, la forzamos a terminar de golpe
+        if self.tutorial_text_visible != self.tutorial_text_full:
+            self.tutorial_text_visible = self.tutorial_text_full
+            return
+
+        # Reproducir sonido si no estamos en celular
+        if not self.mobile_mode:
+            self.audio.play('pop')
+            
+        # Sumamos 1 al paso del tutorial
+        self.endless_tutorial_step += 1
+        
+        # Si pasamos del paso 4, cerramos el tutorial y volvemos al menú de selección
+        if self.endless_tutorial_step > 4:
+            self.state = STATE_SOLO_SUBMODE_SELECTION
+            self.tutorial_text_full = ""
+            self.tutorial_text_visible = ""
+            return
+
+        # === CONTROL DE TEXTOS DEL MODO ENDLESS ===
+        if self.endless_tutorial_step == 1:
+            # Detecta si es celular o PC para el botón de continuar
+            if self.mobile_mode:
+                en_prompt = "(touch the screen to continue)"
+                es_prompt = "(toca la pantalla para continuar)"
+            else:
+                en_prompt = "(press space to continue)"
+                es_prompt = "(presiona espacio para continuar)"
+                
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                f"Here's ENDLESS mode! An infinite mode of PONG KOMBAT.\n{en_prompt}",
+                f"¡Este es el modo SIN FIN! Un modo infinito de PONG KOMBAT.\n{es_prompt}"
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+
+        elif self.endless_tutorial_step == 2:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "An additional modifier will be added at each level.\nOne more modifier will be added to that amount\nfor each level cleared.",
+                "Se añadirá un modificador adicional en cada nivel.\nSe sumará un modificador más a esa cantidad\npor cada nivel superado."
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+            
+        elif self.endless_tutorial_step == 3:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "If you achieve a long winning streak,\nyou will receive a reward.",
+                "Si logras una larga racha de victorias,\nrecibirás una recompensa."
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
+            
+        elif self.endless_tutorial_step == 4:
+            self.tutorial_text_visible = ""
+            self.tutorial_text_full = self.t(
+                "Each game is played to one point, and if you lose by one point,\nyou start over. There's no room for error!",
+                "Cada partida se juega a un punto, y si pierdes por un punto,\nvuelves a empezar. ¡No hay margen de error!"
+            )
+            self.tutorial_text_index = 0
+            self.tutorial_text_timer = 0
 
     def _update_game_entities(self, dt):
         # 1. LÓGICA DE ÍTEM REVÓLVER (ÓRBITA) - Fuera del bucle de pelotas para evitar velocidad duplicada
@@ -2803,8 +3727,9 @@ class Game:
                     self.revolver_item_rect = None
                     self.audio.play('speed') 
                     target_p = self.paddle1 if self.last_hitter == 1 else self.paddle2
-                    target_p.power_stored = POWER_REVOLVER
-                    target_p.color = GUN_METAL
+                    if target_p.power_active not in [POWER_SHIELD, POWER_MAGNET]:
+                        target_p.power_stored = POWER_REVOLVER
+                        target_p.color = GUN_METAL
                     self.global_hits = 0 
                     break
 
@@ -2859,6 +3784,49 @@ class Game:
                 import platform
                 platform.window.navigator.vibrate(duration_ms)
             except: pass
+
+    def _draw_chaos_banner(self, surface):
+        if getattr(self, "state", 0) not in [STATE_SERVE, STATE_PLAYING, STATE_GAME_OVER, STATE_PRESS_TO_START]:
+            return
+        if not hasattr(self, "chaos_banner_timer") or self.chaos_banner_timer <= 0.0:
+            return
+            
+        banner_font = self.medium_font
+        max_text_width = SCREEN_WIDTH - 120
+        
+        # Calcular saltos de línea para estimar el tamaño del banner
+        words = self.chaos_banner_text.split(' ')
+        new_text = ""
+        current_line = ""
+        for word in words:
+            clean_word = re.sub(r'\|[A-Z_]+\|', '', word)
+            clean_line = re.sub(r'\|[A-Z_]+\|', '', current_line)
+            
+            if banner_font.size(clean_line + clean_word)[0] < max_text_width:
+                current_line += (word + " ")
+            else:
+                new_text += current_line.strip() + "\n"
+                current_line = word + " "
+        new_text += current_line.strip()
+        
+        lines = new_text.split('\n')
+        line_height = banner_font.get_linesize()
+        text_total_h = len(lines) * line_height
+        
+        padding_y = 16
+        banner_h = text_total_h + padding_y * 2
+        banner_y = SCREEN_HEIGHT // 3 - banner_h // 2
+        banner_width = SCREEN_WIDTH + 400
+        
+        banner_surf = pygame.Surface((banner_width, banner_h), pygame.SRCALPHA)
+        banner_surf.fill((30, 0, 0, 200)) # Dark red translucent
+        pygame.draw.line(banner_surf, RED, (0, 0), (banner_width, 0), 3)
+        pygame.draw.line(banner_surf, RED, (0, banner_h - 1), (banner_width, banner_h - 1), 3)
+        
+        surface.blit(banner_surf, (int(self.chaos_banner_x) - banner_width // 2, banner_y))
+        
+        text_y = banner_y + padding_y
+        draw_rich_text(surface, new_text, (int(self.chaos_banner_x), text_y), banner_font, default_color=WHITE, align="center")
 
     def draw(self):
         # Calculamos el desplazamiento del shake
@@ -2945,7 +3913,7 @@ class Game:
         elif self.state == STATE_MODIFIERS: self.menus.draw_modifiers(temp_surf)
         elif self.state == STATE_SETTINGS: self.menus.draw_settings(temp_surf)
         elif self.state == STATE_MODE_SELECTION: self.menus.draw_mode_selection(temp_surf)
-        elif self.state == STATE_SOLO_SUBMODE_SELECTION: self.menus.draw_solo_submode_selection(temp_surf)
+        elif self.state == STATE_SOLO_SUBMODE_SELECTION or self.state == STATE_ENDLESS_TUTORIAL: self.menus.draw_solo_submode_selection(temp_surf)
         elif self.state == STATE_ARCADE_TUTORIAL:
             self.menus.draw_arcade_tutorial(temp_surf)
         elif self.state == STATE_CREDITS:
@@ -2957,11 +3925,58 @@ class Game:
             txt = self.large_font.render(f"LEVEL {self.arcade_level}", True, WHITE)
             temp_surf.blit(txt, txt.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
         elif self.state == STATE_GAME_OVER: self.menus.draw_game_over(temp_surf)
+        elif self.state == STATE_ENDLESS_REWARD:
+            self.menus.draw_game_over(temp_surf)
+            self._draw_endless_reward(temp_surf)
         elif self.state == STATE_ARCADE_REWARD: self.menus.draw_arcade_reward(temp_surf)
         
         self.vfx.draw(temp_surf)
 
         self.vfx.draw(temp_surf)
+
+        # MODO ENDLESS INTRO OVERLAY (v0.8.0)
+        if self.endless_active and self.endless_intro_timer > 0:
+            lvl_text = self.t(f"LEVEL {self.endless_level}", f"NIVEL {self.endless_level}")
+            st_title = self.large_font.render(lvl_text, True, YELLOW)
+            temp_surf.blit(st_title, st_title.get_rect(center=(int(self.endless_intro_x), SCREEN_HEIGHT // 2 - 80)))
+            
+            # --- NUEVA LÓGICA DE ESCALADO Y MULTILÍNEA DINÁMICA ---
+            max_w = SCREEN_WIDTH - 120
+            max_h = 130  # Espacio vertical máximo deseado
+            
+            current_size = 36
+            best_font = self.font
+            wrapped_lines = []
+            
+            while current_size >= 14:
+                test_font = pygame.font.SysFont("Arial", current_size, bold=True)
+                line_height = test_font.get_linesize()
+                
+                words = self.endless_new_modifier_text.split(' ')
+                new_lines = []
+                current_line = ""
+                for word in words:
+                    clean_word = re.sub(r'\|[A-Z_]+\|', '', word)
+                    clean_line = re.sub(r'\|[A-Z_]+\|', '', current_line)
+                    
+                    if test_font.size(clean_line + clean_word)[0] < max_w:
+                        current_line += (word + " ")
+                    else:
+                        new_lines.append(current_line.strip())
+                        current_line = word + " "
+                new_lines.append(current_line.strip())
+                
+                total_height = len(new_lines) * line_height
+                
+                if total_height <= max_h or current_size == 14:
+                    best_font = test_font
+                    wrapped_lines = new_lines
+                    break
+                else:
+                    current_size = max(14, int(current_size * 0.9))
+            
+            mod_text = f"|WHITE|{'\n'.join(wrapped_lines)}"
+            draw_rich_text(temp_surf, mod_text, (int(self.endless_intro_x), SCREEN_HEIGHT // 2), best_font, max_width=None, align="center")
 
         # CAPA FINAL: Animaciones de Anuncio (siempre encima de todo lo demás)
         if self.show_match_point_anim and self.match_point_anim_timer > 0: 
@@ -3005,7 +4020,48 @@ class Game:
             th = len(lines) * f.get_linesize()
             draw_rich_text(self.screen, self.arcade_intro_text, (self.arcade_intro_x - max_tw // 2, SCREEN_HEIGHT // 2 - th // 2), f, max_width=max_tw, align="center")
             
+        self._draw_chaos_banner(self.screen)
+        
         pygame.display.flip()
+
+    def _draw_endless_reward(self, surface):
+        if hasattr(self.menus, 'ov_180'):
+            surface.blit(self.menus.ov_180, (0,0))
+        else:
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 200))
+            surface.blit(overlay, (0, 0))
+        
+        step = getattr(self, "reward_step", 0)
+        
+        if step == 1:
+            panel_w, panel_h = 550, 320
+            panel_rect = pygame.Rect(SCREEN_WIDTH//2 - panel_w//2, SCREEN_HEIGHT//2 - panel_h//2 - 50, panel_w, panel_h)
+            pygame.draw.rect(surface, (15, 15, 15), panel_rect)
+            pygame.draw.rect(surface, WHITE, panel_rect, 3)
+            
+            top_txt = self.t("You unlocked the new EXTRA modifier:", "Desbloqueaste el nuevo modificador EXTRA:")
+            draw_rich_text(surface, f"|WHITE|{top_txt}", (SCREEN_WIDTH//2, panel_rect.y + 50), self.small_font, align="center")
+            
+            name = "ENDLESS CHAOS"
+            draw_rich_text(surface, f"|GOLD|{name}", (SCREEN_WIDTH//2, panel_rect.y + 110), self.large_font, align="center")
+
+        box_h = 110
+        box = pygame.Rect(0, SCREEN_HEIGHT - box_h, SCREEN_WIDTH, box_h)
+        pygame.draw.rect(surface, (20, 20, 20), box)
+        pygame.draw.rect(surface, WHITE, box, 2)
+        
+        msg = getattr(self, "reward_text_visible", "")
+        # Usamos cached surface como en el tutorial de Arcade para evitar pestañeos
+        if not hasattr(self, "cached_reward_text"): self.cached_reward_text = ""
+        if not hasattr(self, "cached_reward_surface"): self.cached_reward_surface = pygame.Surface((SCREEN_WIDTH, 200), pygame.SRCALPHA)
+        
+        if self.cached_reward_text != msg:
+            self.cached_reward_text = msg
+            self.cached_reward_surface.fill((0, 0, 0, 0))
+            draw_rich_text(self.cached_reward_surface, f"{msg}", (0, 0), self.small_font, max_width=SCREEN_WIDTH - 100)
+            
+        surface.blit(self.cached_reward_surface, (50, SCREEN_HEIGHT - box_h + 30))
 
     def _draw_game_field(self, surface):
         def draw_zone(owner, z_type):
@@ -3040,6 +4096,46 @@ class Game:
         if self.revolver_item_active and self.revolver_item_rect: self._draw_revolver(surface)
         if self.paddle1.has_extra_life: pygame.draw.line(surface, YELLOW, (2, 0), (2, SCREEN_HEIGHT), 5)
         if self.paddle2.has_extra_life: pygame.draw.line(surface, YELLOW, (SCREEN_WIDTH-2, 0), (SCREEN_WIDTH-2, SCREEN_HEIGHT), 5)
+
+        if self.tictactoe_enabled:
+            # 1. Dibujar líneas de la cuadrícula
+            # Líneas verticales (x = 370, x = 430)
+            pygame.draw.line(surface, (120, 120, 120), (370, 210), (370, 390), 3)
+            pygame.draw.line(surface, (120, 120, 120), (430, 210), (430, 390), 3)
+            # Líneas horizontales (y = 270, y = 330)
+            pygame.draw.line(surface, (120, 120, 120), (310, 270), (490, 270), 3)
+            pygame.draw.line(surface, (120, 120, 120), (310, 330), (490, 330), 3)
+            
+            # 2. Dibujar símbolos (X e O)
+            for i in range(9):
+                val = self.tictactoe_board[i]
+                if val is None: continue
+                
+                row = i // 3
+                col = i % 3
+                cell_left = 310 + col * 60
+                cell_top = 210 + row * 60
+                pad = 14
+                
+                if val == 1: # X (Azul)
+                    pygame.draw.line(surface, (50, 150, 255), (cell_left + pad, cell_top + pad), (cell_left + 60 - pad, cell_top + 60 - pad), 5)
+                    pygame.draw.line(surface, (50, 150, 255), (cell_left + 60 - pad, cell_top + pad), (cell_left + pad, cell_top + 60 - pad), 5)
+                elif val == 2: # O (Rojo)
+                    pygame.draw.circle(surface, (255, 50, 50), (cell_left + 30, cell_top + 30), 16, 5)
+                    
+            # 3. Dibujar línea ganadora
+            if self.tictactoe_winner is not None and self.tictactoe_win_line is not None:
+                start_idx = self.tictactoe_win_line[0]
+                end_idx = self.tictactoe_win_line[2]
+                
+                start_r, start_c = start_idx // 3, start_idx % 3
+                end_r, end_c = end_idx // 3, end_idx % 3
+                
+                p_start = (310 + start_c * 60 + 30, 210 + start_r * 60 + 30)
+                p_end = (310 + end_c * 60 + 30, 210 + end_r * 60 + 30)
+                
+                color = (50, 150, 255) if self.tictactoe_winner == 1 else (255, 50, 50)
+                pygame.draw.line(surface, color, p_start, p_end, 7)
 
     def _draw_revolver(self, surface):
         r = self.revolver_item_rect
@@ -3109,7 +4205,8 @@ class Game:
         surface.blit(bt, bt.get_rect(center=self.back_btn_rect.center))
 
     def _draw_planets(self, surface):
-        px_size, g_idx = 5, self.gravity_force_idx
+        g_idx = max(getattr(self, 'gravity_force_idx', 1), getattr(self, 'gravity_radius_idx', 1), getattr(self, 'planet_resistance_idx', 1))
+        px_size = 5
         matrix = assets.PLANET_MATRIX
         for p_idx, pos in enumerate([self.planet1_pos, self.planet2_pos]):
             if (p_idx == 0 and not self.planet1_alive) or (p_idx == 1 and not self.planet2_alive): continue
@@ -3189,7 +4286,7 @@ class Game:
             [0,1,1,1,1,1,1,1,1,1,1,1,0],
             [0,0,1,1,1,1,1,1,1,1,1,0,0],
             [0,0,0,1,1,1,1,1,1,1,0,0,0],
-            [0,0,1,1,1,1,0,1,1,1,1,0,0],
+            [0,0,1,1,1,1,1,1,1,1,1,0,0],
             [0,1,1,1,1,0,0,0,1,1,1,1,0],
             [0,1,1,1,0,0,0,0,0,1,1,1,0],
             [1,1,1,0,0,0,0,0,0,0,1,1,1],

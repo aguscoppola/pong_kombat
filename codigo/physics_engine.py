@@ -61,8 +61,33 @@ class PhysicsEngine:
         if self.game.portals_enabled:
             self._check_portal_collisions(ball)
 
+        # 4.5. Colisiones con Ta-Te-Ti
+        if self.game.tictactoe_enabled:
+            self._check_tictactoe_collisions(ball)
+
         # 5. Colisiones con Paletas, Goles y Objetos
         self._check_world_collisions(ball)
+
+    def _check_tictactoe_collisions(self, ball):
+        if self.game.tictactoe_enabled and self.game.tictactoe_win_timer <= 0.0:
+            # Solo comprobar si la pelota está en el área central (310, 210, 180, 180)
+            ball_rect = ball.rect
+            grid_x, grid_y = 310, 210
+            grid_w, grid_h = 180, 180
+            if (ball_rect.right >= grid_x and ball_rect.left <= grid_x + grid_w and
+                ball_rect.bottom >= grid_y and ball_rect.top <= grid_y + grid_h):
+                
+                # Calcular la celda colisionada (0-8)
+                col = int((ball_rect.centerx - grid_x) // 60)
+                row = int((ball_rect.centery - grid_y) // 60)
+                
+                if 0 <= col < 3 and 0 <= row < 3:
+                    idx = row * 3 + col
+                    # Solo marcar si la celda está vacía y el último en golpear es un jugador
+                    if self.game.tictactoe_board[idx] is None and self.game.last_hitter in [1, 2]:
+                        self.game.tictactoe_board[idx] = self.game.last_hitter
+                        self.game.audio.play('hit')  # Sonido de confirmación al marcar la celda
+                        self.game._check_tictactoe_win()
 
     def _apply_planet_gravity(self, ball, dt):
         spd = math.sqrt(ball.vx**2 + ball.vy**2)

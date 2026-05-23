@@ -47,6 +47,8 @@ STATE_SOLO_SUBMODE_SELECTION = "solo_submode_selection"
 STATE_ARCADE_LEVEL_START = "arcade_level_start"
 STATE_ARCADE_REWARD = "arcade_reward"
 STATE_ARCADE_TUTORIAL = "arcade_tutorial"
+STATE_ENDLESS_TUTORIAL = "endless_tutorial"
+STATE_ENDLESS_REWARD = "endless_reward"
 STATE_CREDITS = "credits"
 
 # --- Tipos de Poderes ---

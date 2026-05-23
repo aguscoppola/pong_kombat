@@ -35,6 +35,7 @@ def test_paddle_collision_centers(game):
     ball = Ball(35, 100)
     ball.vx = -100
     ball.vy = 0
+    ball.speed = 100
     game.paddle1.rect.center = (35, 100)
     # P1 está a la izquierda, la dirección del rebote es hacia la derecha (1)
     game.handle_paddle_collision(game.paddle1, 1, ball)

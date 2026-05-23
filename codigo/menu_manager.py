@@ -188,10 +188,23 @@ class MenuManager:
     def draw_solo_submode_selection(self, surface):
         surface.fill(BLACK)
         title = self.game.large_font.render(self.game.t("SELECT SOLO MODE", "SELECCIONAR MODO SOLO"), True, WHITE)
-        surface.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 100))
+        surface.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 50))
         
+        # Sincronizar posición del botón ENDLESS según si el test LEVEL está desbloqueado
+        if self.game.arcade_completed:
+            self.game.btn_endless_rect.y = self.game.btn_arcade_level_selector_rect.bottom + 15
+        else:
+            self.game.btn_endless_rect.y = SCREEN_HEIGHT // 2 + 50
+
         mpos = pygame.mouse.get_pos()
         
+        # Back Button
+        hover_b = self.game.btn_solo_sub_back_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (40, 40, 40) if hover_b else BLACK, self.game.btn_solo_sub_back_rect)
+        pygame.draw.rect(surface, WHITE, self.game.btn_solo_sub_back_rect, 2)
+        txt_b = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE)
+        surface.blit(txt_b, txt_b.get_rect(center=self.game.btn_solo_sub_back_rect.center))
+
         # Classic Button
         hover_c = self.game.btn_classic_rect.collidepoint(mpos)
         pygame.draw.rect(surface, (40, 40, 40) if hover_c else BLACK, self.game.btn_classic_rect)
@@ -213,18 +226,80 @@ class MenuManager:
         self._draw_pixel_help_button(surface, r_h, h_col, RED)
         
         # Level Selector (Debug/Testing) - Desbloqueado para testearlo mejor (v0.7.3)
-        hover_ls = self.game.btn_arcade_level_selector_rect.collidepoint(mpos)
-        pygame.draw.rect(surface, (30, 30, 30) if hover_ls else BLACK, self.game.btn_arcade_level_selector_rect)
-        pygame.draw.rect(surface, GRAY, self.game.btn_arcade_level_selector_rect, 1)
-        txt_ls = self.game.tiny_font.render(f"TEST LEVEL: {self.game.test_arcade_level}", True, GRAY)
-        surface.blit(txt_ls, txt_ls.get_rect(center=self.game.btn_arcade_level_selector_rect.center))
+        if self.game.arcade_completed:
+            hover_ls = self.game.btn_arcade_level_selector_rect.collidepoint(mpos)
+            pygame.draw.rect(surface, (30, 30, 30) if hover_ls else BLACK, self.game.btn_arcade_level_selector_rect)
+            pygame.draw.rect(surface, GRAY, self.game.btn_arcade_level_selector_rect, 1)
+            txt_ls = self.game.tiny_font.render(f"TEST LEVEL: {self.game.test_arcade_level}", True, GRAY)
+            surface.blit(txt_ls, txt_ls.get_rect(center=self.game.btn_arcade_level_selector_rect.center))
+
+        # Endless Button
+        hover_e = self.game.btn_endless_rect.collidepoint(mpos)
+        pygame.draw.rect(surface, (80, 70, 0) if hover_e else (50, 40, 0), self.game.btn_endless_rect)
+        pygame.draw.rect(surface, GOLD, self.game.btn_endless_rect, 3 if hover_e else 2)
+        txt_e = self.game.font.render(self.game.t("ENDLESS", "SIN FIN"), True, GOLD)
+        surface.blit(txt_e, txt_e.get_rect(center=self.game.btn_endless_rect.center))
         
-        # Back Button
-        hover_b = self.game.btn_solo_sub_back_rect.collidepoint(mpos)
-        pygame.draw.rect(surface, (40, 40, 40) if hover_b else BLACK, self.game.btn_solo_sub_back_rect)
-        pygame.draw.rect(surface, WHITE, self.game.btn_solo_sub_back_rect, 2)
-        txt_b = self.game.tiny_font.render(self.game.t("BACK", "VOLVER"), True, WHITE)
-        surface.blit(txt_b, txt_b.get_rect(center=self.game.btn_solo_sub_back_rect.center))
+       # === BOTÓN DE AYUDA PARA ENDLESS ===
+        r_h_e = self.game.btn_help_endless_rect
+        is_hover_h_e = r_h_e.collidepoint(mpos)
+
+        # Color del fondo del botón: amarillo oscuro si pasás el mouse, más oscuro si no
+        h_col_e = (150, 120, 0) if is_hover_h_e else (80, 70, 0)
+        
+        # Dibujamos el botón (?) usando tu función pixelada pero con el color GOLD
+        self._draw_pixel_help_button(surface, r_h_e, h_col_e, GOLD)
+
+       # === EFECTO DE MANTO NEGRO Y FOCO DE LUZ (TUTORIAL ENDLESS) ===
+        if self.game.state == "endless_tutorial":
+            # 1. Crear el manto negro transparente sobre toda la pantalla
+            manto = pygame.Surface((surface.get_width(), surface.get_height()), pygame.SRCALPHA)
+            manto.fill((0, 0, 0, 220)) # Negro con buena opacidad para que resalte el foco
+            surface.blit(manto, (0, 0))
+
+            # 2. Redibujar SOLAMENTE el botón principal ENDLESS por encima del manto (Exclusividad)
+            pygame.draw.rect(surface, (80, 70, 0), self.game.btn_endless_rect) # Fondo oscuro
+            # Borde brillante con más grosor (3) para intensidad
+            pygame.draw.rect(surface, GOLD, self.game.btn_endless_rect, 3)     
+            txt_e = self.game.font.render(self.game.t("ENDLESS", "SIN FIN"), True, GOLD)
+            surface.blit(txt_e, txt_e.get_rect(center=self.game.btn_endless_rect.center))
+            
+            # --- NOTA CORRECCIÓN 2 ---
+            # Ya NO redibujamos el botón amarillo (?) aquí. 
+            # Como no lo redibujamos, el manto negro lo tapa y queda opacado. ¡Perfecto!
+            # --------------------------
+
+            # 3. Dibujar el cartel explicativo abajo pegado al piso
+            ancho_cartel = surface.get_width() 
+            alto_cartel = 100 
+            x_cartel = 0 
+            y_cartel = surface.get_height() - 100 # <--- El cambio está acá (100 píxeles exactos)
+            rect_texto = pygame.Rect(x_cartel, y_cartel, ancho_cartel, alto_cartel)
+
+            # Fondo negro para el cartel
+            pygame.draw.rect(surface, (10, 10, 10), rect_texto)
+            # --- CORRECCIÓN 1: El borde ahora es BLANCO (WHITE) como en Arcade ---
+            pygame.draw.rect(surface, WHITE, rect_texto, 2)
+
+          # 4. Renderizar el texto (Soporta múltiples renglones usando \n)
+            # Primero, cortamos el texto cada vez que hay un \n (Enter)
+            lineas = self.game.tutorial_text_visible.split('\n')
+            
+            # Calculamos la altura de la SMALL FONT para saber cuánto espacio ocupa
+            alto_fuente = self.game.small_font.get_height()
+            alto_total = len(lineas) * alto_fuente
+            
+            # Encontramos el punto vertical exacto para que todo el bloque quede centrado
+            y_inicial = rect_texto.centery - (alto_total // 2)
+            
+            # Dibujamos cada renglón uno por uno
+            for i, linea in enumerate(lineas):
+                # Usamos la small_font para renderizar las letras
+                txt_ayuda = self.game.small_font.render(linea, True, WHITE)
+                
+                # Centramos horizontalmente, y bajamos verticalmente según el número de renglón
+                rect_txt = txt_ayuda.get_rect(center=(rect_texto.centerx, y_inicial + (i * alto_fuente) + (alto_fuente // 2)))
+                surface.blit(txt_ayuda, rect_txt)
 
     def draw_modifiers(self, surface):
         panel_rect = self.game.modifiers_panel_rect
@@ -330,42 +405,112 @@ class MenuManager:
             for lbl, col in [("RED", RED), ("GREEN", GREEN), ("YELLOW", YELLOW), ("ORANGE", ORANGE)]:
                 cy += 60; draw_remove_option(self.game, cy, f" - Remove |{lbl}| {lbl} |WHITE| power", getattr(self.game, f"remove_power_{lbl.lower()}"), getattr(self.game, f"remove_power_{lbl.lower()}_rect"), getattr(self.game, f"remove_power_{lbl.lower()}_text_rect"), active_color=col, offset=off, surface=surface)
         self.game.max_y_rendered = cy
-
     def _draw_extras_tab_full(self, surface, off, lm, ox):
         cy = 100
+        
+        # 1. Powers
+        draw_remove_option(self.game, cy, self.game.t("Enable |BLUE|MAG|RED|NET|WHITE| power", "Activar poder |BLUE|MAG|RED|NET"), self.game.magnet_power_enabled, self.game.magnet_power_rect, self.game.magnet_power_text_rect, active_color=GRAY, offset=off, surface=surface)
+        
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |GHOST| GHOST |WHITE| power", "Activar poder |GHOST| FANTASMA"), self.game.ghost_power_enabled, self.game.ghost_power_rect, self.game.ghost_power_text_rect, active_color=GHOST_COLOR, offset=off, surface=surface)
+        if self.game.ghost_power_enabled:
+            cy += 60
+            draw_remove_option(self.game, cy, " - |CYAN|Identical |WHITE|ball", self.game.ghost_identical_enabled, self.game.ghost_identical_rect, self.game.ghost_identical_text_rect, active_color=CYAN, offset=off, surface=surface)
+            
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |GUM_PINK|GUM|WHITE| power", "Activar poder de |GUM_PINK|CHICLE"), self.game.gum_power_enabled, self.game.gum_power_rect, self.game.gum_power_text_rect, active_color=GUM_PINK, offset=off, surface=surface)
+        
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |PURPLE|SLEEPING|WHITE| power", "Activar poder de |PURPLE|SUEÑO"), self.game.sleeping_power_enabled, self.game.sleeping_power_rect, self.game.sleeping_power_text_rect, active_color=SLEEP_PURPLE, offset=off, surface=surface)
+        
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
+        if self.game.revolver_enabled:
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, sub_val=f"{int(self.game.revolver_prob_options[self.game.revolver_prob_idx]*100)}%", text_rect=self.game.revolver_prob_text_rect)
+
+        # 2. Clocks
+        cy += 60
         draw_remove_option(self.game, cy, self.game.t("Enable |ORANGE| ORANGE |WHITE| watch", "Activar reloj |ORANGE| NARANJA"), self.game.orange_watch_enabled, self.game.orange_watch_rect, self.game.orange_watch_text_rect, active_color=ORANGE, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("|GOLD|Enable X2 multiplier", "|GOLD|Multiplicador de X2"), self.game.start_x2_enabled, self.game.start_x2_rect, self.game.start_x2_text_rect, active_color=GOLD, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |BLUE|MAG|RED|NET|WHITE| power", "Activar poder |BLUE|MAG|RED|NET"), self.game.magnet_power_enabled, self.game.magnet_power_rect, self.game.magnet_power_text_rect, active_color=GRAY, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GHOST| GHOST |WHITE| power", "Activar poder |GHOST| FANTASMA"), self.game.ghost_power_enabled, self.game.ghost_power_rect, self.game.ghost_power_text_rect, active_color=GHOST_COLOR, offset=off, surface=surface)
-        if self.game.ghost_power_enabled: cy += 60; draw_remove_option(self.game, cy, " - |CYAN|Identical |WHITE|ball", self.game.ghost_identical_enabled, self.game.ghost_identical_rect, self.game.ghost_identical_text_rect, active_color=CYAN, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GUM_PINK|GUM|WHITE| power", "Activar poder de |GUM_PINK|CHICLE"), self.game.gum_power_enabled, self.game.gum_power_rect, self.game.gum_power_text_rect, active_color=GUM_PINK, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("|GOLD|GOLDEN |WHITE|GOAL rule", "|GOLD|GOL DE ORO |WHITE|(Regla)"), self.game.experimental_golden_goal, self.game.experimental_golden_goal_rect, self.game.experimental_golden_goal_text_rect, active_color=GOLD, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Allow floating planets", "Activar planetas flotantes"), self.game.floating_planets_enabled, self.game.floating_planets_rect, self.game.floating_planets_text_rect, active_color=CYAN, offset=off, surface=surface)
-        if self.game.floating_planets_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.game.t("Gravity:", "Fuerza de gravedad:"), self.game.gravity_force_names[self.game.gravity_force_idx], self.game.gravity_force_rect, off, ox, lm, surface, sub_val=self.game.gravity_force_options[self.game.gravity_force_idx], text_rect=self.game.gravity_force_text_rect)
-            cy += 60; self._draw_sub_selector(cy, self.game.t("Gravity Radius:", "Radio de gravedad:"), self.game.gravity_radius_names[self.game.gravity_radius_idx], self.game.gravity_radius_rect, off, ox, lm, surface, sub_val=str(self.game.gravity_radius_options[self.game.gravity_radius_idx]), text_rect=self.game.gravity_radius_text_rect)
-            cy += 60; draw_remove_option(self.game, cy, self.game.t("Destructible planets", "Planetas destructibles"), self.game.destructible_planets_enabled, self.game.destructible_planets_rect, self.game.destructible_planets_text_rect, active_color=RED, offset=off, surface=surface)
-            if self.game.destructible_planets_enabled: cy += 60; self._draw_sub_selector(cy, self.game.t("Planet resistance:", "Resistencia:"), self.game.planet_resistance_names[self.game.planet_resistance_idx], self.game.planet_resistance_rect, off, ox, lm, surface, sub_val=str(self.game.planet_resistance_options[self.game.planet_resistance_idx]), text_rect=self.game.planet_resistance_text_rect)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Dimensional |BLUE|POR|RED|TALS", "|BLUE|POR|RED|TALES |WHITE|Dimensionales"), self.game.portals_enabled, self.game.portals_rect, self.game.portals_text_rect, active_color=CYAN, offset=off, surface=surface)
-        if self.game.portals_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.game.t("PORTAL size:", "Tamaño del PORTAL:"), self.game.portal_size_names[self.game.portal_size_idx], self.game.portal_size_rect, off, ox, lm, surface, sub_val=str(self.game.portal_size_options[self.game.portal_size_idx]), text_rect=self.game.portal_size_text_rect)
-            cy += 60; draw_remove_option(self.game, cy, self.game.t("Vertical PORTALS", "PORTALES Verticales"), self.game.portals_vertical, self.game.portals_vertical_rect, self.game.portals_vertical_text_rect, active_color=BLUE, offset=off, surface=surface)
-            cy += 60; draw_remove_option(self.game, cy, self.game.t("2 more |RED|POR|GREEN|TALS", "2 |RED|POR|GREEN|TALES |WHITE|más"), self.game.more_portals_enabled, self.game.more_portals_rect, self.game.more_portals_text_rect, active_color=BLUE, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Intrusive Mouse", "Ratón Intruso"), self.game.add_mouse_enabled, self.game.add_mouse_rect, self.game.add_mouse_text_rect, active_color=BROWN, offset=off, surface=surface)
-        if self.game.add_mouse_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.game.t("Mouse speed:", "Velocidad de ratón:"), self.game.mouse_speed_names[self.game.mouse_speed_idx], self.game.mouse_speed_rect, off, ox, lm, surface, sub_val=str(self.game.mouse_speed_options[self.game.mouse_speed_idx]), text_rect=self.game.mouse_speed_text_rect)
-            cy += 60; self._draw_sub_selector(cy, self.game.t("Mouse appear time:", "Tiempo aparición:"), self.game.mouse_appear_names[self.game.mouse_appear_idx], self.game.mouse_appear_rect, off, ox, lm, surface, sub_val=f"{self.game.mouse_appear_options[self.game.mouse_appear_idx]}s", text_rect=self.game.mouse_appear_text_rect)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
-        if self.game.revolver_enabled: cy += 60; self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, sub_val=f"{int(self.game.revolver_prob_options[self.game.revolver_prob_idx]*100)}%", text_rect=self.game.revolver_prob_text_rect)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |PURPLE|SLEEPING|WHITE| power", "Activar poder de |PURPLE|SUEÑO"), self.game.sleeping_power_enabled, self.game.sleeping_power_rect, self.game.sleeping_power_text_rect, active_color=SLEEP_PURPLE, offset=off, surface=surface)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|CLOUDY |WHITE|day", "Activar día |GRAY|NUBLADO"), self.game.cloudy_day_enabled, self.game.cloudy_day_rect, self.game.cloudy_day_text_rect, active_color=GRAY, offset=off, surface=surface)
+
+        # 3. Climates
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|CLOUDY |WHITE|day", "Activar día |GRAY|NUBLADO"), self.game.cloudy_day_enabled, self.game.cloudy_day_rect, self.game.cloudy_day_text_rect, active_color=GRAY, offset=off, surface=surface)
         if self.game.cloudy_day_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.game.t(" - Cloud intensity:", " - Intensidad de nubes:"), self.game.cloud_size_names[self.game.cloud_size_idx], self.game.cloud_size_rect, off, ox, lm, surface, sub_val=f"x{self.game.cloud_size_options[self.game.cloud_size_idx]:g}", text_rect=self.game.cloud_size_text_rect)
-        cy += 60; draw_remove_option(self.game, cy, self.game.t("Enable |BLUE|RAINY |WHITE|day", "Activar día |BLUE|LLUVIOSO"), self.game.rainy_day_enabled, self.game.rainy_day_rect, self.game.rainy_day_text_rect, active_color=BLUE, offset=off, surface=surface)
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t(" - Cloud intensity:", " - Intensidad de nubes:"), self.game.cloud_size_names[self.game.cloud_size_idx], self.game.cloud_size_rect, off, ox, lm, surface, sub_val=f"x{self.game.cloud_size_options[self.game.cloud_size_idx]:g}", text_rect=self.game.cloud_size_text_rect)
+            
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |BLUE|RAINY |WHITE|day", "Activar día |BLUE|LLUVIOSO"), self.game.rainy_day_enabled, self.game.rainy_day_rect, self.game.rainy_day_text_rect, active_color=BLUE, offset=off, surface=surface)
         if self.game.rainy_day_enabled:
-            cy += 60; self._draw_sub_selector(cy, self.game.t(" - Drop size:", " - Tamaño de gota:"), self.game.rain_drop_size_names[self.game.rain_drop_size_idx], self.game.rain_drop_size_rect, off, ox, lm, surface, sub_val=f"x{self.game.rain_drop_size_options[self.game.rain_drop_size_idx]:g}", text_rect=self.game.rain_drop_size_text_rect)
-            cy += 60; self._draw_sub_selector(cy, self.game.t(" - Precipitation:", " - Precipitación:"), self.game.rain_precipitation_names[self.game.rain_precipitation_idx], self.game.rain_precipitation_rect, off, ox, lm, surface, sub_val=f"x{self.game.rain_precipitation_options[self.game.rain_precipitation_idx]:g}", text_rect=self.game.rain_precipitation_text_rect)
-            cy += 60; draw_remove_option(self.game, cy, self.game.t(" - |YELLOW|LIGHTNING", " - |YELLOW|RELÁMPAGO"), self.game.lightning_enabled, self.game.lightning_rect, self.game.lightning_text_rect, active_color=YELLOW, offset=off, surface=surface)
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t(" - Drop size:", " - Tamaño de gota:"), self.game.rain_drop_size_names[self.game.rain_drop_size_idx], self.game.rain_drop_size_rect, off, ox, lm, surface, sub_val=f"x{self.game.rain_drop_size_options[self.game.rain_drop_size_idx]:g}", text_rect=self.game.rain_drop_size_text_rect)
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t(" - Precipitation:", " - Precipitación:"), self.game.rain_precipitation_names[self.game.rain_precipitation_idx], self.game.rain_precipitation_rect, off, ox, lm, surface, sub_val=f"x{self.game.rain_precipitation_options[self.game.rain_precipitation_idx]:g}", text_rect=self.game.rain_precipitation_text_rect)
+            cy += 60
+            draw_remove_option(self.game, cy, self.game.t(" - |YELLOW|LIGHTNING", " - |YELLOW|RELÁMPAGO"), self.game.lightning_enabled, self.game.lightning_rect, self.game.lightning_text_rect, active_color=YELLOW, offset=off, surface=surface)
+
+        # 4. Score Modifiers
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("|GOLD|GOLDEN |WHITE|GOAL rule", "|GOLD|GOL DE ORO |WHITE|(Regla)"), self.game.experimental_golden_goal, self.game.experimental_golden_goal_rect, self.game.experimental_golden_goal_text_rect, active_color=GOLD, offset=off, surface=surface)
+        
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("|GOLD|Enable X2 multiplier", "|GOLD|Multiplicador de X2"), self.game.start_x2_enabled, self.game.start_x2_rect, self.game.start_x2_text_rect, active_color=GOLD, offset=off, surface=surface)
+        
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Intrusive Mouse", "Ratón Intruso"), self.game.add_mouse_enabled, self.game.add_mouse_rect, self.game.add_mouse_text_rect, active_color=BROWN, offset=off, surface=surface)
+        if self.game.add_mouse_enabled:
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t("Mouse speed:", "Velocidad de ratón:"), self.game.mouse_speed_names[self.game.mouse_speed_idx], self.game.mouse_speed_rect, off, ox, lm, surface, sub_val=str(self.game.mouse_speed_options[self.game.mouse_speed_idx]), text_rect=self.game.mouse_speed_text_rect)
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t("Mouse appear time:", "Tiempo aparición:"), self.game.mouse_appear_names[self.game.mouse_appear_idx], self.game.mouse_appear_rect, off, ox, lm, surface, sub_val=f"{self.game.mouse_appear_options[self.game.mouse_appear_idx]}s", text_rect=self.game.mouse_appear_text_rect)
+
+        # 5. Totally Different Mechanics
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Dimensional |BLUE|POR|RED|TALS", "|BLUE|POR|RED|TALES |WHITE|Dimensionales"), self.game.portals_enabled, self.game.portals_rect, self.game.portals_text_rect, active_color=CYAN, offset=off, surface=surface)
+        if self.game.portals_enabled:
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t("PORTAL size:", "Tamaño del PORTAL:"), self.game.portal_size_names[self.game.portal_size_idx], self.game.portal_size_rect, off, ox, lm, surface, sub_val=str(self.game.portal_size_options[self.game.portal_size_idx]), text_rect=self.game.portal_size_text_rect)
+            cy += 60
+            draw_remove_option(self.game, cy, self.game.t("Vertical PORTALS", "PORTALES Verticales"), self.game.portals_vertical, self.game.portals_vertical_rect, self.game.portals_vertical_text_rect, active_color=BLUE, offset=off, surface=surface)
+            cy += 60
+            draw_remove_option(self.game, cy, self.game.t("2 more |RED|POR|GREEN|TALS", "2 |RED|POR|GREEN|TALES |WHITE|más"), self.game.more_portals_enabled, self.game.more_portals_rect, self.game.more_portals_text_rect, active_color=BLUE, offset=off, surface=surface)
+            
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Allow floating planets", "Activar planetas flotantes"), self.game.floating_planets_enabled, self.game.floating_planets_rect, self.game.floating_planets_text_rect, active_color=CYAN, offset=off, surface=surface)
+        if self.game.floating_planets_enabled:
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t("Gravity:", "Fuerza de gravedad:"), self.game.gravity_force_names[self.game.gravity_force_idx], self.game.gravity_force_rect, off, ox, lm, surface, sub_val=self.game.gravity_force_options[self.game.gravity_force_idx], text_rect=self.game.gravity_force_text_rect)
+            cy += 60
+            self._draw_sub_selector(cy, self.game.t("Gravity Radius:", "Radio de gravedad:"), self.game.gravity_radius_names[self.game.gravity_radius_idx], self.game.gravity_radius_rect, off, ox, lm, surface, sub_val=str(self.game.gravity_radius_options[self.game.gravity_radius_idx]), text_rect=self.game.gravity_radius_text_rect)
+            cy += 60
+            draw_remove_option(self.game, cy, self.game.t("Destructible planets", "Planetas destructibles"), self.game.destructible_planets_enabled, self.game.destructible_planets_rect, self.game.destructible_planets_text_rect, active_color=RED, offset=off, surface=surface)
+            if self.game.destructible_planets_enabled:
+                cy += 60
+                self._draw_sub_selector(cy, self.game.t("Planet resistance:", "Resistencia:"), self.game.planet_resistance_names[self.game.planet_resistance_idx], self.game.planet_resistance_rect, off, ox, lm, surface, sub_val=str(self.game.planet_resistance_options[self.game.planet_resistance_idx]), text_rect=self.game.planet_resistance_text_rect)
+                
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Tic-tac-toe (|CYAN|Ta-Te-Ti|WHITE|)", "Tic-tac-toe (|CYAN|Ta-Te-Ti|WHITE|)"), self.game.tictactoe_enabled, self.game.tictactoe_rect, self.game.tictactoe_text_rect, active_color=CYAN, offset=off, surface=surface)
+
+        # 6. Unlockables
+        cy += 60
+        if getattr(self.game, 'endless_chaos_unlocked', False):
+            draw_remove_option(self.game, cy, self.game.t("|GOLD|Endless CHAOS:", "|GOLD|CAOS Infinito:"), self.game.endless_chaos_enabled, self.game.endless_chaos_rect, self.game.endless_chaos_text_rect, active_color=GOLD, offset=off, surface=surface)
+            if self.game.endless_chaos_enabled:
+                cy += 60
+                self._draw_sub_selector(cy, self.game.t(" - Amount of additions:", " - Cantidad de adiciones:"), self.game.endless_chaos_names[self.game.endless_chaos_idx], self.game.endless_chaos_amount_rect, off, ox, lm, surface, text_rect=self.game.endless_chaos_amount_text_rect)
+                cy += 60
+                draw_remove_option(self.game, cy, self.game.t(" - Accumulation of modifiers", " - Acumulación de modificadores"), self.game.endless_chaos_accumulation, self.game.endless_chaos_accumulation_rect, self.game.endless_chaos_accumulation_text_rect, active_color=GOLD, offset=off, surface=surface)
+        else:
+            draw_y = self.game.modifiers_panel_rect.y + cy - off
+            self.game.endless_chaos_text_rect.update(lm, draw_y, 400, 30)
+            draw_rich_text(surface, self.game.t("|GRAY|Endless CHAOS:", "|GRAY|CAOS Infinito:"), (lm, draw_y), self.game.small_font)
+            self.game.endless_chaos_rect.update(ox + 25, draw_y - 5, 30, 30)
+            pygame.draw.rect(surface, (20, 20, 20), self.game.endless_chaos_rect)
+            pygame.draw.rect(surface, GRAY, self.game.endless_chaos_rect, 2)
+            pygame.draw.circle(surface, GRAY, (self.game.endless_chaos_rect.centerx, self.game.endless_chaos_rect.centery - 2), 5, 2)
+            pygame.draw.rect(surface, GRAY, (self.game.endless_chaos_rect.centerx - 6, self.game.endless_chaos_rect.centery, 12, 8))
+            
         self.game.max_y_rendered = cy
 
     def _draw_skins_tab_full(self, surface, off, lm, ox):
@@ -586,7 +731,12 @@ class MenuManager:
             surface.blit(f.render(txt, True, WHITE), f.render(txt, True, WHITE).get_rect(center=r.center))
         else:
             restart_text = self.game.t("Restart Game", "Reiniciar Juego")
-            if self.game.arcade_active and self.game.score1 > self.game.score2:
+            if self.game.endless_active:
+                if self.game.score1 > self.game.score2:
+                    restart_text = self.game.t("Next Level", "Siguiente Nivel")
+                else:
+                    restart_text = self.game.t("Try Again", "Intentar de Nuevo")
+            elif self.game.arcade_active and self.game.score1 > self.game.score2:
                 restart_text = self.game.t("Continue", "Continuar")
                 
             for r, txt in [(self.game.btn_gameover_restart, restart_text), (self.game.btn_gameover_menu, self.game.t("Back to Menu", "Volver al Menú"))]:
@@ -600,7 +750,8 @@ class MenuManager:
         
         rect.update(ox, draw_y - 5, 130, 40); pygame.draw.rect(surface, BLACK, rect); pygame.draw.rect(surface, WHITE, rect, 2)
         translations = {
-            "None": "Ninguno", "Low": "Bajo", "Medium": "Medio", "High": "Alto", "Extreme": "Extremo", 
+            "None": "Ninguno", "1 Mod": "1 Mod", "2 Mods": "2 Mods", "3 Mods": "3 Mods", "4 Mods": "4 Mods", "5 Mods": "5 Mods",
+            "Low": "Bajo", "Medium": "Medio", "High": "Alto", "Extreme": "Extremo", 
             "Default": "Normal", "Slow": "Lento", "Fast": "Rápido", "Sonic": "Sónico", 
             "Moon": "Luna", "Planet": "Planeta", "Gas Giant": "Gigante", "Star": "Estrella",
             "Low Prob": "Baja", "Quite": "Mucha", "Always": "Siempre",
@@ -641,8 +792,14 @@ class MenuManager:
                 (self.game.start_with_power_text_rect, "start_with_power"), (self.game.encapsulate_powers_text_rect, "encapsulate_powers")
             ]
         elif tab == "EXTRAS":
-            areas = [
-                (self.game.orange_watch_text_rect, "orange_watch"), (self.game.start_x2_text_rect, "start_x2"),
+            areas = []
+            if getattr(self.game, 'endless_chaos_unlocked', False):
+                areas.extend([
+                    (self.game.endless_chaos_text_rect, "endless_chaos"),
+                    (self.game.endless_chaos_accumulation_text_rect, "chaos_accumulation")
+                ])
+            areas.extend([
+                (self.game.orange_watch_text_rect, "orange_watch"), (self.game.tictactoe_text_rect, "tictactoe"), (self.game.start_x2_text_rect, "start_x2"),
                 (self.game.magnet_power_text_rect, "magnet_power"), (self.game.ghost_power_text_rect, "ghost_power"), 
                 (self.game.ghost_identical_text_rect, "ghost_identical"), (self.game.gum_power_text_rect, "gum_power"),
                 (self.game.experimental_golden_goal_text_rect, "exp_golden_goal"), (self.game.floating_planets_text_rect, "floating_planets"), 
@@ -652,7 +809,7 @@ class MenuManager:
                 (self.game.sleeping_power_text_rect, "sleeping_power"), (self.game.cloudy_day_text_rect, "cloudy_day"),
                 (self.game.rainy_day_text_rect, "rainy_day"),
                 (self.game.lightning_text_rect, "lightning")
-            ]
+            ])
         
         for rect, key in areas:
             if rect.collidepoint(m): draw_tooltip(self.game, lang_dict.get(key, []), surface); break

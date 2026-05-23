@@ -32,9 +32,9 @@ def test_ball_update():
     ball.vx = 100
     ball.vy = 0
     ball.update(0.1) 
-    # En el código original: self.x_float += self.vx * dt * 60
-    # 400 + 100 * 0.1 * 60 = 400 + 60 = 460
-    assert ball.x_float == 460
+    # El centro es 400, BALL_SIZE//2 = 7, por ende x_float inicial = 393.0
+    # Al actualizar con vx=100 y dt=0.1: 393.0 + 100 * 0.1 = 403.0
+    assert ball.x_float == 403.0
 
 def test_mouse_initialization():
     mouse = Mouse(100, 100)

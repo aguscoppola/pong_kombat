@@ -100,6 +100,8 @@ class Paddle:
         self.last_y = self.rect.y
 
     def grant_random_power(self, game):
+        if self.power_active in [POWER_SHIELD, POWER_MAGNET]:
+            return
         all_p = [
             (POWER_FIREBALL, RED, 25 if game.equal_powers_enabled else 30, game.remove_power_red),
             (POWER_SHIELD, GREEN, 25 if game.equal_powers_enabled else 30, game.remove_power_green),

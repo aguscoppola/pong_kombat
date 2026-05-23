@@ -100,7 +100,7 @@ class AIController:
                                 dodge_offset = -150
 
         # 3. Lógica de Ataque y Apuntar
-        if p2.power_active == POWER_SLEEP:
+        if p2.power_active in [POWER_SLEEP, POWER_REVOLVER]:
             # Si no hay pelota viniendo, apuntar activamente al centro del jugador
             if not valid_balls or target_ball.vx < 0:
                 target_y = p1.rect.centery

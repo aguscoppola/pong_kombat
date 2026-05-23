@@ -45,6 +45,7 @@ def test_ai_evades_yellow_bullet(game):
 def test_ai_revolver_aiming(game):
     game.is_ai_mode = True
     game.paddle2.power_active = POWER_REVOLVER
+    game.balls = []
     
     # Paleta 1 está arriba
     game.paddle1.rect.centery = 100

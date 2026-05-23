@@ -131,3 +131,31 @@ def test_ai_corner_hit_alignment(game):
     # Comprobamos que el target_y calculado incluye el offset de esquina!
     # Para verificar esto de forma limpia, simulamos y comprobamos el movimiento.
     pass
+
+def test_no_new_power_when_shield_or_magnet_active(game):
+    # Caso 1: Escudo activo
+    game.paddle1.power_active = POWER_SHIELD
+    game.paddle1.power_stored = POWER_NONE
+    
+    # Intentar darle un poder aleatorio
+    game.paddle1.grant_random_power(game)
+    assert game.paddle1.power_stored == POWER_NONE
+    
+    # Intentar darle poder de Ta-Te-Ti
+    game._grant_tictactoe_power(game.paddle1)
+    assert game.paddle1.power_stored == POWER_NONE
+    
+    # Intentar activar un poder almacenado
+    game.paddle1.power_stored = POWER_FIREBALL
+    game.activate_paddle_power(game.paddle1, 1)
+    # No debería activarse (sigue como shield)
+    assert game.paddle1.power_active == POWER_SHIELD
+    assert game.paddle1.power_stored == POWER_FIREBALL
+
+    # Caso 2: Imán activo
+    game.paddle1.power_active = POWER_MAGNET
+    game.paddle1.power_stored = POWER_NONE
+    
+    # Intentar darle un poder aleatorio
+    game.paddle1.grant_random_power(game)
+    assert game.paddle1.power_stored == POWER_NONE
