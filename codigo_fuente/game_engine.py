@@ -28,10 +28,6 @@ class Game:
         self.save_path = os.path.join(appdata_path, "save_data.json")
         print(f"DEBUG: Guardando configuraciones en: {self.save_path}")
 
-        # 3. Cargamos el progreso
-        self.first_time_playing = True
-        self.load_progress()
-
         # Mantenemos self.base_dir solo para los assets (imágenes/sonidos)
         self.base_dir = base_dir if base_dir else os.path.dirname(os.path.abspath(__file__))
 
@@ -42,8 +38,7 @@ class Game:
         # SCALED permite que Pygame gestione automáticamente el escalado de 800x600 
         # a cualquier tamaño de ventana o pantalla, manteniendo las coordenadas lógicas.
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED | pygame.RESIZABLE)
-        pygame.display.set_caption("Pong Kombat v0.7.0 - Mobile & Web Edition")
-        # Icono de ventana (v0.6.0)
+        pygame.display.set_caption("PONG KOMBAT version 0.8.0.1 Hotfix")        # Icono de ventana (v0.6.0)
         try:
             icon_path = os.path.join(self.base_dir, "archivos", "pong_kombat_cover.png")
             if os.path.exists(icon_path):
@@ -60,6 +55,11 @@ class Game:
         
         self.clock = pygame.time.Clock()
         self.audio = AudioManager()
+
+        # 3. Cargamos el progreso
+        self.first_time_playing = True
+        self.load_progress()
+
         self.shake_duration = 0
         self.shake_intensity = 0
         self.shake_offset = [0, 0]
@@ -741,8 +741,8 @@ class Game:
                     self.endless_chaos_unlocked = data.get("endless_chaos_unlocked", False)
                     
                     # FORZAR RESET PARA TESTEO (v0.7.4): Permitir siempre ver la pantalla de recompensa final en cada inicio de juego
-                    self.endless_chaos_unlocked = False
-                    self.arcade_completed = False
+                    #self.endless_chaos_unlocked = False
+                    #self.arcade_completed = False
                     
                     # Sincronizar volúmenes con AudioManager
                     self.audio.master_volume = self.sfx_volume
@@ -2553,15 +2553,6 @@ class Game:
             return
 
         if ball.is_orange:
-            # Si tiene escudo, el escudo protege de la naranja
-            if paddle.power_active == POWER_SHIELD:
-                ball.reset_orange(BALL_SIZE)
-                self.audio.play('hit')
-                paddle.shield_hits_left -= 1
-                if paddle.shield_hits_left <= 0: paddle.shield_shrink_timer = 0.1
-                # Rebote normal tras perder el "fuego" naranja
-                self._calculate_bounce_physics(paddle, direction_x, ball)
-                return
                 
             ball.reset_orange(BALL_SIZE); self.audio.play('pop')
             # Destruir paleta visualmente (v0.6.0 Fix: Letalidad absoluta)
@@ -2848,6 +2839,7 @@ class Game:
             
         # Resetear RATÓN (v0.6.0)
         self.mouse = None
+        self.mouse_banned = False  # <--- EL CANDADO SE ABRE PARA EL NUEVO PUNTO
         # Resetear REVOLVER ITEM (v0.6.0 Fix)
         self.revolver_item_active = False
         self.revolver_item_rect = None
@@ -3308,13 +3300,16 @@ class Game:
                 
                 # Lógica de Relámpago (LIGHTNING)
                 if self.lightning_enabled and self.state in [STATE_PLAYING, STATE_SERVE]:
+                    # 1. El desvanecimiento ocurre SIEMPRE (evita la pantalla blanca trabada)
                     if self.lightning_active:
-                        self.lightning_flash_timer -= dt
-                        if self.lightning_flash_timer <= 0:
+                       self.lightning_flash_timer -= dt
+                    if self.lightning_flash_timer <= 0:
                             self.lightning_active = False
                             self.lightning_flash_timer = 0.0
-                    
-                    self.lightning_timer += dt
+
+                     # 2. Solo caen NUEVOS rayos si estamos jugando o sacando
+                    if self.lightning_enabled and self.state in [STATE_PLAYING, STATE_SERVE]:
+                       self.lightning_timer += dt
                     if self.lightning_timer >= 1.0:
                         self.lightning_timer -= 1.0
                         if random.random() < 0.05:
@@ -3343,13 +3338,13 @@ class Game:
 
             # Lógica del RATÓN (v0.5.0)
             if self.add_mouse_enabled:
-                if self.mouse is None:
+                if self.mouse is None and not getattr(self, 'mouse_banned', False):
                     appear_at = self.mouse_appear_options[self.mouse_appear_idx]
                     if self.mouse_hits_counter >= appear_at:
                         # Aparecer ratón asomándose por el piso (v0.6.0)
                         self.mouse = Mouse(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
                         self.audio.play('squeak')
-                else:
+                elif self.mouse is not None:
                     # Actualizar ratón (solo persigue pelotas sólidas, no fantasmas)
                     solid_balls = [b for b in self.balls if not b.is_ghost]
                     if solid_balls:
@@ -3362,6 +3357,9 @@ class Game:
                                     self.audio.play('explosion')
                                     self.vfx.explosion(self.mouse.rect.centerx, self.mouse.rect.centery, (150, 150, 150))
                                     self.mouse = None
+                                    b.reset_orange(BALL_SIZE)
+                                    self.mouse = None
+                                    self.mouse_banned = True  # <--- EL CANDADO SE CIERRA
                                     b.reset_orange(BALL_SIZE)
                                     break
                                 else:
@@ -3986,15 +3984,29 @@ class Game:
             
         # Capa de Relámpago (LIGHTNING)
         if self.rainy_day_enabled and self.lightning_enabled and self.lightning_active and self.lightning_flash_timer > 0:
+            
+            # 1. Restamos tiempo siempre (para que desvanezca en saques y menús)
+            self.lightning_flash_timer -= 0.016
+            
+            # 2. Calculamos la opacidad
             if self.lightning_flash_timer > 0.5:
                 opacity = 255
             else:
                 opacity = int((self.lightning_flash_timer / 0.5) * 255)
+            
+            # 3. ¡EL SALVAVIDAS! Clavamos la opacidad entre 0 y 255 para evitar el crasheo de Pygame
             opacity = max(0, min(255, opacity))
+            
+            # 4. Dibujamos el destello
             flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             flash_surf.fill(WHITE)
             flash_surf.set_alpha(opacity)
             temp_surf.blit(flash_surf, (0, 0))
+
+            # 5. Si el temporizador llegó a cero, apagamos el relámpago limpiamente
+            if self.lightning_flash_timer <= 0:
+                self.lightning_active = False
+                self.lightning_flash_timer = 0.0
         
         self.screen.fill(BLACK)
         self.screen.blit(temp_surf, (off_x, off_y))
