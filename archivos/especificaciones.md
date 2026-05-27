@@ -1,97 +1,118 @@
-# Pong Kombat - Documento de Especificaciones Técnicas (v0.7.2)
+# Pong Kombat - Documento de Especificaciones Técnicas (GDD - v0.8.0)
 
-## 1. Visión General
-**Pong Kombat** es una evolución del clásico arcade que introduce mecánicas de combate, gestión de poderes y alteración del entorno mediante ítems. La v0.7.2 consolida la **Campaña de 7 Niveles del Modo Arcade**, el rediseño meditativo del **Reloj Violeta** y la **reactivación e insonorización segura del audio web** para garantizar compatibilidad total en celulares y PC sin caídas.
+## 1. VISIÓN GENERAL Y ARQUITECTURA
+**Pong Kombat** es un motor de físicas 2D competitivo (PVP y PVE) desarrollado en Pygame-CE. Transforma el concepto clásico del Pong mediante un sistema de combate activo, gestión de proyectiles, alteración de físicas de entorno y modos de juego con muerte súbita.
 
----
-
-## 2. Sistema de Controles (Input Mapping)
-### Entrada Táctil y Móvil (v0.7.0)
-*   **Gestión de Dedos (Multitouch)**: El motor rastrea múltiples IDs de contacto de forma simultánea. Permite el movimiento independiente de ambas paletas y el uso de poderes sin bloqueos de entrada.
-*   **Modo Clásico (Botones Virtuales)**: Botones temáticos de dirección (ʌ, v) y activación de poder (POW). El botón POW cambia de color dinámicamente según el poder cargado.
-*   **Modo Geográfico (Position-Based)**: El usuario toca directamente la posición de destino. El campo se divide verticalmente en dos zonas de control (Mitad Izquierda: P1, Mitad Derecha: P2).
-*   **Unificación de Entrada (Virtual Finger)**: El ratón en PC simula el comportamiento de un dedo, permitiendo pruebas de UX móvil en entornos de escritorio sin discrepancias de lógica.
-
-### Modo SOLO (IA de Supervivencia Avanzada)
-*   **Radar de Amenazas Letales**: La IA detecta balas del **REVÓLVER** y bolas **NARANJAS** en trayectoria de colisión. Prioriza la esquiva absoluta (moviéndose 70px fuera de la trayectoria) a menos que la pelota esté a menos de 80px de su fondo.
-*   **Defensa vs Fantasmas (v0.6.1)**: La IA ahora combina la lista de pelotas reales y fantasmales del oponente. Elegirá como objetivo la que esté más cerca de su posición horizontal (`centerx`), permitiendo defender goles espectrales de forma efectiva.
-*   **Gestión de Poder SLEEP**: La IA utiliza el poder de sueño apuntando al centro de la paleta del jugador. Detecta las mini-bolas violetas y las esquiva si no tiene la pelota principal cerca.
-*   **Gestión Defensiva**: Si la IA posee el poder **REVOLVER**, no disparará si la pelota principal está en peligro de gol; primero asegurará el punto para mantener el poder.
+* **Resolución y Escalado:** El juego utiliza una resolución base interna de `800x600`. Se despliega utilizando `pygame.SCALED` para adaptarse dinámicamente a cualquier monitor o dispositivo móvil manteniendo el aspect ratio y la integridad de las colisiones.
+* **Soporte Multiplataforma (PWA):** El motor está insonorizado (`try...except` en el mixer) y adaptado (Fetch Monkeypatching) para compilar en WebAssembly vía `pygbag`. Soporta ejecución offline, haptic feedback (`vibrate()`) y transformaciones CSS a 90° dinámicas para dispositivos móviles.
 
 ---
 
-## 3. Modos de Juego (v0.7.2)
-### MODO ARCADE
-*   **Estructura:** 7 niveles consecutivos con reglas y modificadores únicos.
-*   **Persistencia (v0.7.2):** El progreso de completado se almacena de forma persistente en `save_data.json`. Al superar el Nivel 7 (Boss Final), se desbloquean permanentemente la Corona, el selector de niveles y el panel TEST LEVEL.
-*   **Dificultad:** La velocidad de reacción y la agresividad de la IA aumentan de forma progresiva nivel a nivel.
-*   **Detalle de los Niveles:**
-    *   **Niveles 1 y 2**: Duelos veloces de **1 punto** bajo la regla estricta de **GOL DE ORO** (`is_golden_goal_round`).
-    *   **Nivel 3**: Partida a **1 punto** pero con **MATCH POINT** activo (se debe ganar con diferencia de 2 puntos).
-    *   **Nivel 4**: Configurado a **3 puntos** con variantes: Variante 1 (Poderes raros) y Variante 2 (Modificador de Ratón + Poderes Clásicos).
-    *   **Nivel 5 (Duelo Táctico)**: Partida a **3 puntos** sin Match Point, con **2 portales** activos, **planetas flotantes por defecto (no destructibles)**, poderes clásicos + revólver, frecuencia de toques a **5 hits**, y mecánicas de **Relojes persistentes** y **Números encapsuladores**.
-    *   **Nivel 6 (El Clima de la Discordia)**: Partida al mejor de **3 puntos** con variantes climatológicas extremas:
-        *   **Variante 1**: Día Lluvioso torrencial + relámpagos, poderes limitados a Chicle, Fantasma, Sueño y Revólver (100%), frecuencia a **3 hits**.
-        *   **Variante 2**: Día Nublado torrencial + lluvia básica (10mm), **planetas flotantes por defecto (no destructibles)**, todos los poderes activos, solo el reloj violeta disponible, **2 portales** activos, frecuencia a **3 hits**.
-    *   **Nivel 7 (Boss Final Definitivo)**: Batalla final a **6 puntos** con Match Point, Gol de Oro experimental, velocidad de pelota inicial a **x1.0** (estándar), multiplicador inicial **X2**, **4 portales** activos, clima lluvioso/nublado extremo con relámpagos, revólver al 100% y **planetas flotantes destructibles** (resistencia de 3 hits).
-*   **Recompensa:** Al completar el Nivel 7, se desbloquea el accesorio cosmético **CROWN (Corona)** permanentemente.
+## 2. DICCIONARIO DE ESTADOS DE LA UI (State Machine)
+El motor principal (`game_engine.py`) funciona en base a una máquina de estados finitos que controla qué menú o lógica se renderiza.
+
+* `STATE_MAIN_MENU`: Menú de inicio. Gestiona la bifurcación entre Solo, Multiplayer, Settings, Extras y Skins.
+* `STATE_MODE_SELECTION`: Selector de modo multijugador.
+* `STATE_SOLO_SUBMODE_SELECTION`: Submenú de 1 Jugador. Contiene los botones `btn_classic_rect` (Clásico), `btn_arcade_rect` (Arcade) y `btn_endless_rect` (Sin Fin).
+* `STATE_ARCADE_TUTORIAL`: Estado temporal para renderizar el tutorial del modo campaña.
+* `STATE_ENDLESS_TUTORIAL`: Nuevo estado v0.8.0. Renderiza la UI del submenú en segundo plano con un manto negro semitransparente (`SRCALPHA` a 220) por encima. Solo redibuja el botón "SIN FIN" para resaltarlo.
+* `STATE_SETTINGS` / `STATE_MODIFIERS` / `STATE_SKINS`: Menús de configuración.
+* `STATE_GAME`: El bucle del motor de físicas y gameplay.
+* `STATE_GAME_OVER`: Pantalla de victoria/derrota.
 
 ---
 
-## 4. Diccionario de Modificadores (Match Modifiers)
-*   **SLEEPING (The Dreamer Update):** 
-    *   **Logic:** Lanza un proyectil violeta que se divide en 3 al cruzar la mitad del campo (ángulos de 45°).
-    *   **Effect:** Inmoviliza al oponente por 4 segundos si es impactado.
-    *   **Velocity:** El proyectil viaja a 2.5x la velocidad base de la pelota.
-*   **CROWN HAT (Reward):** 
-    *   Accesorio visual desbloqueable tras vencer el modo Arcade. Puede asignarse al Jugador 1, Jugador 2 o ambos.
-*   **ACTIVE POWER RESTRICTION (v0.6.1):**
-    *   Si una paleta tiene un efecto activo (Imán, Chicle, Fantasma, Sueño), no podrá recibir un nuevo poder mediante el sistema de toques (hits) hasta que el efecto termine.
-    *   **Excepción:** Los poderes de contacto (Fuego y Naranja) pueden ser recibidos en cualquier momento.
-*   **VIOLET WATCH (Meditation Mechanic - v0.7.2):**
-    *   **Logic:** Sustituye por completo la mecánica antigua de toques (hits).
-    *   **Effect:** Si la paleta del **jugador que capturó el reloj** se mantiene **totalmente quieta durante 3 segundos**, medita y recibe un poder aleatorio directamente. El rival no se ve afectado ni recibe el beneficio.
-    *   **Visual Indicator:** Se dibuja una barra de carga violeta sobre la paleta en tiempo real que muestra el progreso de la meditación. Si la paleta se mueve, el temporizador y la barra se reinician a cero.
-    *   **AI Integration:** La IA (Player 2) comprende este reloj y evalúa si es seguro quedarse quieta para meditar (cuando no hay amenazas directas y la pelota está en la mitad del campo del oponente). Si es seguro, detiene su movimiento ordinario por 3 segundos para obtener el poder; en caso de peligro inminente, interrumpe la meditación para defender el arco.
-    *   **Tutorial:** Integración total con el paso 18 del tutorial interactivo para instruir al usuario sobre la nueva jugabilidad meditativa.
+## 3. DICCIONARIO DE PODERES Y ARMAS
+Los jugadores adquieren poderes capturando relojes, golpeando la pelota repetidas veces o recolectando ítems orbitales. Existe una **Restricción de Poder Activo**: Si un jugador tiene un efecto de alteración activo (Imán, Chicle, Fantasma, Sueño), no puede adquirir otro poder nuevo hasta que se agote, a excepción de los poderes de impacto físico (Naranja/Revólver).
+
+* **BEER WATCH (Reloj Cerveza - ID 7):**
+    * **Mecánica:** Modificador de estado que altera la percepción y control del oponente. Emite un sonido chiptune sintetizado (`glup.wav`).
+    * **Efecto Jugador Humano:** Invierte los controles físicos de movimiento obligando a jugar en reversa.
+    * **Efecto Inteligencia Artificial:** Ignora la inversión del motor físico (`entities.py`). En su lugar, induce un *cooldown* de pánico de 2 segundos donde la IA convulsiona sin rumbo, seguido de una miopía táctica permanente que aplica un desfase de 20 píxeles a su cálculo de intercepción.
+* **VIOLET WATCH (Reloj Violeta - Meditación):** * **Mecánica:** Se activa manteniendo la paleta completamente inmóvil durante 3 segundos.
+    * **Visuales:** Renderiza una barra de carga dinámica sobre la paleta. Al completarse, emite sonido de campana y explosión de partículas.
+    * **Resultado:** Otorga un poder aleatorio al instante.
+* **ESPECTRAL (Teletransportación Asesina):**
+    * **Mecánica:** Otorga munición para ejecutar un ataque sorpresivo basado en la posición de la pelota.
+    * **Impacto:** Permite gatillar una reacción rápida cuando la pelota cruza el medio campo, desestabilizando la defensa rival mediante físicas impredecibles.
+* **REVOLVER (Arma Orbital):**
+    * **Mecánica:** Aparece en el centro del campo con una probabilidad configurable (10%, 25%, 50%, 100%).
+    * **Munición:** Otorga 3 balas amarillas. Posee un seguro de disparo (`bullet_immunity` de 0.1s) para no autoinfligirse daño.
+    * **Impacto:** Las balas viajan en línea horizontal recta a 2x la velocidad base. Cualquier impacto directo contra el rival causa explosión inmediata y pérdida del punto (Muerte Súbita/Gol).
+* **SLEEP (Sueño):**
+    * **Mecánica:** Dispara un proyectil violeta que viaja a 2.5x la velocidad de la pelota.
+    * **Físicas:** Al cruzar la mitad del campo (coordenada `SCREEN_WIDTH // 2`), el proyectil se divide en 3 esferas (una recta, dos a 45°).
+    * **Impacto:** Inmoviliza completamente la paleta rival durante 4 segundos.
+* **GUM (Chicle):**
+    * **Mecánica:** Tiñe la paleta de rosa. La pelota principal se queda pegada magnéticamente a la paleta al hacer contacto, permitiendo retenerla.
+    * **Ofensiva:** Permite disparar proyectiles gigantes de chicle con físicas de rebote erráticas para confundir y empujar al oponente.
+* **GHOST (Fantasma):**
+    * **Mecánica:** Dispara un proyectil blanco-azulado espectral. Viaja a una velocidad 50% más lenta.
+    * **Impacto:** Si el rival no lo atrapa/bloquea con su paleta, el proyectil cruzará la línea de gol y le sumará un punto válido al jugador que lo disparó.
+* **MAGNET (Imán) / RED (Fuego) / ORANGE (Demolición):**
+    * Poderes elementales de control de trayectoria e impactos físicos violentos de repulsión.
 
 ---
 
-## 7. Sistema de Tutoriales
-*   **Tutorial General:** Accesible mediante el botón "?" pixelado en el menú principal. Guía al usuario por la configuración de idioma, volumen y el uso de modificadores antes de entrar en combate. **Se autogestiona mediante persistencia para no aparecer repetitivamente.**
-*   **Tutorial Arcade:** Guía específica dentro del menú SOLO que explica la estructura de los 7 niveles y la recompensa de la Corona.
-*   **Interacción:** Ambos sistemas utilizan un manto negro de enfoque y navegación mediante la barra espaciadora con efecto de escritura palabra por palabra.
+## 4. DICCIONARIO DE MODIFICADORES (Pestaña EXTRAS & CAOS)
+Reglas ambientales que alteran las matemáticas de la pista.
+
+* **TIC-TAC-TOE (Ta-Te-Ti) [v0.8.0]:**
+    * **Comportamiento:** Renderiza una grilla de 3x3 en el centro del campo. Las líneas y celdas son cuerpos rígidos (colliders).
+    * **Efecto:** Altera radicalmente el control del medio campo, bloqueando proyectiles y rebotando la pelota en ángulos asimétricos.
+* **ENDLESS CHAOS (Caos Infinito) [v0.8.0]:**
+    * **Gated Content:** Bloqueado y oculto por defecto. Se activa en `save_data.json` únicamente tras completar el Nivel 7 del Modo SIN FIN en una sola racha.
+    * **Efecto:** Fuerza al motor a saturar las físicas (portales máximos, gravedad severa, proyectiles erráticos).
+* **PORTALS (Portales Dimensionales):**
+    * **Comportamiento:** Pares conectados (Azul/Naranja, Rojo/Verde). Soportan 5 tamaños (Minion a GIANT). Pueden orientarse verticalmente u horizontalmente.
+    * **Físicas:** Al cruzar, la pelota gana +0.5% de velocidad y altera su ángulo 5° para evitar bucles infinitos de teletransporte (infinite loops).
+* **FLOATING PLANETS (Planetas Flotantes):**
+    * **Comportamiento:** Cuerpos celestes con nombres, colores y sistemas de partículas temáticos (Tierra, Marte, Júpiter, Saturno).
+    * **Físicas:** Ejercen gravedad en área (Moon, Planet, Gas Giant, Star). Pueden configurarse como indestructibles o destructibles (explotan tras 3 impactos).
+* **WEATHER SYSTEM (Sistema de Clima):**
+    * **Lluvioso (Rainy):** De 10mm a 50mm (Torrencial). Físicas de gotas cayendo en diagonal, sonido ambiental dinámico de 3 capas superpuestas (cross-fade de 0.3s).
+    * **Nublado / Relámpagos (Cloudy / Lightning):** Oscurecimiento de pantalla y flashes fotográficos esporádicos.
+* **MOUSE (Ratón):**
+    * Entidad NPC que corre por el campo. Velocidad inicial y tiempo de aparición (delay spawn) configurables.
+* **REGLAS DE PUNTUACIÓN:**
+    * **Golden Goal:** El primer punto gana la partida.
+    * **Match Point:** Requiere ganar por una diferencia estricta de 2 puntos.
+    * **Multiplicador X2:** Ítem dorado en el campo que duplica los puntos del siguiente gol.
 
 ---
 
-## 8. Lógica de Versionado (SemVer)
-*   **v0.4.0**: "The Solo & Settings Update" - Modo contra IA y panel de ajustes.
-*   **v0.5.0**: "The REVOLVER Update" - Combate letal, IA pistolera y poder de chicle.
-*   **v0.5.1**: "The Architect & Survival Update" - Arquitectura modular, IA con radar de esquiva.
-*   **v0.6.0**: "The Arcade & Sleep Update" - Modo campaña, poder de sueño, recompensas desbloqueables e IA táctica.
-*   **v0.6.1**: "The Persistence & Credits Update" - Sistema de guardado JSON, panel de créditos y balance de combate.
-*   **v0.7.0**: "The Mobile & Web Update" - Soporte táctil, Modo Geográfico, Escalado Dinámico Inteligente e infraestructura PWA para funcionamiento offline.
-*   **v0.7.1**: "The Rainy Kombat & Local Network Update" - Sonido generativo de lluvia pura, Interceptor de Fetch Global (Fetch Monkeypatching) para móviles por Wi-Fi, apertura de Firewall automatizada e inyección dinámica de CSS móvil.
-*   **v0.7.2**: "The Meditation, Arcade Rework & Web Sound Update" - Rediseño absoluto del Reloj Violeta (meditación quieta por 3 segundos en lugar de toques), expansión de la campaña Arcade a 7 niveles dinámicos, velocidad inicial x1.0 en Nivel 7, textos coloridos e insonorización segura con compatibilidad de Audio Web en navegadores móviles/PC.
+## 5. MODOS DE JUEGO (Lógica de Motor)
+### 5.1. Modo ARCADE (Campaña de 7 Niveles)
+El progreso se guarda. Vencer el nivel 7 desbloquea la Corona y el panel `TEST LEVEL`.
+* **Nivel 1 & 2:** 1 Punto (Golden Goal).
+* **Nivel 3:** 1 Punto (Match Point forzado).
+* **Nivel 4:** 3 Puntos (Variante Poderes vs Variante Ratón).
+* **Nivel 5:** 3 Puntos. Táctico. 2 Portales, Planetas fijos. Relojes persistentes.
+* **Nivel 6:** 3 Puntos. Clima Extremo. Restricción masiva de habilidades según la variante climatológica.
+* **Nivel 7 (Boss):** 6 Puntos (Match Point + Golden Goal experimental). X2 activo inicial. 4 Portales, clima extremo, revólver 100%, planetas destructibles.
+
+### 5.2. Modo SIN FIN (Endless Mode) [v0.8.0]
+Modo PVE de supervivencia procedimental y generativa.
+* **Muerte Súbita:** `max_score = 1`. Perder 1 punto significa Game Over y reinicio del contador de racha (Win Streak) a cero.
+* **Entropía Acumulativa:** La dificultad aumenta inyectando modificadores matemáticos y entidades físicas al azar. En cada nivel superado, se incrementa la cantidad de modificadores activos en la pista de forma simultánea.
+* **Recompensas:** Guardado persistente de la mejor racha. Al llegar al nivel 7 continuo, desencadena el unlocker de `ENDLESS CHAOS`.
 
 ---
 
-## 9. Arquitectura Móvil y Web (v0.7.2)
-*   **Escalado Dinámico (SCALED)**: El motor utiliza `pygame.SCALED` para desacoplar la lógica de 800x600 de la resolución física. Esto permite que el juego se adapte a cualquier relación de aspecto (21:9, 4:3, etc.) sin deformar las colisiones.
-*   **Infraestructura PWA**: 
-    *   **Offline Mode**: Mediante Service Workers, el juego es jugable sin internet.
-    *   **Standalone Experience**: El `manifest.json` permite la instalación como app nativa, forzando la orientación horizontal y eliminando la interfaz del navegador.
-    *   **Haptic Feedback**: Integración de la API `vibrate()` del navegador para sincronizar impactos visuales con vibración física en móviles.
-*   **Interceptor de Peticiones Global (Fetch Monkeypatching)**:
-    *   Para evitar fallos de CORS y 404s silenciosos en redes Wi-Fi locales al descargar la rueda de Pygame (`pygame_ce`), se inyectó una función interceptora que monitorea el objeto `window.fetch`. 
-    *   Si detecta una solicitud de descarga dirigida al CDN oficial de Pygame-web para el `.whl` del motor, reescribe de forma transparente el destino apuntando a `window.location.origin` (nuestro servidor local). Esto permite que los archivos de configuración JSON genéricos se carguen de internet y la biblioteca pesada se transmita de forma local e instantánea.
-*   **Inyección Dinámica de CSS Móvil**:
-    *   Se eliminaron las restricciones estáticas de visualización en la cabecera que rompían los clics del puntero en PC. 
-    *   El motor ahora detecta dinámicamente si el navegador del cliente es móvil (`/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i`). Si es afirmativo, inyecta mediante JS en tiempo de ejecución las reglas de transformación física a 90° (Landscape) y el bloqueo absoluto de zoom. En caso contrario (Desktop PC), se omiten al 100%, restaurando la interacción del ratón original.
-*   **Reactivación Segura de Sonido en WebAssembly**:
-    *   Se eliminaron los bloqueos preventivos de `sys.platform == "emscripten"` en el `AudioManager`.
-    *   Se implementó una arquitectura de reproducción tolerante a fallos: todas las llamadas a `pygame.mixer.Sound` y `pygame.mixer.music` se ejecutan dentro de bloques `try...except Exception` protectores.
-    *   Esto permite cargar y reproducir archivos de audio `.wav` y `.ogg` de forma nativa en navegadores móviles y de escritorio una vez que el usuario realiza la primera interacción táctil/clic, evitando caídas repentinas en navegadores con restricciones severas de autoplay o formatos no soportados.
-*   **Clima y Sonido Generativo Ambiental**:
-    *   **Sonido de Lluvia (`rainy.wav`)**: Generado mediante un script matemático (`crear_lluvia.py`) combinando tres capas de ruido con filtros de paso bajo para graves, medios y agudos, y un cross-fade lineal de 0.3 segundos para lograr un loop ininterrumpido sin clicks de fase.
-    *   **Clima Lluvioso**: El modificador visual "RAINY DAY" dibuja partículas de gotas de lluvia cayendo en diagonal, sincronizadas con el nuevo canal inmersivo de audio tridimensional.
+## 6. SISTEMAS DE INTELIGENCIA ARTIFICIAL (Player 2)
+El script `ai_controller.py` contiene un árbol de decisiones jerárquico actualizado.
+* **Manejo de Ebriedad (Drunk State):** La IA posee un escudo contra el motor físico que evita la inversión matemática de sus controles. Al emborracharse, simula torpeza humana: se paraliza durante 2 segundos convulsionando en el lugar, y luego intenta atajar la pelota sumándole un desfase permanente de 20 píxeles de error a su `final_y`. Cancela automáticamente cualquier intento de Meditación Violeta.
+* **Evaluación de Radar Espectral y Fantasmas:** Detecta proyectiles GHOST. Calcula la cercanía horizontal (`centerx`) de las pelotas reales vs espectrales para decidir cuál atajar primero. Si posee el poder Espectral, espera inteligentemente a que la pelota cruce la mitad de la cancha para gatillarlo con un 20% de probabilidad por frame, buscando el error del jugador.
+* **Supervivencia Absoluta:** La máxima prioridad es evadir colisiones fatales. Si un proyectil Revólver o bola Naranja se acerca, la IA aborta la persecución de la pelota y se mueve a una zona segura de 70px de distancia libre.
+* **Gestión Táctica (Hold/Fire):** Con el revólver en mano, no dispara si está defendiendo su línea de fondo (evita soltar un tiro por error y perder el arma si recibe un gol).
+* **Manejo de Meditación:** Lee el estado de la pelota y de la pista. Si no hay amenazas acercándose rápidamente, se queda inmóvil 3 segundos para cobrar el Reloj Violeta.
+
+---
+
+## 7. UX, RENDERING Y SISTEMA DE TEXTOS
+* **Typewriter Engine (Máquina de escribir):**
+    * Motor de renderizado en `game_engine.py` controlado por `tutorial_text_timer` y `tutorial_text_index`. Reproduce sonido `pop` por cada palabra procesada (`split(" ")`).
+* **Soporte Multilínea Dinámico (v0.8.0):**
+    * Procesa el carácter `\n`. En lugar de desbordar la caja, divide el texto y calcula el `get_height()` de la tipografía `small_font` para apilar y centrar verticalmente hasta 3 renglones dentro de un bloque negro inferior de borde blanco (100px de altura total).
+* **Focus Rendering (Manto de Foco):**
+    * Se dibuja una Surface de `(0,0,0, 220)` sobre toda la UI para oscurecer botones inactivos (incluyendo el botón Back). Solo los elementos esenciales de la interacción actual se dibujan en una capa Z superior (ej: el botón de la modalidad seleccionada o el contenedor de texto).

@@ -355,6 +355,10 @@ class Game:
         self.orange_watch_enabled = False
         self.orange_watch_rect = pygame.Rect(0,0,30,30)
         self.orange_watch_text_rect = pygame.Rect(0,0,0,0)
+        # --- RELOJ CERVEZA ---
+        self.beer_watch_enabled = False
+        self.beer_watch_rect = pygame.Rect(0,0,30,30)
+        self.beer_watch_text_rect = pygame.Rect(0,0,0,0)
         self.tictactoe_enabled = False
         self.tictactoe_rect = pygame.Rect(0,0,30,30)
         self.tictactoe_text_rect = pygame.Rect(0,0,0,0)
@@ -375,6 +379,9 @@ class Game:
         self.gum_power_rect = pygame.Rect(0,0,30,30)
         self.gum_power_text_rect = pygame.Rect(0,0,0,0)
         self.gum_projectiles = []
+        self.espectral_power_enabled = False
+        self.espectral_power_rect = pygame.Rect(0,0,30,30)
+        self.espectral_power_text_rect = pygame.Rect(0,0,0,0)
         self.cloudy_day_enabled = False
         self.cloudy_day_rect = pygame.Rect(0,0,30,30)
         self.cloudy_day_text_rect = pygame.Rect(0,0,0,0)
@@ -447,6 +454,11 @@ class Game:
         self.sleeping_power_rect = pygame.Rect(0,0,30,30)
         self.sleeping_power_text_rect = pygame.Rect(0,0,0,0)
         self.sleep_projectiles = []
+
+        # --- PODER ESPECTRAL ---
+        self.espectral_power_enabled = False
+        self.espectral_power_rect = pygame.Rect(0,0,30,30)
+        self.espectral_power_text_rect = pygame.Rect(0,0,0,0)
         
         self.start_x2_enabled = False
         self.start_x2_rect = pygame.Rect(0,0,30,30)
@@ -652,6 +664,7 @@ class Game:
         self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
         self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
         self.orange_watch_enabled = False
+        self.beer_watch_enabled = False
         self.tictactoe_enabled = False
         self.magnet_power_enabled = False
         self.ghost_power_enabled = False
@@ -904,7 +917,10 @@ class Game:
             {"id": "add_mouse", "type": "toggle", "field": "add_mouse_enabled", 
              "text_en": "Intrusive |GRAY|Mouse|WHITE|", "text_es": "|GRAY|Ratón|WHITE| Intruso activo"},
             {"id": "orange_watch", "type": "toggle", "field": "orange_watch_enabled", 
-             "text_en": "Enable |ORANGE|ORANGE|WHITE| watch", "text_es": "Reloj |ORANGE|NARANJA|WHITE| activo"},
+             "text_en": "Enable |ORANGE|ORANGE|WHITE| watch", "text_es": "Reloj |ORANGE|NARANJA|WHITE| activo"}, 
+             # --- NUEVO RELOJ CERVEZA ---
+            {"id": "beer_watch", "type": "toggle", "field": "beer_watch_enabled", 
+             "text_en": "Enable |GOLD|BEER|WHITE| watch", "text_es": "Reloj de |GOLD|CERVEZA|WHITE| activo"},
             {"id": "magnet_power", "type": "toggle", "field": "magnet_power_enabled", 
              "text_en": "Enable |GRAY|MAGNET|WHITE| power", "text_es": "Poder |GRAY|MAGNÉTICO|WHITE| activo"},
             {"id": "ghost_power", "type": "toggle", "field": "ghost_power_enabled", 
@@ -913,6 +929,10 @@ class Game:
              "text_en": "Identical |GHOST|GHOST|WHITE| ball", "text_es": "Pelota |GHOST|fantasma|WHITE| idéntica"},
             {"id": "gum_power", "type": "toggle", "field": "gum_power_enabled", 
              "text_en": "Enable |PINK|GUM|WHITE| power", "text_es": "Poder de |PINK|CHICLE|WHITE| activo"},
+             # --- NUEVO MODIFICADOR ESPECTRAL ---
+            {"id": "espectral_power", "type": "toggle", "field": "espectral_power_enabled", 
+             "text_en": "Enable |GRAY|SPECTRAL|WHITE| power", "text_es": "Poder |GRAY|ESPECTRAL|WHITE| activo"},
+            # -----------------------------------
             {"id": "tictactoe", "type": "toggle", "field": "tictactoe_enabled", 
              "text_en": "Enable |CYAN|Tic-tac-toe|WHITE|", "text_es": "Activar |CYAN|Ta-Te-Ti|WHITE|"},
             {"id": "experimental_golden_goal", "type": "toggle", "field": "experimental_golden_goal", 
@@ -1162,7 +1182,7 @@ class Game:
                 "orange_watch", "magnet_power", "ghost_power", "ghost_identical", 
                 "gum_power", "tictactoe", "floating_planets", "destructible_planets", 
                 "portals", "portals_vertical", "more_portals", "add_mouse", "revolver", 
-                "sleeping_power", "cloudy_day", "rainy_day", "lightning"
+                "sleeping_power", "cloudy_day", "rainy_day", "lightning", "espectral_power", "beer_watch"
             }
             
             for item in self.endless_pool:
@@ -1299,6 +1319,8 @@ class Game:
             # Eliminar relojes
             self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = True
             self.orange_watch_enabled = False
+            self.beer_watch_enabled = False
+            self.start_with_power_enabled = True
             # Solo RED y GREEN poderes
             self.remove_power_red = False
             self.remove_power_green = False
@@ -1335,6 +1357,7 @@ class Game:
             # Activar relojes (Clásico)
             self.remove_blue = self.remove_red = self.remove_purple = self.remove_white = self.remove_yellow = False
             self.orange_watch_enabled = False
+            self.beer_watch_enabled = False
             self.start_with_power_enabled = True
             # Activar todos los poderes clásicos
             self.remove_power_red = self.remove_power_green = self.remove_power_yellow = self.remove_power_orange = False
@@ -2275,6 +2298,11 @@ class Game:
             self.audio.play('pop'); self.revolver_prob_idx = (self.revolver_prob_idx + 1) % len(self.revolver_prob_options)
         elif self.sleeping_power_rect.collidepoint(event.pos) or self.sleeping_power_text_rect.collidepoint(event.pos):
             self.audio.play('pop'); self.sleeping_power_enabled = not self.sleeping_power_enabled
+        elif self.espectral_power_rect.collidepoint(event.pos) or self.espectral_power_text_rect.collidepoint(event.pos):
+            self.audio.play('pop'); self.espectral_power_enabled = not self.espectral_power_enabled
+        elif self.beer_watch_rect.collidepoint(event.pos) or self.beer_watch_text_rect.collidepoint(event.pos):
+            self.audio.play('pop')
+            self.beer_watch_enabled = not self.beer_watch_enabled
         elif self.cloudy_day_rect.collidepoint(event.pos) or self.cloudy_day_text_rect.collidepoint(event.pos):
             self.audio.play('pop'); self.cloudy_day_enabled = not self.cloudy_day_enabled
         elif self.cloudy_day_enabled and self.cloud_size_rect.collidepoint(event.pos):
@@ -2497,7 +2525,7 @@ class Game:
         return en if self.language == "EN" else es
 
     def _handle_watch_capture(self):
-        sounds = {1: 'item_get', 2: 'error', 3: 'bell', 4: 'divine', 5: 'life'}
+        sounds = {1: 'item_get', 2: 'error', 3: 'bell', 4: 'divine', 5: 'life', 7: 'glup'}
         if self.hourglass_type in sounds: self.audio.play(sounds[self.hourglass_type])
         
         self.is_x2_item_active = False
@@ -2700,6 +2728,7 @@ class Game:
         if not self.remove_white: avail.append((4, 10))
         if not self.remove_yellow: avail.append((5, 25))
         if self.orange_watch_enabled: avail.append((6, 20))
+        if self.beer_watch_enabled: avail.append((7, 20))
         if not avail: return
         
         self.hourglass_rect = pygame.Rect(SCREEN_WIDTH//2 - 15, SCREEN_HEIGHT//2 - 20, 30, 40)
@@ -2781,8 +2810,64 @@ class Game:
                 self.gum_projectiles.append(GumProjectile(px, paddle.rect.centery, dir_x, paddle))
                 paddle.gum_charges -= 1
                 if paddle.gum_charges <= 0:
-                    paddle.power_active = POWER_NONE
-                    paddle.color = WHITE
+                   paddle.power_active = POWER_NONE
+                   paddle.color = WHITE
+                
+        # --- PODER ESPECTRAL: Teletransportación ---
+        if paddle.power_active == POWER_ESPECTRAL and paddle.espectral_ammo > 0 and not paddle.is_espectral_active:
+            # 1. Chequeamos que haya una pelota principal para teletransportarse
+            if len(self.balls) > 0:
+                target_ball = self.balls[0] # Apunta siempre a la pelota principal
+                
+                # 2. Gastamos la munición y activamos el timer
+                paddle.espectral_ammo -= 1
+                paddle.is_espectral_active = True
+                paddle.espectral_start_time = pygame.time.get_ticks()
+                
+                # --- MODIFICACIÓN: Penalización reducida al 15% ---
+                if not hasattr(paddle, 'espectral_speed_factor'): paddle.espectral_speed_factor = 1.0
+                paddle.espectral_speed_factor *= 0.85 # Antes era 0.75. Ahora pierde solo 15%
+                # --------------------------------------------------
+                
+                # 3. Guardamos la posición original
+                paddle.original_x = paddle.rect.x
+                
+                # 4. Sonido y Efecto Visual de desaparición
+                self.audio.play('espectral') 
+                self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, (100, 100, 100)) # Gris
+                self.vfx.explosion(paddle.rect.centerx, paddle.rect.centery, (255, 255, 255)) # Blanco
+                
+                # 5. ¡TELETRANSPORTACIÓN!
+                if owner == 1: # Jugador Izquierdo
+                    paddle.rect.x = target_ball.rect.left - paddle.rect.width - 20
+                else: # Jugador Derecho
+                    paddle.rect.x = target_ball.rect.right + 20
+                    
+                # Chequeamos que no se hunda en el techo
+                if paddle.rect.top < 0:
+                    paddle.rect.top = 0
+                # Chequeamos que no se hunda en el piso
+                elif paddle.rect.bottom > SCREEN_HEIGHT:
+                    paddle.rect.bottom = SCREEN_HEIGHT
+                    
+                # Guardamos la posición Y final con decimales para el motor físico
+                paddle.y_float = float(paddle.rect.y)
+                
+                # 6. Efecto visual de aparición
+                self.vfx.burst(paddle.rect.centerx, paddle.rect.centery, (100, 100, 100)) # Gris
+                self.vfx.burst(paddle.rect.centerx, paddle.rect.centery, (255, 255, 255)) # Blanco
+                
+                # 7. Reseteo del poder
+                paddle.power_active = POWER_NONE
+
+                # Si el poder ESPECTRAL está guardado, sacarlo de la cápsula y equiparlo
+                if paddle.power_stored == POWER_ESPECTRAL:
+                   paddle.power_active = POWER_ESPECTRAL
+                   paddle.espectral_ammo = 1
+                   paddle.power_stored = POWER_NONE
+                   paddle.color = (100, 100, 100) # Se pinta de gris
+                
+            return
 
         elif paddle.power_stored == POWER_GHOST:
             self.audio.play('ghost') # Risa malévola
@@ -2847,6 +2932,10 @@ class Game:
         self.sleep_projectiles = []
         self.mouse_hits_counter = 0
         self.reset_tictactoe()
+
+        # Limpiar borrachera de la cerveza
+        self.paddle1.is_drunk = False
+        self.paddle2.is_drunk = False
 
     def goal_scored(self, player):
         self.audio.play('goal')
@@ -3217,6 +3306,25 @@ class Game:
                         p.rect.height = SCREEN_HEIGHT; p.rect.width = SCREEN_WIDTH // 2; p.rect.y = 0; p.y_float = 0.0
                         p.rect.x = 0 if p == self.paddle1 else SCREEN_WIDTH // 2; p.white_zone_hits_left = 5
 
+            # --- ESTE ES EL CABLE DE LAS BURBUJAS ---
+            # (Fijate que los "if" están alineados verticalmente con la "f" de "for")
+            if getattr(self.paddle1, 'is_drunk', False):
+                self.vfx.drunk_bubbles(self.paddle1.rect)
+                
+            if getattr(self.paddle2, 'is_drunk', False):
+                self.vfx.drunk_bubbles(self.paddle2.rect)
+
+
+            # --- NUEVO: SISTEMA INTELIGENTE BEER WATCH ---
+            # Si la zona activa es la 7, el dueño de esa zona está borracho
+            self.paddle1.is_drunk = (getattr(self, 'zone_type', 0) == 7 and getattr(self, 'slow_zone_owner', 0) == 1)
+            self.paddle2.is_drunk = (getattr(self, 'zone_type', 0) == 7 and getattr(self, 'slow_zone_owner', 0) == 2)
+
+            # Actualizar Proyectiles de Chicle
+            for gp in self.gum_projectiles[:]:
+                gp.update(dt)
+                if not gp.active:
+                    self.gum_projectiles.remove(gp)
             # Actualizar Proyectiles de Chicle
             for gp in self.gum_projectiles[:]:
                 gp.update(dt)
@@ -4078,13 +4186,24 @@ class Game:
     def _draw_game_field(self, surface):
         def draw_zone(owner, z_type):
             if z_type == 0: return
-            colors = {1: (0, 0, 80), 2: (80, 0, 0), 3: VIOLET_ZONE, 4: WHITE}
+            # Cambiamos el 7 por (45, 35, 0), un tono marrón/mostaza muy oscuro y elegante
+            colors = {1: (0, 0, 80), 2: (80, 0, 0), 3: VIOLET_ZONE, 4: WHITE, 5: YELLOW, 6: ORANGE, 7: (45, 35, 0)}
             r = (0, 0, SCREEN_WIDTH//2, SCREEN_HEIGHT) if owner == 1 else (SCREEN_WIDTH//2, 0, SCREEN_WIDTH//2, SCREEN_HEIGHT)
-            pygame.draw.rect(surface, colors[z_type], r)
+            pygame.draw.rect(surface, colors.get(z_type, WHITE), r)
+            
+            # Usamos colors.get() para que si a futuro te olvidás un color, use BLANCO en vez de crashear
+            pygame.draw.rect(surface, colors.get(z_type, WHITE), r)
 
         if self.watches_kept_enabled: draw_zone(1, self.p1_zone_type); draw_zone(2, self.p2_zone_type)
         elif self.slow_zone_owner != 0: draw_zone(self.slow_zone_owner, self.zone_type)
         self._draw_dashed_line(surface, WHITE, (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), 2, 15)
+
+        # --- EFECTO VISUAL BEER WATCH (Zona Amarilla Elegante) ---
+        if getattr(self.paddle1, 'is_drunk', False):
+            pygame.draw.rect(surface, (95, 75, 0), (0, 0, SCREEN_WIDTH//2, SCREEN_HEIGHT))
+            
+        if getattr(self.paddle2, 'is_drunk', False):
+            pygame.draw.rect(surface, (95, 75, 0), (SCREEN_WIDTH//2, 0, SCREEN_WIDTH//2, SCREEN_HEIGHT))
         
         # Dibujar Portales
         if self.portals_enabled:
@@ -4242,25 +4361,46 @@ class Game:
 
     def _draw_hourglass(self, surface):
         px = 4
-        colors = {1: (50, 150, 255), 2: RED, 3: PURPLE, 4: WHITE, 5: YELLOW, 6: ORANGE}
-        
-        # Elegir matriz y color según la skin del reloj amarillo (tipo 5)
-        if self.hourglass_type == 5 and self.yellow_watch_skin_idx == 1:
+        colors = {1: (50, 150, 255), 2: RED, 3: PURPLE, 4: WHITE, 5: YELLOW, 6: ORANGE, 7: GOLD}
+
+        # Elegir matriz y color base
+        if self.hourglass_type == 5 and getattr(self, 'yellow_watch_skin_idx', 0) == 1:
             matrix = assets.CROSS_MATRIX
             draw_color = BROWN
+        elif self.hourglass_type == 7:
+            matrix = assets.BEER_MATRIX
+            draw_color = colors[self.hourglass_type]
         else:
             matrix = assets.HOURGLASS_MATRIX
-            draw_color = colors[self.hourglass_type]
-            
-        # Calcular centro dinámicamente según el tamaño de la matriz
+            draw_color = colors.get(self.hourglass_type, WHITE)
+
+        # Calcular centro dinámicamente
         rows = len(matrix)
         cols = len(matrix[0])
         sx = self.hourglass_rect.centerx - (cols * px) // 2
         sy = self.hourglass_rect.centery - (rows * px) // 2
-        
+
+        # Paleta específica para los detalles del reloj de cerveza
+        beer_colors = {
+            1: (30, 30, 30),      # Negro (Bordes)
+            2: (255, 255, 255),   # Blanco (Espuma)
+            3: (252, 215, 3),     # Amarillo (Líquido superior)
+            4: (235, 137, 21),    # Naranja (Líquido inferior)
+            5: (140, 206, 235)    # Celeste (Vidrio y asa)
+        }
+
+        # Dibujar la matriz píxel por píxel aplicando los colores individuales
         for r in range(rows):
             for c in range(cols):
-                if matrix[r][c]: pygame.draw.rect(surface, draw_color, (sx+c*px, sy+r*px, px, px))
+                val = matrix[r][c]
+                if val: 
+                    # Si es la cerveza, usa su paleta detallada. Si no, usa el color plano del reloj.
+                    if self.hourglass_type == 7:
+                        px_color = beer_colors.get(val, draw_color)
+                    else:
+                        px_color = draw_color
+                        
+                    pygame.draw.rect(surface, px_color, (sx+c*px, sy+r*px, px, px))
 
     def _draw_x2_icon(self, surface):
         cx, cy, px = *self.x2_item_rect.center, 4

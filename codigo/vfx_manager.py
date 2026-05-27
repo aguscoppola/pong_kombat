@@ -45,6 +45,23 @@ class VFXManager:
             # Spawnear algunos dentro de la pantalla para efecto inmediato (v0.6.0 Fix)
             y = random.randint(-300, 300)
             self.particles.append(Particle(x, y, random.choice(colors), lifetime=6.0, is_confetti=True))
+    
+    def drunk_bubbles(self, paddle_rect):
+        if not self.enabled: return
+        
+        # Probabilidad del 15%
+        if random.random() < 0.06:
+            # Vuelven a nacer en cualquier parte adentro de la paleta
+            x = random.randint(paddle_rect.left, paddle_rect.right)
+            y = random.randint(paddle_rect.top, paddle_rect.bottom)
+            
+            p = Particle(x, y, GREEN, lifetime=random.uniform(0.5, 1.2))
+            
+            # Las velocidades originales, sutiles y erráticas
+            p.vy = random.uniform(-3.0, -1.0)
+            p.vx = random.uniform(-1.5, 1.5)
+            
+            self.particles.append(p)
 
     def clear(self):
         self.particles.clear()

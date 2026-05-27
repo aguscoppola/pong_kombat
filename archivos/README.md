@@ -2,12 +2,12 @@
 
 ¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con un **Modo Arcade** desafiante y una IA que aprende de tus movimientos.
 
-## 🔭 ¿Qué hay de nuevo en la v0.6.1?
-¡La **Persistence & Credits Update** ha llegado! 💾✨
-*   **Sistema de Guardado:** ¡Tu progreso ya no se borra! El juego guarda automáticamente tu victoria en el modo Arcade, la corona desbloqueada, el estado del tutorial y tus ajustes de volumen/idioma. 💾
-*   **Panel de Créditos:** Descubre quién está detrás del juego haciendo clic en el nuevo botón "+" del menú principal. 🎖️
-*   **Balance de Combate:** Sistema de restricción de poderes activos para evitar ventajas injustas. ⚖️
-*   **IA Mejorada:** Ahora la IA detecta y defiende las pelotas fantasmales, además de tener una letalidad absoluta con proyectiles críticos. 🤖
+## 🔭 ¿Qué hay de nuevo en esta versión?
+¡Llegó la **Spectral & Beer Update**! 👻🍻
+* **Nuevo Poder Espectral:** ¡Una habilidad letal se suma al arsenal! Aprovechá este poder oscuro para realizar teletransportaciones agresivas y ataques sorpresa que dejarán a tu oponente sin reacción. 🌌
+* **El Reloj Cerveza (BEER):** Un nuevo modificador entra a la cancha. Al agarrarlo, emborracharás a tu rival. A los jugadores humanos les invierte los controles temporalmente, y a la IA le provoca un pánico de 2 segundos seguido de una miopía táctica. ¡Salud! 🍺😵‍💫
+* **IA Más Inteligente y Realista:** La máquina recibió una mejora masiva en su cerebro. Ahora sabe exactamente cómo usar y defenderse del poder Espectral, y reacciona de forma "humana" y torpe cuando sufre los efectos del alcohol en lugar de simplemente romperse. 🤖🧠
+* **Arreglo de Bugs y Mejoras:** Limpieza profunda del motor de físicas, solución a conflictos de colisiones y optimización general para que los combates fluyan a la perfección. 🛠️🐛
 
 ## 📂 Estructura del Proyecto
 *   **`main.py`**: El lanzador principal (ejecuta este archivo para jugar).

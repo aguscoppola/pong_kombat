@@ -1,6 +1,8 @@
 import pygame
 import os
 import sys
+import math     # <-- IMPORTANTE: Lo usamos para fabricar las ondas
+import struct   # <-- IMPORTANTE: Lo usamos para empaquetar los bytes
 
 class AudioManager:
     def __init__(self):
@@ -42,10 +44,49 @@ class AudioManager:
             "sleep_shoot": ("sleep_shoot.wav", 0.7),
             "sleep": ("sleep.wav", 0.7),
             "rainy": ("rainy.wav", 0.03),
-            "thunder": ("thunder.wav", 0.8)
+            "thunder": ("thunder.wav", 0.8),
+            "espectral": ("espectral.wav", 0.8),
+            "glup": ("glup.wav", 0.8)  # <-- AGREGAMOS LA CERVEZA ACÁ
         }
         
         pygame.mixer.set_num_channels(32)
+    # --- NUEVA FUNCIÓN: EL SINTETIZADOR DE 8-BITS ---
+    def _generate_retro_gulp(self):
+        """Genera matemáticamente un sonido chiptune de trago (onda cuadrada con pitch-bend)"""
+        sample_rate = 22050  # Frecuencia estándar retro
+        num_glugs = 4        # Cantidad de "glu" en la ráfaga
+        glug_duration = 0.12 # Duración de cada trago en segundos
+        
+        samples_per_glug = int(sample_rate * glug_duration)
+        buffer = bytearray()
+        
+        for g in range(num_glugs):
+            phase = 0.0
+            for i in range(samples_per_glug):
+                t = i / samples_per_glug  # Progreso del glug actual (0.0 a 1.0)
+                
+                # Frecuencia base empieza en 140Hz y sube a 450Hz para dar efecto burbuja
+                freq = 140 + (310 * t)
+                
+                phase += (2 * math.pi * freq) / sample_rate
+                
+                # Onda cuadrada pura (estilo NES)
+                sample = 12000 if math.sin(phase) > 0 else -12000
+                
+                # Suavizado al final de cada trago para evitar un chasquido
+                if t > 0.8:
+                    sample = int(sample * (1.0 - (t - 0.8) / 0.2))
+                    
+                buffer.extend(struct.pack('<h', sample))
+                
+            # Micro silencio de separación entre tragos
+            silence_samples = int(sample_rate * 0.02)
+            for _ in range(silence_samples):
+                buffer.extend(struct.pack('<h', 0))
+                
+        return pygame.mixer.Sound(buffer=bytes(buffer))
+        
+    # ... (Acá abajo seguro siguen tus funciones play(), stop(), etc.)
 
     def _load_single_sound(self, name):
         """Carga un sonido individual de forma segura (Lazy Loading)"""

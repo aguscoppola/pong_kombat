@@ -423,16 +423,24 @@ class MenuManager:
         cy += 60
         draw_remove_option(self.game, cy, self.game.t("Enable |PURPLE|SLEEPING|WHITE| power", "Activar poder de |PURPLE|SUEÑO"), self.game.sleeping_power_enabled, self.game.sleeping_power_rect, self.game.sleeping_power_text_rect, active_color=SLEEP_PURPLE, offset=off, surface=surface)
         
+        # --- PODER ESPECTRAL ---
         cy += 60
-        draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|REVOLVER|WHITE| power", "Activar poder de |GRAY|REVÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100,100,100), offset=off, surface=surface)
+        draw_remove_option(self.game, cy, self.game.t("Enable |WHITE|SPECTRAL|WHITE| power", "Activar poder de |WHITE|ESPECTRO"), self.game.espectral_power_enabled, self.game.espectral_power_rect, self.game.espectral_power_text_rect, active_color=(0, 0, 0), offset=off, surface=surface)
+# --- PODER REVÓLVER ---
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |BROWN|RE|GRAY|VOLVER|WHITE| power", "Activar poder de |BROWN|RE|GRAY|VÓLVER"), self.game.revolver_enabled, self.game.revolver_rect, self.game.revolver_text_rect, active_color=(100, 100, 100), offset=off, surface=surface)
         if self.game.revolver_enabled:
-            cy += 60
-            self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, sub_val=f"{int(self.game.revolver_prob_options[self.game.revolver_prob_idx]*100)}%", text_rect=self.game.revolver_prob_text_rect)
+             cy += 60
+             self._draw_sub_selector(cy, self.game.t(" - Probability of appear:", " - Probabilidad de aparición:"), self.game.revolver_prob_names[self.game.revolver_prob_idx], self.game.revolver_prob_rect, off, ox, lm, surface, sub_val=f"{int(self.game.revolver_prob_options[self.game.revolver_prob_idx]*100)}%", text_rect=self.game.revolver_prob_text_rect)
 
         # 2. Clocks
         cy += 60
         draw_remove_option(self.game, cy, self.game.t("Enable |ORANGE| ORANGE |WHITE| watch", "Activar reloj |ORANGE| NARANJA"), self.game.orange_watch_enabled, self.game.orange_watch_rect, self.game.orange_watch_text_rect, active_color=ORANGE, offset=off, surface=surface)
 
+        # --- NUEVO RELOJ CERVEZA ---
+        cy += 60
+        draw_remove_option(self.game, cy, self.game.t("Enable |GOLD| BEER |WHITE| watch", "Activar reloj de |GOLD| CERVEZA"), self.game.beer_watch_enabled, self.game.beer_watch_rect, self.game.beer_watch_text_rect, active_color=GOLD, offset=off, surface=surface)
+        
         # 3. Climates
         cy += 60
         draw_remove_option(self.game, cy, self.game.t("Enable |GRAY|CLOUDY |WHITE|day", "Activar día |GRAY|NUBLADO"), self.game.cloudy_day_enabled, self.game.cloudy_day_rect, self.game.cloudy_day_text_rect, active_color=GRAY, offset=off, surface=surface)
@@ -799,9 +807,9 @@ class MenuManager:
                     (self.game.endless_chaos_accumulation_text_rect, "chaos_accumulation")
                 ])
             areas.extend([
-                (self.game.orange_watch_text_rect, "orange_watch"), (self.game.tictactoe_text_rect, "tictactoe"), (self.game.start_x2_text_rect, "start_x2"),
+                (self.game.orange_watch_text_rect, "orange_watch"), (self.game.beer_watch_text_rect, "beer_watch"), (self.game.tictactoe_text_rect, "tictactoe"), (self.game.start_x2_text_rect, "start_x2"),
                 (self.game.magnet_power_text_rect, "magnet_power"), (self.game.ghost_power_text_rect, "ghost_power"), 
-                (self.game.ghost_identical_text_rect, "ghost_identical"), (self.game.gum_power_text_rect, "gum_power"),
+                (self.game.ghost_identical_text_rect, "ghost_identical"), (self.game.gum_power_text_rect, "gum_power"), (self.game.espectral_power_text_rect, "espectral_power"),
                 (self.game.experimental_golden_goal_text_rect, "exp_golden_goal"), (self.game.floating_planets_text_rect, "floating_planets"), 
                 (self.game.destructible_planets_text_rect, "destructible_planets"), (self.game.portals_text_rect, "portals"), 
                 (self.game.portals_vertical_text_rect, "portals_vertical"), (self.game.more_portals_text_rect, "more_portals"),

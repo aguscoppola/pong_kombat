@@ -26,6 +26,20 @@ HOURGLASS_MATRIX = [
     [1,1,1,1,1,1,1],
 ]
 
+# --- Reloj Cerveza Completo a Color (11x10) ---
+BEER_MATRIX = [
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+    [0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0],
+    [1, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0],
+    [1, 2, 1, 2, 3, 3, 1, 0, 0, 1, 0],
+    [0, 1, 3, 3, 3, 3, 1, 0, 5, 1, 0],
+    [0, 1, 4, 1, 4, 4, 1, 2, 5, 1, 1],
+    [0, 1, 4, 1, 4, 4, 1, 2, 5, 1, 1],
+    [0, 1, 4, 1, 4, 4, 1, 5, 5, 1, 0],
+    [0, 1, 5, 5, 5, 5, 1, 1, 1, 0, 0],
+    [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+]
+
 # --- Cruz Bíblica (10x8) ---
 CROSS_MATRIX = [
     [0,0,0,1,1,0,0,0],
@@ -57,6 +71,15 @@ X2_MATRIX_2 = [
     [1,1,1,1,1]
 ]
 
+# Mapa de colores para dibujar la matriz
+BEER_COLORS = {
+    1: (30, 30, 30),      # Negro
+    2: (255, 255, 255),   # Blanco
+    3: (252, 215, 3),    # Amarillo Cerveza
+    4: (235, 137, 21),    # Naranja Cerveza
+    5: (140, 206, 235)    # Celeste Vidrio
+}
+
 # --- Configuración de Tooltips ---
 TOOLTIPS = {
     "EN": {
@@ -80,6 +103,7 @@ TOOLTIPS = {
         "destructible_planets": ["Planets can be destroyed if they are hit by the ball.", "They will explode and respawn in the next round."],
         "planet_resistance": ["Sets how many hits a planet can take before exploding.", "Based on the astronomical hierarchy (Moon to Star)."],
         "orange_watch": ["Orange Watch: If hit by the ball, it triggers", "the Demolition Ball effect instantly!"],
+        "beer_watch": ["Beer Watch: Don't drink beer! If you do", "your controls will reverse until you grab another watch", "or score a goal."],
         "magnet_power": ["MAGNET: The ball is attracted to your paddle", "center like a planet when in your zone.", "Allows steering the ball after hitting it."],
         "exp_golden_goal": ["Random GOLDEN Goal: 10% chance per round", "to become Sudden Death. Next goal wins the match!"],
         "x2_multiplier": ["X2 Multiplier: 50% chance to spawn an X2 icon at the start.", "Appears after the first hit. Capturing it turns the ball GOLD", "and the next goal will be worth 2 points."],
@@ -92,6 +116,7 @@ TOOLTIPS = {
         "more_portals": ["Add RED and GREEN PORTALS (Cross-connection)."],
         "revolver": ["REVOLVER: Orbiting item at center.", "Allows shooting 3 BULLETS that destroy", "the enemy paddle temporarily."],
         "gum_power": ["GUM: The ball sticks to your paddle!", "You have 3 seconds to aim and shoot.", "Consumes charges per second."],
+        "espectral_power": ["SPECTRAL: Teleport directly to the ball!", "Reduces your paddle speed by 15% per use.", "Perfect for instant defense or surprise attacks."],
         "start_x2": ["X2 Multiplier: 50% initial chance.", "After first hit, capture the icon to make", "the next goal worth 2 points."],
         "sleeping_power": ["SLEEP: Shoots a large violet projectile that", "splits into 3 at mid-map.", "Immobilizes opponent for 2 hits if caught."],
         "cloudy_day": ["CLOUDY DAY: Random clouds will cross the field.", "They are 100% opaque, covering ball and paddles.", "They speed up exponentially after 30 hits!"],
@@ -122,6 +147,7 @@ TOOLTIPS = {
         "destructible_planets": ["Los planetas pueden destruirse si reciben golpes.", "Explotarán y reaparecerán en la siguiente ronda."],
         "planet_resistance": ["Define cuántos golpes aguanta un planeta.", "Basado en jerarquía (Luna hasta Estrella)."],
         "orange_watch": ["Reloj Naranja: ¡Si la bola lo toca, activa", "la Bola de Demolición al instante!"],
+        "beer_watch": ["Reloj de Cerveza: ¡No bebas cerveza! Si lo haces", "tus controles se invertirán hasta que agarres otro", "reloj o anotes un gol."],
         "magnet_power": ["IMÁN: La bola es atraída al centro de tu paleta", "como un planeta. Permite dirigir el tiro."],
         "exp_golden_goal": ["Gol de Oro aleatorio: 10% de probabilidad", "de muerte súbita. ¡El próximo gol gana!"],
         "x2_multiplier": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
@@ -134,6 +160,7 @@ TOOLTIPS = {
         "more_portals": ["Añade portales ROJOS y VERDES (Conexión cruzada)."],
         "revolver": ["REVÓLVER: Ítem que orbita el centro.", "Permite disparar 3 BALAS que destruyen", "la paleta enemiga temporalmente."],
         "gum_power": ["CHICLE: ¡La bola se queda pegada a tu paleta!", "Tienes 3 segundos para apuntar y disparar.", "Consume cargas por segundo."],
+        "espectral_power": ["ESPECTRAL: ¡Teletranspórtate directo a la pelota!", "Reduce tu velocidad un 15% con cada uso.", "Ideal para defender o contraatacar por sorpresa."],
         "start_x2": ["Multiplicador de X2: 50% de probabilidad inicial.", "Tras el primer golpe, captura el ícono para que", "el próximo gol valga 2 puntos."],
         "sleeping_power": ["SUEÑO: Lanza un gran proyectil violeta que", "se divide en 3 al cruzar la mitad.", "Inmoviliza al rival por 2 toques si lo atrapa."],
         "cloudy_day": ["DÍA NUBLADO: Nubes aleatorias cruzan el campo.", "Son 100% opacas, tapando pelota y paletas.", "¡Se aceleran exponencialmente tras 30 golpes!"],

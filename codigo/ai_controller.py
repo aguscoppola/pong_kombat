@@ -12,6 +12,8 @@ class AIController:
         p2 = self.game.paddle2
         p1 = self.game.paddle1
 
+        p2.is_ai = True
+
         # 1. Prioridad: Determinar objetivo de la pelota (Seguir / Anticipar)
         target_y = None
         # Filtrar pelotas: Ignorar las propias pelotas fantasmas siempre
@@ -108,8 +110,42 @@ class AIController:
         # 4. Movimiento final
         final_y = target_y if target_y is not None else SCREEN_HEIGHT // 2
         final_y += dodge_offset
+
+        # --- NUEVO: LÓGICA DE BORRACHERA (Cerveza ID 7) ---
+        if getattr(p2, 'is_drunk', False):
+            # Inicializamos cronómetro si recién se emborracha
+            if not hasattr(p2, 'drunk_timer'):
+                p2.drunk_timer = 2.0  # 2 segundos de pánico
+                p2.drunk_error_offset = 0
+            
+            p2.drunk_timer -= dt
+            
+            # FASE 1: Pánico (Se mueve aleatoriamente sin importar la pelota)
+            if p2.drunk_timer > 0:
+                should_meditate = False # Anulamos la meditación violeta si está en pánico
+                if not p2.is_stuck:
+                    # Mueve la paleta arriba o abajo al azar
+                    if random.random() < 0.5:
+                        p2.move(-1, dt, PADDLE_SPEED)
+                    else:
+                        p2.move(1, dt, PADDLE_SPEED)
+                return # Cortamos acá para que no haga el movimiento normal de abajo
+                
+            # FASE 2: Adaptación Torpe
+            else:
+                # Cada tanto le cambiamos el margen de error para que tiemble/erre
+                if random.random() < 0.05: 
+                    p2.drunk_error_offset = random.randint(-60, 60)
+                
+                # Le sumamos el error a la posición final que calculó la IA
+                final_y += p2.drunk_error_offset
+        else:
+            # Reseteamos si se le fue el efecto
+            if hasattr(p2, 'drunk_timer'):
+                del p2.drunk_timer
+        # --------------------------------------------------
         
-        # Lógica de Meditación para el Reloj Violeta (v0.7.2)
+# Lógica de Meditación para el Reloj Violeta (v0.7.2)
         is_purple = False
         if self.game.watches_kept_enabled:
             is_purple = (self.game.p2_zone_type == 3)
@@ -129,10 +165,38 @@ class AIController:
             if not has_threat and ball_safe:
                 should_meditate = True
 
-        if not p2.is_stuck and not should_meditate:
-            if final_y < p2.rect.centery - 10: p2.move(-1, dt, PADDLE_SPEED)
-            elif final_y > p2.rect.centery + 10: p2.move(1, dt, PADDLE_SPEED)
+        # --- LÓGICA DE BORRACHERA (Cerveza ID 7) ---
+        if getattr(p2, 'is_drunk', False):
+            # 1. Inicializamos el estado al agarrar la cerveza
+            if not hasattr(p2, 'drunk_timer'):
+                p2.drunk_timer = 2.0  # Cooldown de 2 segundos clavados
+                p2.drunk_error_offset = random.choice([-20, 20]) # Desfase fijo de 20px
+            
+            p2.drunk_timer -= dt
+            
+            # 2. Cooldown (Los primeros 2 segundos)
+            if p2.drunk_timer > 0:
+                should_meditate = False 
+                if not p2.is_stuck:
+                    # Tiembla en el lugar pero NO intenta seguir a la pelota
+                    p2.move(random.choice([-1, 1]), dt, PADDLE_SPEED)
+                return # Cortamos la ejecución acá
+                
+            # 3. Termina el cooldown: le aplicamos el desfase a su puntería
+            else:
+                final_y += p2.drunk_error_offset
+        else:
+            # Reseteamos si ya se le pasó el efecto
+            if hasattr(p2, 'drunk_timer'):
+                del p2.drunk_timer
+        # --------------------------------------------------
 
+        # --- MOVIMIENTO FINAL DE LA IA ---
+        if not p2.is_stuck and not should_meditate:
+            if final_y < p2.rect.centery - 10: 
+                p2.move(-1, dt, PADDLE_SPEED) # Va para arriba
+            elif final_y > p2.rect.centery + 10: 
+                p2.move(1, dt, PADDLE_SPEED)  # Va para abajo
         # 5. Lógica de activación de poderes
         # SLEEP
         if p2.power_active == POWER_SLEEP:
@@ -162,13 +226,21 @@ class AIController:
             else:
                 p2.power_active = POWER_NONE
 
+                # --- PODER ESPECTRAL (Teletransportación Asesina) ---
+        if p2.power_active == POWER_ESPECTRAL and getattr(p2, 'espectral_ammo', 0) > 0:
+            if valid_balls and target_ball.vx > 0 and not getattr(target_ball, 'is_orange', False):
+                # Espera a que cruce la mitad de la cancha (0.5) y tiene 20% de chances de gatillar rápido
+                if target_ball.rect.centerx > SCREEN_WIDTH * 0.5 and random.random() < 0.2:
+                    self.game.activate_paddle_power(p2, 2)
+
         # Activar poder si está guardado (Estrategia)
         if p2.power_stored != POWER_NONE:
             # Activar chicle si la pelota viene de frente
             if p2.power_stored == POWER_GUM and valid_balls and target_ball.vx > 0:
                 if abs(p2.rect.centery - target_ball.rect.centery) < 50:
                     self.game.activate_paddle_power(p2, 2)
-            # Activar revólver inmediatamente para tenerlo listo
-            elif p2.power_stored == POWER_REVOLVER:
+            
+            # Activar revólver o espectral inmediatamente para tenerlo listo
+            elif p2.power_stored in [POWER_REVOLVER, POWER_ESPECTRAL]:
                 self.game.activate_paddle_power(p2, 2)
 

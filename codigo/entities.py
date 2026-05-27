@@ -67,6 +67,13 @@ class Paddle:
         # Variables para Reloj Violeta (v0.7.2)
         self.purple_still_timer = 0.0
         self.last_y = y
+        # --- Variables para Poder ESPECTRAL ---
+        self.espectral_ammo = 0
+        self.is_espectral_active = False
+        self.espectral_start_time = 0
+        self.espectral_speed_penalty = 0.0  # <-- ¡Acá la sumás!
+        #-- Variable para el estado de borrachera (v0.8.1)
+        self.is_drunk = False
 
     def reset(self):
         self.rect.height = PADDLE_HEIGHT
@@ -98,6 +105,14 @@ class Paddle:
         self.sleep_timer = 0.0
         self.purple_still_timer = 0.0
         self.last_y = self.rect.y
+        # Reset de Espectral
+        self.espectral_ammo = 0
+        self.is_espectral_active = False
+
+        # Reset de Espectral (Adentro de def reset)
+        self.espectral_ammo = 0
+        self.is_espectral_active = False
+        self.espectral_speed_factor = 1.0  # <-- ¡Arranca siempre al 100% en cada punto!
 
     def grant_random_power(self, game):
         if self.power_active in [POWER_SHIELD, POWER_MAGNET]:
@@ -110,7 +125,9 @@ class Paddle:
             (POWER_MAGNET, GRAY, 25 if game.equal_powers_enabled else 15, not game.magnet_power_enabled),
             (POWER_GHOST, GHOST_COLOR, 25 if game.equal_powers_enabled else 15, not game.ghost_power_enabled),
             (POWER_GUM, GUM_PINK, 25 if game.equal_powers_enabled else 15, not game.gum_power_enabled),
-            (POWER_SLEEP, SLEEP_PURPLE, 25 if game.equal_powers_enabled else 10, not game.sleeping_power_enabled)
+            (POWER_SLEEP, SLEEP_PURPLE, 25 if game.equal_powers_enabled else 10, not game.sleeping_power_enabled),
+            # --- ACÁ AGREGAMOS EL ESPECTRAL ---
+            (POWER_ESPECTRAL, (100, 100, 100), 25 if game.equal_powers_enabled else 15, not game.espectral_power_enabled)
         ]
         available_powers = [p for p in all_p if not p[3]]
         if not available_powers: return
@@ -151,6 +168,13 @@ class Paddle:
                     self.gum_charges = 3
                     self.color = GUM_PINK
                     self.power_stored = POWER_NONE
+
+                    # --- AUTO-ACTIVAR PODER ESPECTRAL ---
+                elif p_type == POWER_ESPECTRAL:
+                    self.power_active = POWER_ESPECTRAL 
+                    self.espectral_ammo = 1 # Te da 1 carga de teletransporte
+                    self.color = (100, 100, 100) # Se pinta de gris
+                    self.power_stored = POWER_NONE
                 break
 
     def activate_power(self, game):
@@ -177,9 +201,20 @@ class Paddle:
                 self.color = SLEEP_PURPLE
 
     def move(self, direction, dt, paddle_speed):
-        if self.sleep_hits_left > 0: return # Bloqueo por Sueño (v0.6.0)
-        self.y_float += direction * (paddle_speed * self.speed_multiplier) * dt
+        if self.sleep_hits_left > 0: return 
+        
+        # --- LÓGICA DE VELOCIDAD ESPECTRAL ---
+        factor = getattr(self, 'espectral_speed_factor', 1.0)
+        velocidad_final = paddle_speed * self.speed_multiplier * factor
+        
+        # --- MAGIA BORRACHA (BEER WATCH) ---
+        # Si la paleta está borracha y NO es la IA, invertimos la dirección
+        if getattr(self, 'is_drunk', False) and not getattr(self, 'is_ai', False):
+            direction *= -1
+        
+        self.y_float += direction * velocidad_final * dt
         self.rect.y = int(self.y_float)
+        
         if self.rect.top < 0: 
             self.rect.top = 0 
             self.y_float = float(self.rect.y)
@@ -266,8 +301,18 @@ class Paddle:
             
         self.last_y = self.rect.y
 
+        # --- Temporizador del Poder ESPECTRAL ---
+        if self.is_espectral_active:
+            tiempo_actual = pygame.time.get_ticks()
+            if tiempo_actual - self.espectral_start_time >= 250: # 0.25 segundos
+                self.is_espectral_active = False
+                self.rect.x = self.original_x # Vuelve a su carril X original
+                if self.power_active == POWER_NONE:
+                    self.color = WHITE # Resetea el color si no tiene otro poder encima
+
     def draw(self, surface, game):
         if self.is_destroyed: return
+        
         if self.power_active == POWER_ORANGE and game.orange_skin_idx == 1:
             pygame.draw.rect(surface, WHITE, self.rect)
             belt_h = 10
@@ -301,8 +346,13 @@ class Paddle:
             fz = pygame.font.SysFont("Arial", 16, bold=True)
             txt = fz.render("Zzz", True, WHITE)
             surface.blit(txt, (self.rect.centerx - txt.get_width()//2, self.rect.y - 20))
+        elif self.espectral_ammo > 0 or self.is_espectral_active:
+            # --- NUEVO Diseño del Poder ESPECTRAL Hoyo Negro ---
+            pygame.draw.rect(surface, (0, 0, 0), self.rect) # Negro Total (Relleno)
+            pygame.draw.rect(surface, (100, 100, 100), self.rect, 2) # Gris (Contorno)
         else:
             pygame.draw.rect(surface, self.color, self.rect)
+            
         if self.power_active == POWER_MAGNET:
             pygame.draw.rect(surface, RED, (self.rect.x, self.rect.y, self.rect.width, 10))
             pygame.draw.rect(surface, BLUE, (self.rect.x, self.rect.bottom - 10, self.rect.width, 10))

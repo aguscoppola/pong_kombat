@@ -9,7 +9,7 @@ def draw_rich_text(surface, text, pos, font, default_color=WHITE, max_width=None
         "BLUE": BLUE, "RED": RED, "PURPLE": PURPLE, "WHITE": WHITE,
         "YELLOW": YELLOW, "ORANGE": ORANGE, "GREEN": GREEN, "CYAN": CYAN,
         "GOLDEN": GOLD, "GOLD": GOLD, "MAG": BLUE, "NET": RED, "GHOST": GHOST_COLOR,
-        "PINK": PINK, "GUM_PINK": GUM_PINK, "GRAY": GRAY
+        "PINK": PINK, "GUM_PINK": GUM_PINK, "GRAY": GRAY, "BROWN": BROWN
     }
     
     line_height = font.get_linesize()
@@ -87,7 +87,11 @@ def draw_remove_option(game, y, label, is_active, rect, text_rect, active_color=
         pygame.draw.rect(surface, BLACK, rect)
         pygame.draw.rect(surface, WHITE, rect, 2)
         if is_active:
-            pygame.draw.rect(surface, active_color, rect.inflate(-10, -10))
+                if active_color == (0, 0, 0): # Caso especial: Poder Espectral
+                    pygame.draw.rect(surface, (0, 0, 0), rect.inflate(-10, -10))
+                    pygame.draw.rect(surface, (100, 100, 100), rect.inflate(-10, -10), 2)
+                else:
+                    pygame.draw.rect(surface, active_color, rect.inflate(-10, -10))
     else:
         rect.update(ox + 25, draw_y - 5, 30, 30)
         # Dibujar el cuadrado base (consistente con checkbox)

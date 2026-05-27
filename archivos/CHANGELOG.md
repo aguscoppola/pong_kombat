@@ -1,3 +1,65 @@
+# Changelog - PONG KOMBAT
+
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+# Changelog
+Todos los cambios notables de este proyecto se documentarán en este archivo.
+
+## [v0.8.1] - 2026-05-26
+
+### Añadido (Added)
+* **Reloj Cerveza (BEER WATCH - ID 7):** Nuevo modificador temporal que emborracha al rival. Invierte los controles de movimiento para los jugadores humanos.
+* **Poder Espectral (SPECTRAL):** Nueva habilidad ofensiva que permite realizar teletransportaciones tácticas de la pelota cuando cruza el medio campo, ideal para ataques sorpresa.
+
+### Cambiado (Changed)
+* **IA Mejorada (Cerebro Táctico):** La Inteligencia Artificial ahora sabe exactamente cómo usar el Poder Espectral (espera a que la pelota cruce el centro para gatillarlo). 
+* **IA Realista (Comportamiento Ebrio):** Se modificó la forma en la que la IA reacciona a la Cerveza. Ahora experimenta un *cooldown* de pánico de 2 segundos (convulsiona en el lugar) seguido de una miopía permanente (desfase de 20 píxeles al apuntar a la pelota).
+* **Interrupción de Meditación:** La IA ahora cancela automáticamente su intento de meditar (Reloj Violeta) si entra en estado de ebriedad y pánico.
+
+### Arreglado (Fixed)
+* **Conflicto de Motor Físico con IA:** Se solucionó un bug crítico en `entities.py` donde el motor forzaba la inversión matemática de dirección a la IA, obligándola a huir de la pelota. Se añadió un "escudo" (`is_ai`) para que procese su propia lógica de torpeza.
+* **Errores de Sintaxis e Indentación:** Se reestructuró el bloque de decisiones finales en `ai_controller.py` para evitar crasheos por bloques de código vacíos o mal indentados durante la evaluación de meditación.
+* **Optimización de Colisiones:** Limpieza general en la interacción entre la pelota y los relojes para garantizar la correcta asignación de sonidos (como la carga de `glup.wav` al impactar el Reloj ID 7).
+
+## [0.8.0.1] - 2026-05-23 (Hotfix)
+
+### Corregido
+- **Destello de Relámpago Infinito:** Reparado el bug crítico donde la pantalla se quedaba permanentemente en blanco si un rayo caía exactamente al terminar la partida o al pausar el juego en los menús. La reducción del temporizador se trasladó a la capa de dibujado (`draw`) y se blindó la opacidad con un límite estricto (`max(0, min(255, opacity))`) para evitar crasheos gráficos silenciosos.
+- **Inmunidad Injusta del Poder Verde:** Eliminado el fallo de balance donde las paletas con el poder Verde (Tamaño x2) eran inmortales a la pelota Naranja de demolición. Se reestructuró la jerarquía de colisiones en `game_engine.py` eliminando el bloque redundante que causaba un desvío físico inapropiado.
+- **Bug del "Ratón Hidra" y Crasheo de Actualización:** Solucionado el problema por el cual un ratón reaparecía de manera instantánea tras ser destruido por una pelota naranja. Se implementó un sistema de candado temporal (`mouse_banned`) por punto de juego y se corrigió un `AttributeError: 'NoneType' object has no attribute 'update'` transformando la comprobación en un entorno seguro (`elif self.mouse is not None:`).
+- **Orden de Inicialización de Audio:** Corregido el error fatal en el inicio del juego `'Game' object has no attribute 'audio'` que ocurría porque `load_progress()` intentaba ajustar el volumen maestro antes de que el objeto `AudioManager` fuera instanciado. Esto solventa la interrupción de carga del archivo `save_data.json` y asegura el correcto desbloqueo de modificadores como *Endless Chaos*.
+
+
+## [0.8.0] - 2026-05-22
+### The ENDLESS FUN Update (v0.8.0)
+Esta actualización introduce el desafiante modo "Sin Fin", expandiendo radicalmente la rejugabilidad de PONG KOMBAT. Además, trae nuevos modificadores caóticos y un minijuego clásico integrado directamente en la pista de combate.
+
+#### Agregado (Nuevo Modo y Modificadores)
+- **Modo SIN FIN (Endless Mode)**:
+    - Nuevo modo de supervivencia de oleadas infinitas donde el objetivo es sobrevivir el mayor tiempo posible.
+    - Dificultad extrema: Cada partida se juega a 1 solo punto (Muerte Súbita). Un error y vuelves a empezar.
+    - Progresión caótica: Se añade un modificador adicional en cada nivel superado.
+    - Sistema de recompensas integrado para los jugadores que logren rachas largas de victorias.
+- **Nuevo Modificador: ENDLESS CHAOS**:
+    - Un modificador extremo diseñado para llevar las físicas y la pantalla al límite absoluto.
+- **Nuevo Modificador: TIC-TAC-TOE (Ta-Te-Ti)**:
+    - Integración del clásico juego de Ta-Te-Ti directamente en el centro de la pista de combate, añadiendo una nueva capa estratégica a los rebotes y al control del centro del campo.
+
+#### Mejorado (UI, Tutoriales y UX)
+- **Tutorial Interactivo SIN FIN**:
+    - Nuevo botón de ayuda (`?`) dorado en el menú de selección Solo.
+    - Guía de 4 pasos con texto dinámico que se adapta si el jugador está en PC ("press space") o en un dispositivo móvil ("touch the screen").
+- **Motor de Texto y "Máquina de Escribir" (Typewriter)**:
+    - Soporte nativo para múltiples renglones (reconocimiento de `\n`) y centrado vertical automático.
+    - Los textos largos de los tutoriales ahora utilizan la tipografía `small_font` para una legibilidad perfecta.
+- **Efecto de Foco Visual (Manto Negro)**:
+    - Al abrir un tutorial, la pantalla se oscurece con un manto semitransparente, resaltando únicamente el botón relevante (ej. el botón dorado de "SIN FIN") para guiar la atención del jugador.
+
+#### Arreglado (Bugs y Estabilidad)
+- **Renderizado de Menús**: Se solucionó el bug de "pantalla negra" que ocurría al cambiar al estado del tutorial Endless.
+- **Fluidez de Texto**: Se reparó el bloqueo del temporizador del tutorial, permitiendo que la animación de la máquina de escribir fluya sin necesidad de que el jugador presione botones extras.
+
 ## [0.7.2] - 2026-05-18
 ### The Meditation, Arcade Rework & Web Sound Update (v0.7.2)
 Esta actualización rediseña por completo el Reloj Violeta con un sistema de meditación quieta, reestructura por completo el Modo Arcade con 7 niveles dinámicos con reglas específicas de puntaje (Golden Goal, Match Point, variantes climatológicas y peleas de jefe), desbloquea incondicionalmente el selector de nivel "TEST LEVEL" en el menú para facilitar las pruebas y **reactiva el sonido nativo en la versión Web Assembly para celulares y PC** con una arquitectura de insonorización segura ante excepciones.
