@@ -1,13 +1,16 @@
-¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal, modificadores climatológicos y una IA que no tiene piedad.
+# 🕹️ Pong Kombat v0.8.0 - ENDLESS FUN Update
 
-## 🔭 ¿Qué hay de nuevo en la v0.7.2?
-¡La **Meditation, Arcade Rework & Web Sound Update** ha llegado! 📱🌐🧘🔊
-*   **Campaña Arcade de 7 Niveles:** Rediseño total de la progresión para un solo jugador con 7 niveles con reglas, desafíos y modificadores únicos (Duelos de Gol de Oro, Match Point de ventaja, lluvias torrenciales y planetas flotantes).
-*   **Boss Final Definitivo (Nivel 7):** Combate definitivo a 6 puntos en una pista roja oscura de alta tensión con 4 portales, clima de tormentas extremas, planetas destructibles y munición de revólver al 100%.
-*   **Reloj Violeta y Mecánica de Meditación:** Olvídate de golpear la bola para conseguir poderes. Ahora, quédate completamente quieto por 3 segundos para meditar, cargando una barra violeta retro animada para invocar un estallido de partículas y recibir una habilidad especial. ¡La IA también comprende esto y medita estratégicamente!
-*   **Audio Web Totalmente Habilitado:** Los celulares y navegadores en la versión web ahora reproducen todos los efectos de sonido y la música de forma nativa y robusta. Insonorizado con bloques protectores ante políticas de Autoplay o restricciones de códecs.
-*   **Selector de Niveles (Test Level) Desbloqueado:** Salta directamente a probar cualquiera de los 7 niveles desde el menú Solo sin tener que completar la campaña primero.
-*   **Textos Enriquecidos a Color:** Los introductores pixel art de la campaña Arcade ahora se despliegan en atractivos colores vivos acordes al ambiente de cada nivel.
+¡El clásico "Pong" transformado en una batalla épica de reflejos, estrategia y caos dimensional! Ahora con combate letal, modificadores climatológicos, una IA que no tiene piedad y un **modo infinito** diseñado para llevar tus límites al extremo.
+
+---
+
+## 🚀 ¿Qué hay de nuevo en la v0.8.0?
+La **ENDLESS FUN Update** expande el universo de Pong Kombat:
+* **♾️ MODO SIN FIN (Endless):** Supervivencia infinita. Cada partida se juega a 1 solo punto (Muerte Súbita). La dificultad escala inyectando modificadores matemáticos procedimentales.
+* **❌ TIC-TAC-TOE Integration:** Minijuego estratégico 3x3 integrado en el centro de la pista con físicas de rebote reales.
+* **😈 ENDLESS CHAOS (Modificador Oculto):** El modificador más inestable del juego. *Se desbloquea al superar el Nivel 7 del Modo Sin Fin.*
+* **📖 Tutorial Interactivo:** Guía de 4 pasos con detección dinámica (PC/Móvil) y enfoque cinematográfico con manto negro (z-index exclusivo).
+* **🎨 UI Refinada:** Sistema de renderizado de texto multilínea con tipografía optimizada (`small_font`).
 
 ---
 

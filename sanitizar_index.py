@@ -71,6 +71,9 @@ def sanitizar_index():
     '''
     content = content.replace('<head>', '<head>\n' + fetch_interceptor)
 
+    # 5. Forzar todo el ecosistema Pygbag a usar el proxy de Vercel /cdn/ local para evitar bloqueos CORS
+    content = content.replace('https://pygame-web.github.io/cdn/', '/cdn/')
+
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
     print("Saneamiento base y robustecimiento de carga completado con éxito.")

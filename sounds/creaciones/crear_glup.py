@@ -2,6 +2,8 @@ import pygame
 import math
 import struct
 import time
+import wave  # <-- IMPORTANTE: Este módulo guarda el archivo
+import os
 
 def generate_retro_gulp():
     """Genera matemáticamente un sonido chiptune de trago"""
@@ -38,22 +40,34 @@ def generate_retro_gulp():
             
     return bytes(buffer)
 
+def save_wav_file(filename, data, sample_rate):
+    """Guarda los bytes crudos en un archivo .wav válido"""
+    # Configuramos los parámetros del archivo WAV: Mono, 2 bytes por muestra, sample rate
+    with wave.open(filename, 'wb') as wav_file:
+        wav_file.setnchannels(1)      # Mono
+        wav_file.setsampwidth(2)      # 2 bytes (16-bit signed)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(data)
+
 def main():
-    # 1. Inicializamos SOLO el mixer de audio en modo Mono (1 canal)
-    pygame.mixer.init(frequency=22050, size=-16, channels=1)
+    # Definimos la ruta de salida (asumimos que 'creaciones' está dentro de 'sounds')
+    output_filename = os.path.join("..", "glup.wav")
+    sample_rate = 22050
     
     print("Fabricando los bytes del sonido retro...")
     raw_audio = generate_retro_gulp()
     
-    # 2. Cargamos los bytes en un objeto de sonido de Pygame
+    print(f"Guardando archivo en {output_filename}...")
+    save_wav_file(output_filename, raw_audio, sample_rate)
+    
+    print("¡Archivo creado! Ahora puedes verlo en VS Code. 🍻")
+    print("Reproduciendo una vez para probar...")
+
+    # Opcional: También lo reproducimos para que lo escuches ahora
+    pygame.mixer.init(frequency=sample_rate, size=-16, channels=1)
     gulp_sound = pygame.mixer.Sound(buffer=raw_audio)
-    
-    print("¡Reproduciendo 'glu, glu, glu, glu'! 🍻")
     gulp_sound.play()
-    
-    # 3. Le damos tiempo para que suene antes de que el programa termine
-    time.sleep(1.0)
-    
+    time.sleep(1.5)
     pygame.mixer.quit()
 
 if __name__ == "__main__":
