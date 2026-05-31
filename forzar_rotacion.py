@@ -229,8 +229,9 @@ def fuerza_bruta_orientacion():
             const originalGetBoundingClientRect = HTMLCanvasElement.prototype.getBoundingClientRect;
             HTMLCanvasElement.prototype.getBoundingClientRect = function() {
                 const rect = originalGetBoundingClientRect.call(this);
-                const realW = descInnerWidth ? descInnerWidth.get.call(window) : window.visualViewport.width;
-                const realH = descInnerHeight ? descInnerHeight.get.call(window) : window.visualViewport.height;
+                // Usar visualViewport o screen para obtener dimensiones REALES, saltando el innerWidth falseado
+                const realW = window.visualViewport ? window.visualViewport.width : window.screen.width;
+                const realH = window.visualViewport ? window.visualViewport.height : window.screen.height;
                 const isPortrait = realH > realW;
                 
                 if (isPortrait) {
@@ -260,8 +261,8 @@ def fuerza_bruta_orientacion():
             if (descX && descY) {
                 Object.defineProperty(MouseEvent.prototype, 'clientX', {
                     get: function() {
-                        const realW = descInnerWidth ? descInnerWidth.get.call(window) : window.visualViewport.width;
-                        const realH = descInnerHeight ? descInnerHeight.get.call(window) : window.visualViewport.height;
+                        const realW = window.visualViewport ? window.visualViewport.width : window.screen.width;
+                        const realH = window.visualViewport ? window.visualViewport.height : window.screen.height;
                         const isPortrait = realH > realW;
                         if (isPortrait) {
                             return descY.get.call(this);
@@ -273,8 +274,8 @@ def fuerza_bruta_orientacion():
 
                 Object.defineProperty(MouseEvent.prototype, 'clientY', {
                     get: function() {
-                        const realW = descInnerWidth ? descInnerWidth.get.call(window) : window.visualViewport.width;
-                        const realH = descInnerHeight ? descInnerHeight.get.call(window) : window.visualViewport.height;
+                        const realW = window.visualViewport ? window.visualViewport.width : window.screen.width;
+                        const realH = window.visualViewport ? window.visualViewport.height : window.screen.height;
                         const isPortrait = realH > realW;
                         if (isPortrait) {
                             const realX = descX.get.call(this);
@@ -294,8 +295,8 @@ def fuerza_bruta_orientacion():
                 if (descTouchX && descTouchY) {
                     Object.defineProperty(Touch.prototype, 'clientX', {
                         get: function() {
-                            const realW = descInnerWidth ? descInnerWidth.get.call(window) : window.visualViewport.width;
-                            const realH = descInnerHeight ? descInnerHeight.get.call(window) : window.visualViewport.height;
+                            const realW = window.visualViewport ? window.visualViewport.width : window.screen.width;
+                            const realH = window.visualViewport ? window.visualViewport.height : window.screen.height;
                             const isPortrait = realH > realW;
                             if (isPortrait) {
                                 return descTouchY.get.call(this);
@@ -307,8 +308,8 @@ def fuerza_bruta_orientacion():
 
                     Object.defineProperty(Touch.prototype, 'clientY', {
                         get: function() {
-                            const realW = descInnerWidth ? descInnerWidth.get.call(window) : window.visualViewport.width;
-                            const realH = descInnerHeight ? descInnerHeight.get.call(window) : window.visualViewport.height;
+                            const realW = window.visualViewport ? window.visualViewport.width : window.screen.width;
+                            const realH = window.visualViewport ? window.visualViewport.height : window.screen.height;
                             const isPortrait = realH > realW;
                             if (isPortrait) {
                                 const realX = descTouchX.get.call(this);
