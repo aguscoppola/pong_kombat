@@ -50,30 +50,6 @@ def sanitizar_index():
             tar.close()'''
     content = content.replace(old_tar, new_tar)
 
-    # 4. Inyectar Interceptor de Fetch Global para mapear la descarga de pygame_ce de forma local en cualquier red (móviles)
-    fetch_interceptor = '''
-    <script type="text/javascript">
-        (function() {
-            const originalFetch = window.fetch;
-            window.fetch = function(input, init) {
-                let url = typeof input === 'string' ? input : (input && input.url ? input.url : "");
-                if (url && url.includes('pygame-web.github.io/cdn/') && url.includes('pygame_ce')) {
-                    const parts = url.split('/cdn/');
-                    const localUrl = window.location.origin + '/cdn/' + parts[parts.length - 1];
-                    console.log('LOG [INTERCEPTOR]: Redirigiendo descarga de Pygame a servidor local:', localUrl);
-                    return originalFetch(localUrl, init);
-                }
-                return originalFetch(input, init);
-            };
-            console.log("LOG: Interceptor de Fetch de Pygame cargado correctamente.");
-        })();
-    </script>
-    '''
-    content = content.replace('<head>', '<head>\n' + fetch_interceptor)
-
-    # 5. Forzar todo el ecosistema Pygbag a usar el proxy de Vercel /cdn/ local para evitar bloqueos CORS
-    content = content.replace('https://pygame-web.github.io/cdn/', '/cdn/')
-
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
     print("Saneamiento base y robustecimiento de carga completado con éxito.")

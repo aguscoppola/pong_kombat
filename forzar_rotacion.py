@@ -181,27 +181,7 @@ def fuerza_bruta_orientacion():
                 configurable: true
             });
 
-            // D. ENMASCARAR COMPLETAMENTE LAS DIMENSIONES DEL DOM DEL CANVAS (SIEMPRE 800x600)
-            // Esto evita que SDL2 altere la Viewport de WebGL al regresar de segundo plano
-            Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', {
-                get: function() { return 800; },
-                configurable: true
-            });
 
-            Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', {
-                get: function() { return 600; },
-                configurable: true
-            });
-
-            Object.defineProperty(HTMLCanvasElement.prototype, 'offsetWidth', {
-                get: function() { return 800; },
-                configurable: true
-            });
-
-            Object.defineProperty(HTMLCanvasElement.prototype, 'offsetHeight', {
-                get: function() { return 600; },
-                configurable: true
-            });
 
             console.log("LOG: Aislamiento virtual absoluto 800x600 de Canvas calibrado con éxito.");
         })();

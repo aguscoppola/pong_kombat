@@ -1,11 +1,11 @@
-<html lang="en-us"><script src="/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+<html lang="en-us"><script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
 
 print("""
 Loading pong_kombat from pong_kombat.apk
     Pygbag Version : 0.9.3
     Template Version : 0.9.3
     Python  : 3.12
-    CDN URL : /cdn/0.9.3/
+    CDN URL : https://pygame-web.github.io/cdn/0.9.3/
     Screen  : 1280x720
     Title   : pong_kombat
     Folder  : pong_kombat
@@ -125,25 +125,7 @@ asyncio.run( custom_site() )
 #
 # do not alter that comment block it is separating python code from html code
 # =============================================================================
-# --></script><head>
-
-    <script type="text/javascript">
-        (function() {
-            const originalFetch = window.fetch;
-            window.fetch = function(input, init) {
-                let url = typeof input === 'string' ? input : (input && input.url ? input.url : "");
-                if (url && url.includes('pygame-web.github.io/cdn/') && url.includes('pygame_ce')) {
-                    const parts = url.split('/cdn/');
-                    const localUrl = window.location.origin + '/cdn/' + parts[parts.length - 1];
-                    console.log('LOG [INTERCEPTOR]: Redirigiendo descarga de Pygame a servidor local:', localUrl);
-                    return originalFetch(localUrl, init);
-                }
-                return originalFetch(input, init);
-            };
-            console.log("LOG: Interceptor de Fetch de Pygame cargado correctamente.");
-        })();
-    </script>
-    <!--
+# --></script><head><!--
 //=============================================================================
 //
 //
@@ -174,7 +156,7 @@ config = {
     can_close : 0,
     archive : "pong_kombat",
     gui_debug : 3,
-    cdn : "/cdn/0.9.3/",
+    cdn : "https://pygame-web.github.io/cdn/0.9.3/",
     autorun : 0,
     PYBUILD : "3.12",
     fb_ar   :  1.77,
@@ -299,7 +281,7 @@ function show_infobox() {
     <script>
 /*
         if (navigator.serviceWorker)
-            navigator.serviceWorker.register("/cdn/0.9.3/pygbag0.9.3.js")
+            navigator.serviceWorker.register("https://pygame-web.github.io/cdn/0.9.3/pygbag0.9.3.js")
         else
             console.warn("Service workers not supported")
 */
@@ -390,7 +372,7 @@ frameborder="1"
                 mozallowfullscreen="true"
                 sandbox="allow-same-origin allow-top-navigation allow-scripts allow-pointer-lock"
                 allow="autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated"
-                src="/cdn/0.9.3/empty.html"
+                src="https://pygame-web.github.io/cdn/0.9.3/empty.html"
                 scrolling="yes">
             </iframe>
         </div>
@@ -622,27 +604,7 @@ frameborder="1"
                 configurable: true
             });
 
-            // D. ENMASCARAR COMPLETAMENTE LAS DIMENSIONES DEL DOM DEL CANVAS (SIEMPRE 800x600)
-            // Esto evita que SDL2 altere la Viewport de WebGL al regresar de segundo plano
-            Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', {
-                get: function() { return 800; },
-                configurable: true
-            });
 
-            Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', {
-                get: function() { return 600; },
-                configurable: true
-            });
-
-            Object.defineProperty(HTMLCanvasElement.prototype, 'offsetWidth', {
-                get: function() { return 800; },
-                configurable: true
-            });
-
-            Object.defineProperty(HTMLCanvasElement.prototype, 'offsetHeight', {
-                get: function() { return 600; },
-                configurable: true
-            });
 
             console.log("LOG: Aislamiento virtual absoluto 800x600 de Canvas calibrado con éxito.");
         })();
