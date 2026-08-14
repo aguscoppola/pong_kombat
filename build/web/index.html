@@ -571,16 +571,7 @@ frameborder="1"
                 descInnerHeight = { get: function() { return window.visualViewport ? window.visualViewport.height : 600; } };
             }
 
-            // B. Virtualizar window.innerWidth e innerHeight para reportar SIEMPRE 800x600 de forma absoluta
-            Object.defineProperty(window, 'innerWidth', {
-                get: function() { return 800; },
-                configurable: true
-            });
 
-            Object.defineProperty(window, 'innerHeight', {
-                get: function() { return 600; },
-                configurable: true
-            });
 
             // C. CANDADO DE RESOLUCIÓN INTERNA DEL CANVAS (SIEMPRE 800x600 COINCIDENTE CON PYTHON)
             const originalWidth = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'width') || {
